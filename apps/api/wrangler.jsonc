@@ -1,0 +1,40 @@
+{
+  // CampusPulse 360 - Worker unico (API + SPA). Plan Workers Free; sin servicios de pago.
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "campuspulse",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "assets": {
+    "directory": "../web/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "campuspulse-db",
+      // Se completa al crear la BD en la cuenta del equipo (wrangler d1 create).
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "ai": { "binding": "AI" },
+  // Free: maximo 5 Cron Triggers por cuenta. Usamos 2.
+  "triggers": { "crons": ["* * * * *", "0 12 * * *"] },
+  "vars": {
+    "ENVIRONMENT": "local",
+    "APP_VERSION": "0.1.0",
+    "GIT_COMMIT": "dev",
+    "AI_PROVIDER": "workers-ai",
+    "AI_MODEL": "@cf/openai/gpt-oss-20b",
+    "AI_DAILY_LIMIT": "60",
+    "WEBAUTHN_RP_ID": "localhost",
+    "WEBAUTHN_RP_NAME": "CampusPulse 360",
+    "WEBAUTHN_ORIGIN": "http://localhost:5173"
+  }
+  // Secretos (wrangler secret put / .dev.vars, nunca en el repo):
+  // GATEWAY_KEYS, BOOTSTRAP_TOKEN, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, OPENAI_API_KEY (opcional)
+}

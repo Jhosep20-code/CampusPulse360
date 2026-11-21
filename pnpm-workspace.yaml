@@ -1,0 +1,10 @@
+packages:
+  - apps/*
+  - packages/*
+  - tools/*
+
+# pnpm 12: solo estos paquetes pueden ejecutar scripts de instalacion.
+allowBuilds:
+  esbuild: true
+  workerd: true
+  sharp: true

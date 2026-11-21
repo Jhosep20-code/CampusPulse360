@@ -1,0 +1,19 @@
+{
+  "name": "campuspulse360",
+  "private": true,
+  "version": "0.1.0",
+  "description": "CampusPulse 360 - Gemelo digital inteligente del campus UTP Huancayo",
+  "type": "module",
+  "packageManager": "pnpm@12.14.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev:api": "pnpm --filter @campuspulse/api dev",
+    "dev:web": "pnpm --filter @campuspulse/web dev",
+    "build": "pnpm --filter @campuspulse/web build && pnpm --filter @campuspulse/api build",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test": "pnpm -r --if-present test",
+    "lint": "pnpm -r --if-present lint"
+  }
+}
