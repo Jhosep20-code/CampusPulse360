@@ -1,0 +1,103 @@
+{
+  "version": 2,
+  "skills": {
+    "docker-build-strategies": {
+      "source": "docker/skills",
+      "commit": "caeee2024f7527d890a29dd1732b62a112f56d0e",
+      "sourceType": "github",
+      "skillPath": "skills/docker-build-strategies/SKILL.md",
+      "computedHash": "a9cc5c3839d60ec8e7ca390292e1d4784bc69cf962413cb17364e7b5a46783e1"
+    },
+    "docker-project-foundations": {
+      "source": "docker/skills",
+      "commit": "caeee2024f7527d890a29dd1732b62a112f56d0e",
+      "sourceType": "github",
+      "skillPath": "skills/docker-project-foundations/SKILL.md",
+      "computedHash": "58fdbbc9acb9264cff9225135998e1fd47f74c28519e2707ee964d408db53afb"
+    },
+    "frameworks-on-cloudflare": {
+      "source": "cloudflare/skills",
+      "commit": "5108325ecceabc899c761e07aa617b09c02445ee",
+      "sourceType": "github",
+      "skillPath": "skills/frameworks-on-cloudflare/SKILL.md",
+      "computedHash": "2e327d257090fa5e9202c9cb3ac20eae51fa6f069d3a4b1c56a7e3a5d4dfc5bb"
+    },
+    "frontend-design": {
+      "source": "anthropics/skills",
+      "commit": "e4bb5d960d87126ff3b3a8af1a104b7db67560ba",
+      "sourceType": "github",
+      "skillPath": "skills/frontend-design/SKILL.md",
+      "computedHash": "83485963700bcf11d5bf78118facb301676b69d918fee2e45a95e7f1a2840f6c"
+    },
+    "threejs-assets": {
+      "source": "cesartevisual/threejs-skills",
+      "commit": "84f9bcb4bea1f7a28d57fe7f0af78f7f9c3dc467",
+      "sourceType": "github",
+      "skillPath": "skills/threejs-assets/SKILL.md",
+      "computedHash": "e9eff1ef877573695c2d6554a1f8dd693720382fb49f61524c31c38d6ade7e9d"
+    },
+    "threejs-lighting": {
+      "source": "cesartevisual/threejs-skills",
+      "commit": "84f9bcb4bea1f7a28d57fe7f0af78f7f9c3dc467",
+      "sourceType": "github",
+      "skillPath": "skills/threejs-lighting/SKILL.md",
+      "computedHash": "630b1d351bfa6b1c1cafb7fe27f57cc38934bf9fa9e971e186f6f2460694e4d8"
+    },
+    "threejs-materials": {
+      "source": "cesartevisual/threejs-skills",
+      "commit": "84f9bcb4bea1f7a28d57fe7f0af78f7f9c3dc467",
+      "sourceType": "github",
+      "skillPath": "skills/threejs-materials/SKILL.md",
+      "computedHash": "c6cc83f5d492c98bac444721b14561b4590084141c61ec5f64084570f01c7dbe"
+    },
+    "threejs-performance": {
+      "source": "cesartevisual/threejs-skills",
+      "commit": "84f9bcb4bea1f7a28d57fe7f0af78f7f9c3dc467",
+      "sourceType": "github",
+      "skillPath": "skills/threejs-performance/SKILL.md",
+      "computedHash": "063ea29b3ada42b145a2934562a028900cf97dcc08b1b98767561c85de0d6259"
+    },
+    "threejs-r3f": {
+      "source": "cesartevisual/threejs-skills",
+      "commit": "84f9bcb4bea1f7a28d57fe7f0af78f7f9c3dc467",
+      "sourceType": "github",
+      "skillPath": "skills/threejs-r3f/SKILL.md",
+      "computedHash": "4eca6f00838a79b0ae6a836d189506bfc1ccef733d71cfd34dafea340fc81a95"
+    },
+    "threejs-xr": {
+      "source": "cesartevisual/threejs-skills",
+      "commit": "84f9bcb4bea1f7a28d57fe7f0af78f7f9c3dc467",
+      "sourceType": "github",
+      "skillPath": "skills/threejs-xr/SKILL.md",
+      "computedHash": "4b212796cc2386b9d487af0f95fef507c3cf4d1b0a702a92d8385877458e5b1b"
+    },
+    "vercel-react-best-practices": {
+      "source": "vercel-labs/agent-skills",
+      "commit": "5a37a6329fbad3666c3207392a6a7c0110e92efb",
+      "sourceType": "github",
+      "skillPath": "skills/react-best-practices/SKILL.md",
+      "computedHash": "7991ed4fbecdac23f47c1a40c243e00a212a9e7f3604db93959b3ae11dffe299"
+    },
+    "web-design-guidelines": {
+      "source": "vercel-labs/agent-skills",
+      "commit": "5a37a6329fbad3666c3207392a6a7c0110e92efb",
+      "sourceType": "github",
+      "skillPath": "skills/web-design-guidelines/SKILL.md",
+      "computedHash": "5994e4cfd86144903d2ba750f862b9e36af15e3297aac983679e347b99f6cb71"
+    },
+    "workers-best-practices": {
+      "source": "cloudflare/skills",
+      "commit": "5108325ecceabc899c761e07aa617b09c02445ee",
+      "sourceType": "github",
+      "skillPath": "skills/workers-best-practices/SKILL.md",
+      "computedHash": "7f941bbc549454872a4c7c261bf75a1ef7aaa69666bc85cec91e97cf40c11cc6"
+    },
+    "wrangler": {
+      "source": "cloudflare/skills",
+      "commit": "5108325ecceabc899c761e07aa617b09c02445ee",
+      "sourceType": "github",
+      "skillPath": "skills/wrangler/SKILL.md",
+      "computedHash": "182e370d8c26e6bcb896a57a63e6cab006b253b9278cc3515f7b9db2c4d07661"
+    }
+  }
+}

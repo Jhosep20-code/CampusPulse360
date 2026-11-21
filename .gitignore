@@ -1,0 +1,31 @@
+# Dependencias
+node_modules/
+
+# Compilaciones y pruebas
+dist/
+build/
+coverage/
+
+# Secretos y credenciales
+.env
+.env.*
+!.env.example
+.dev.vars*
+*.pem
+*.key
+
+# Cloudflare
+.wrangler/
+
+# Configuracion local de Claude
+.claude/settings.local.json
+
+# Rubrica privada del curso
+docs/requisitos/*.pdf
+
+# Archivos temporales
+*.log
+Thumbs.db
+.DS_Store
+docs/referencias/utp-huancayo/fotos-originales/
+.mcp.json
