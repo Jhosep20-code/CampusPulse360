@@ -1,7 +1,31 @@
+import { app } from "./app";
 import type { Env } from "./env";
+import { runIncidentBot } from "./engine/incident-bot";
+import { runReportBot } from "./engine/report-bot";
+
 export default {
-  async fetch(_req: Request, env: Env): Promise<Response> {
-    const r = await env.DB.prepare("SELECT COUNT(*) AS n FROM spaces").first<{ n: number }>();
-    return Response.json({ spaces: r?.n ?? 0 });
+  async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const { pathname } = new URL(req.url);
+    if (pathname === "/api" || pathname.startsWith("/api/")) {
+      return app.fetch(req, env, ctx);
+    }
+    if (env.ASSETS) return env.ASSETS.fetch(req);
+    return new Response("Not Found", { status: 404 });
+  },
+
+  async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    const now = Date.now();
+    const run = async (name: string, fn: () => Promise<unknown>) => {
+      try {
+        await fn();
+      } catch (err) {
+        console.error(`cron ${name} fallo`, err);
+      }
+    };
+    if (controller.cron === "* * * * *") {
+      ctx.waitUntil(run("incident-bot", () => runIncidentBot(env, now)));
+    } else if (controller.cron === "0 12 * * *") {
+      ctx.waitUntil(run("report-bot", () => runReportBot(env, now)));
+    }
   },
 } satisfies ExportedHandler<Env>;

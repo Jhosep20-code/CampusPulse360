@@ -1,0 +1,751 @@
+{
+  "note": "Casos de evaluacion sobre datos SIMULADOS. Los de chat con ids dependen solo del catalogo; los de palabras clave aceptan cualquier estado del campus. El mock los cumple por diseno: mide el contrato, no la calidad del LLM.",
+  "diagnosis": [
+    {
+      "id": "diag-01",
+      "context": {
+        "simulated": true,
+        "now_lima": "2026-03-10 11:00 (martes, hora de Lima UTC-5)",
+        "incident": {
+          "id": "inc_eval1",
+          "title": "CO2 critico en Aula A301",
+          "severity": "critical",
+          "opened_at": 1773158400000
+        },
+        "space": {
+          "id": "SPC_3_A301",
+          "name": "Aula A301",
+          "type": "classroom",
+          "level": 3,
+          "capacity": 45
+        },
+        "rule": {
+          "id": "RULE_CO2_CRIT",
+          "name": "CO2 critico",
+          "metric": "co2_ppm",
+          "op": ">=",
+          "threshold": 1500,
+          "sustain_s": 60,
+          "severity": "critical"
+        },
+        "device_id": "DEV_3_A301",
+        "readings": {
+          "n": 30,
+          "window_min": 30,
+          "summary": {
+            "co2_ppm": {
+              "min": 900,
+              "max": 1710,
+              "last": 1710
+            },
+            "occupancy": {
+              "min": 30,
+              "max": 52,
+              "last": 52
+            },
+            "temp_c": {
+              "min": 23,
+              "max": 26.8,
+              "last": 26.8
+            }
+          }
+        },
+        "history": []
+      },
+      "expected": {
+        "severidad": "critical",
+        "causa_keywords": [
+          "ventilaci"
+        ]
+      }
+    },
+    {
+      "id": "diag-02",
+      "context": {
+        "simulated": true,
+        "now_lima": "2026-03-10 11:00 (martes, hora de Lima UTC-5)",
+        "incident": {
+          "id": "inc_eval2",
+          "title": "CO2 elevado sostenido en Aula A201",
+          "severity": "warning",
+          "opened_at": 1773158400000
+        },
+        "space": {
+          "id": "SPC_2_A201",
+          "name": "Aula A201",
+          "type": "classroom",
+          "level": 2,
+          "capacity": 40
+        },
+        "rule": {
+          "id": "RULE_CO2_HIGH",
+          "name": "CO2 elevado sostenido",
+          "metric": "co2_ppm",
+          "op": ">=",
+          "threshold": 1200,
+          "sustain_s": 120,
+          "severity": "warning"
+        },
+        "device_id": "DEV_2_A201",
+        "readings": {
+          "n": 30,
+          "window_min": 30,
+          "summary": {
+            "co2_ppm": {
+              "min": 700,
+              "max": 1310,
+              "last": 1290
+            },
+            "occupancy": {
+              "min": 10,
+              "max": 38,
+              "last": 38
+            },
+            "temp_c": {
+              "min": 22,
+              "max": 24.5,
+              "last": 24.5
+            }
+          }
+        },
+        "history": []
+      },
+      "expected": {
+        "severidad": "warning",
+        "causa_keywords": [
+          "ventilaci"
+        ]
+      }
+    },
+    {
+      "id": "diag-03",
+      "context": {
+        "simulated": true,
+        "now_lima": "2026-03-10 11:00 (martes, hora de Lima UTC-5)",
+        "incident": {
+          "id": "inc_eval3",
+          "title": "Temperatura alta sostenida en Laboratorio de IoT",
+          "severity": "warning",
+          "opened_at": 1773158400000
+        },
+        "space": {
+          "id": "SPC_4_LAB2",
+          "name": "Laboratorio de IoT",
+          "type": "lab",
+          "level": 4,
+          "capacity": 25
+        },
+        "rule": {
+          "id": "RULE_TEMP_HIGH",
+          "name": "Temperatura alta sostenida",
+          "metric": "temp_c",
+          "op": ">=",
+          "threshold": 28,
+          "sustain_s": 180,
+          "severity": "warning"
+        },
+        "device_id": "DEV_4_LAB2",
+        "readings": {
+          "n": 30,
+          "window_min": 30,
+          "summary": {
+            "temp_c": {
+              "min": 23,
+              "max": 31,
+              "last": 31
+            },
+            "occupancy": {
+              "min": 14,
+              "max": 16,
+              "last": 15
+            },
+            "co2_ppm": {
+              "min": 600,
+              "max": 780,
+              "last": 760
+            }
+          }
+        },
+        "history": []
+      },
+      "expected": {
+        "severidad": "warning",
+        "causa_keywords": [
+          "climatiz"
+        ]
+      }
+    },
+    {
+      "id": "diag-04",
+      "context": {
+        "simulated": true,
+        "now_lima": "2026-03-10 11:00 (martes, hora de Lima UTC-5)",
+        "incident": {
+          "id": "inc_eval4",
+          "title": "Temperatura alta sostenida en Laboratorio de computo",
+          "severity": "warning",
+          "opened_at": 1773158400000
+        },
+        "space": {
+          "id": "SPC_3_LAB1",
+          "name": "Laboratorio de computo",
+          "type": "lab",
+          "level": 3,
+          "capacity": 30
+        },
+        "rule": {
+          "id": "RULE_TEMP_HIGH",
+          "name": "Temperatura alta sostenida",
+          "metric": "temp_c",
+          "op": ">=",
+          "threshold": 28,
+          "sustain_s": 180,
+          "severity": "warning"
+        },
+        "device_id": "DEV_3_LAB1",
+        "readings": {
+          "n": 30,
+          "window_min": 30,
+          "summary": {
+            "temp_c": {
+              "min": 24,
+              "max": 29.4,
+              "last": 29.4
+            },
+            "occupancy": {
+              "min": 20,
+              "max": 28,
+              "last": 28
+            },
+            "co2_ppm": {
+              "min": 700,
+              "max": 950,
+              "last": 950
+            }
+          }
+        },
+        "history": []
+      },
+      "expected": {
+        "severidad": "warning",
+        "causa_keywords": [
+          "climatiz"
+        ]
+      }
+    },
+    {
+      "id": "diag-05",
+      "context": {
+        "simulated": true,
+        "now_lima": "2026-03-10 11:00 (martes, hora de Lima UTC-5)",
+        "incident": {
+          "id": "inc_eval5",
+          "title": "Sobreaforo en Aula A301",
+          "severity": "critical",
+          "opened_at": 1773158400000
+        },
+        "space": {
+          "id": "SPC_3_A301",
+          "name": "Aula A301",
+          "type": "classroom",
+          "level": 3,
+          "capacity": 45
+        },
+        "rule": {
+          "id": "RULE_OVERCAP",
+          "name": "Sobreaforo",
+          "metric": "occupancy_ratio",
+          "op": ">=",
+          "threshold": 1,
+          "sustain_s": 60,
+          "severity": "critical"
+        },
+        "device_id": "DEV_3_A301",
+        "readings": {
+          "n": 30,
+          "window_min": 30,
+          "summary": {
+            "occupancy": {
+              "min": 20,
+              "max": 52,
+              "last": 52
+            },
+            "co2_ppm": {
+              "min": 800,
+              "max": 1100,
+              "last": 1100
+            },
+            "temp_c": {
+              "min": 23,
+              "max": 25.9,
+              "last": 25.9
+            }
+          }
+        },
+        "history": []
+      },
+      "expected": {
+        "severidad": "critical",
+        "causa_keywords": [
+          "redistribu"
+        ]
+      }
+    },
+    {
+      "id": "diag-06",
+      "context": {
+        "simulated": true,
+        "now_lima": "2026-03-10 11:00 (martes, hora de Lima UTC-5)",
+        "incident": {
+          "id": "inc_eval6",
+          "title": "Sobreaforo en Auditorio",
+          "severity": "critical",
+          "opened_at": 1773158400000
+        },
+        "space": {
+          "id": "SPC_5_AUD",
+          "name": "Auditorio",
+          "type": "auditorium",
+          "level": 5,
+          "capacity": 150
+        },
+        "rule": {
+          "id": "RULE_OVERCAP",
+          "name": "Sobreaforo",
+          "metric": "occupancy_ratio",
+          "op": ">=",
+          "threshold": 1,
+          "sustain_s": 60,
+          "severity": "critical"
+        },
+        "device_id": "DEV_5_AUD",
+        "readings": {
+          "n": 30,
+          "window_min": 30,
+          "summary": {
+            "occupancy": {
+              "min": 60,
+              "max": 170,
+              "last": 170
+            },
+            "co2_ppm": {
+              "min": 700,
+              "max": 1150,
+              "last": 1150
+            },
+            "temp_c": {
+              "min": 22,
+              "max": 25,
+              "last": 25
+            }
+          }
+        },
+        "history": []
+      },
+      "expected": {
+        "severidad": "critical",
+        "causa_keywords": [
+          "redistribu"
+        ]
+      }
+    },
+    {
+      "id": "diag-07",
+      "context": {
+        "simulated": true,
+        "now_lima": "2026-03-10 11:00 (martes, hora de Lima UTC-5)",
+        "incident": {
+          "id": "inc_eval7",
+          "title": "CO2 elevado sostenido en Biblioteca",
+          "severity": "warning",
+          "opened_at": 1773158400000
+        },
+        "space": {
+          "id": "SPC_1_BIB",
+          "name": "Biblioteca",
+          "type": "library",
+          "level": 1,
+          "capacity": 80
+        },
+        "rule": {
+          "id": "RULE_CO2_HIGH",
+          "name": "CO2 elevado sostenido",
+          "metric": "co2_ppm",
+          "op": ">=",
+          "threshold": 1200,
+          "sustain_s": 120,
+          "severity": "warning"
+        },
+        "device_id": "DEV_1_BIB",
+        "readings": {
+          "n": 30,
+          "window_min": 30,
+          "summary": {
+            "co2_ppm": {
+              "min": 650,
+              "max": 1250,
+              "last": 1250
+            },
+            "occupancy": {
+              "min": 30,
+              "max": 70,
+              "last": 70
+            },
+            "temp_c": {
+              "min": 22,
+              "max": 24,
+              "last": 24
+            }
+          }
+        },
+        "history": []
+      },
+      "expected": {
+        "severidad": "warning",
+        "causa_keywords": [
+          "ventilaci"
+        ]
+      }
+    },
+    {
+      "id": "diag-08",
+      "context": {
+        "simulated": true,
+        "now_lima": "2026-03-10 11:00 (martes, hora de Lima UTC-5)",
+        "incident": {
+          "id": "inc_eval8",
+          "title": "Temperatura alta sostenida en Oficinas administrativas",
+          "severity": "warning",
+          "opened_at": 1773158400000
+        },
+        "space": {
+          "id": "SPC_5_OFI",
+          "name": "Oficinas administrativas",
+          "type": "office",
+          "level": 5,
+          "capacity": 20
+        },
+        "rule": {
+          "id": "RULE_TEMP_HIGH",
+          "name": "Temperatura alta sostenida",
+          "metric": "temp_c",
+          "op": ">=",
+          "threshold": 28,
+          "sustain_s": 180,
+          "severity": "warning"
+        },
+        "device_id": "DEV_5_OFI",
+        "readings": {
+          "n": 30,
+          "window_min": 30,
+          "summary": {
+            "temp_c": {
+              "min": 22,
+              "max": 28.8,
+              "last": 28.8
+            },
+            "occupancy": {
+              "min": 8,
+              "max": 9,
+              "last": 9
+            },
+            "co2_ppm": {
+              "min": 500,
+              "max": 640,
+              "last": 640
+            }
+          }
+        },
+        "history": []
+      },
+      "expected": {
+        "severidad": "warning",
+        "causa_keywords": [
+          "climatiz"
+        ]
+      }
+    },
+    {
+      "id": "diag-09",
+      "context": {
+        "simulated": true,
+        "now_lima": "2026-03-10 11:00 (martes, hora de Lima UTC-5)",
+        "incident": {
+          "id": "inc_eval9",
+          "title": "CO2 critico en Hall de ingreso",
+          "severity": "critical",
+          "opened_at": 1773158400000
+        },
+        "space": {
+          "id": "SPC_1_LOBBY",
+          "name": "Hall de ingreso",
+          "type": "lobby",
+          "level": 1,
+          "capacity": 120
+        },
+        "rule": {
+          "id": "RULE_CO2_CRIT",
+          "name": "CO2 critico",
+          "metric": "co2_ppm",
+          "op": ">=",
+          "threshold": 1500,
+          "sustain_s": 60,
+          "severity": "critical"
+        },
+        "device_id": "DEV_1_LOBBY",
+        "readings": {
+          "n": 30,
+          "window_min": 30,
+          "summary": {
+            "co2_ppm": {
+              "min": 800,
+              "max": 1560,
+              "last": 1520
+            },
+            "occupancy": {
+              "min": 40,
+              "max": 130,
+              "last": 130
+            },
+            "temp_c": {
+              "min": 22,
+              "max": 25.5,
+              "last": 25.5
+            }
+          }
+        },
+        "history": []
+      },
+      "expected": {
+        "severidad": "critical",
+        "causa_keywords": [
+          "ventilaci"
+        ]
+      }
+    },
+    {
+      "id": "diag-10",
+      "context": {
+        "simulated": true,
+        "now_lima": "2026-03-10 11:00 (martes, hora de Lima UTC-5)",
+        "incident": {
+          "id": "inc_eval10",
+          "title": "Sobreaforo en Laboratorio de IoT",
+          "severity": "critical",
+          "opened_at": 1773158400000
+        },
+        "space": {
+          "id": "SPC_4_LAB2",
+          "name": "Laboratorio de IoT",
+          "type": "lab",
+          "level": 4,
+          "capacity": 25
+        },
+        "rule": {
+          "id": "RULE_OVERCAP",
+          "name": "Sobreaforo",
+          "metric": "occupancy_ratio",
+          "op": ">=",
+          "threshold": 1,
+          "sustain_s": 60,
+          "severity": "critical"
+        },
+        "device_id": "DEV_4_LAB2",
+        "readings": {
+          "n": 30,
+          "window_min": 30,
+          "summary": {
+            "occupancy": {
+              "min": 10,
+              "max": 29,
+              "last": 29
+            },
+            "co2_ppm": {
+              "min": 700,
+              "max": 1180,
+              "last": 1180
+            },
+            "temp_c": {
+              "min": 23,
+              "max": 26.2,
+              "last": 26.2
+            }
+          }
+        },
+        "history": []
+      },
+      "expected": {
+        "severidad": "critical",
+        "causa_keywords": [
+          "redistribu"
+        ]
+      }
+    }
+  ],
+  "chat": [
+    {
+      "id": "chat-01",
+      "question": "¿Dónde queda la biblioteca?",
+      "expected_space_ids": [
+        "SPC_1_BIB"
+      ],
+      "keywords_any": []
+    },
+    {
+      "id": "chat-02",
+      "question": "Busca el laboratorio de IoT",
+      "expected_space_ids": [
+        "SPC_4_LAB2"
+      ],
+      "keywords_any": []
+    },
+    {
+      "id": "chat-03",
+      "question": "¿Dónde está el auditorio?",
+      "expected_space_ids": [
+        "SPC_5_AUD"
+      ],
+      "keywords_any": []
+    },
+    {
+      "id": "chat-04",
+      "question": "¿Dónde están las oficinas administrativas?",
+      "expected_space_ids": [
+        "SPC_5_OFI"
+      ],
+      "keywords_any": []
+    },
+    {
+      "id": "chat-05",
+      "question": "Muéstrame el aula A301",
+      "expected_space_ids": [
+        "SPC_3_A301"
+      ],
+      "keywords_any": []
+    },
+    {
+      "id": "chat-06",
+      "question": "¿Cómo está el aula A201?",
+      "expected_space_ids": [
+        "SPC_2_A201"
+      ],
+      "keywords_any": []
+    },
+    {
+      "id": "chat-07",
+      "question": "Busca el hall de ingreso",
+      "expected_space_ids": [
+        "SPC_1_LOBBY"
+      ],
+      "keywords_any": []
+    },
+    {
+      "id": "chat-08",
+      "question": "¿Qué espacios hay en el piso 3?",
+      "expected_space_ids": [
+        "SPC_3_A301",
+        "SPC_3_LAB1"
+      ],
+      "keywords_any": []
+    },
+    {
+      "id": "chat-09",
+      "question": "Pronóstico de CO2 para A301",
+      "expected_space_ids": [
+        "SPC_3_A301"
+      ],
+      "keywords_any": []
+    },
+    {
+      "id": "chat-10",
+      "question": "¿Cuál es la temperatura en LAB2?",
+      "expected_space_ids": [
+        "SPC_4_LAB2"
+      ],
+      "keywords_any": []
+    },
+    {
+      "id": "chat-11",
+      "question": "Dame el estado de la biblioteca SPC_1_BIB",
+      "expected_space_ids": [
+        "SPC_1_BIB"
+      ],
+      "keywords_any": []
+    },
+    {
+      "id": "chat-12",
+      "question": "Busca aulas de clase",
+      "expected_space_ids": [
+        "SPC_2_A201",
+        "SPC_4_A401"
+      ],
+      "keywords_any": []
+    },
+    {
+      "id": "chat-13",
+      "question": "Dame un resumen del campus",
+      "expected_space_ids": [],
+      "keywords_any": [
+        "simulad"
+      ]
+    },
+    {
+      "id": "chat-14",
+      "question": "¿Hay incidencias abiertas?",
+      "expected_space_ids": [],
+      "keywords_any": [
+        "incidencias"
+      ]
+    },
+    {
+      "id": "chat-15",
+      "question": "¿Qué espacios están en riesgo?",
+      "expected_space_ids": [],
+      "keywords_any": [
+        "riesgo",
+        "ningún espacio"
+      ]
+    },
+    {
+      "id": "chat-16",
+      "question": "¿Cuál es la ocupación total del campus?",
+      "expected_space_ids": [],
+      "keywords_any": [
+        "ocupación"
+      ]
+    },
+    {
+      "id": "chat-17",
+      "question": "¿Hay aulas saturadas?",
+      "expected_space_ids": [],
+      "keywords_any": [
+        "riesgo",
+        "ningún espacio"
+      ]
+    },
+    {
+      "id": "chat-18",
+      "question": "¿Qué alertas hay ahora?",
+      "expected_space_ids": [],
+      "keywords_any": [
+        "incidencias"
+      ]
+    },
+    {
+      "id": "chat-19",
+      "question": "Estado general del campus",
+      "expected_space_ids": [],
+      "keywords_any": [
+        "espacios"
+      ]
+    },
+    {
+      "id": "chat-20",
+      "question": "¿Qué datos usas? ¿Son reales?",
+      "expected_space_ids": [],
+      "keywords_any": [
+        "simulad"
+      ]
+    }
+  ]
+}

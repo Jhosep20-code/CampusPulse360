@@ -1,0 +1,14 @@
+{
+  "name": "CampusPulse 360",
+  "short_name": "CampusPulse",
+  "description": "Gemelo digital universitario con telemetria simulada.",
+  "lang": "es",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#080F1D",
+  "theme_color": "#080F1D",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

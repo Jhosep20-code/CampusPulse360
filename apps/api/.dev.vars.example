@@ -1,0 +1,10 @@
+# Copiar a .dev.vars (ignorado por git) para desarrollo local. NUNCA versionar valores reales.
+# Clave HMAC del gateway del simulador (hex). Generar: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+GATEWAY_KEYS={"gw-sim-01":"<clave-hex-local>"}
+# Token de arranque de un solo uso para registrar la primera passkey.
+BOOTSTRAP_TOKEN=<token-aleatorio-largo>
+# Opcional: notificaciones Telegram (bot creado por el equipo con BotFather).
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=
+# Opcional: solo si un integrante aporta voluntariamente su propia clave de OpenAI.
+OPENAI_API_KEY=

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="CampusPulse 360">
+  <defs>
+    <linearGradient id="g" x1="4" y1="44" x2="44" y2="4" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#22D3D6" />
+      <stop offset="1" stop-color="#2962FF" />
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="11" fill="#080F1D" />
+  <circle cx="24" cy="24" r="19" fill="none" stroke="url(#g)" stroke-width="2.6" stroke-linecap="round" pathLength="100" stroke-dasharray="86 14" stroke-dashoffset="-7" />
+  <path d="M5 24H12L14.5 19.5L17 27L19.5 24H23V17H26V11.5H29.5V18H33V24H41" fill="none" stroke="url(#g)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+  <circle cx="43" cy="24" r="2.8" fill="#F0B95B" />
+</svg>
