@@ -34,6 +34,8 @@
     "AI_PROVIDER": "workers-ai",
     "AI_MODEL": "@cf/openai/gpt-oss-20b",
     "AI_DAILY_LIMIT": "60",
+    // Simulador en la nube (telemetria SIMULADA) para la demo publica: "on" solo en el deploy.
+    "CLOUD_SIM": "off",
     "WEBAUTHN_RP_ID": "localhost",
     "WEBAUTHN_RP_NAME": "CampusPulse 360",
     "WEBAUTHN_ORIGIN": "http://localhost:5173"
