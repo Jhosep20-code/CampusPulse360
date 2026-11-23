@@ -159,3 +159,29 @@ Hay que tocar `constants.ts`, `facade.ts`, `layout.ts`, `view.ts`, `CampusTwin.t
 - Rótulo: "Modelo aproximado basado en fotografía · dimensiones estimadas".
 
 Sin la comparación del punto 7 no se declara el modelo "reconocible".
+
+## 9. Evidencia de video (23-nov-2026): rasgos VERIFICADOS
+Fuentes:
+- Video institucional de la UTP: "¡La mejor tecnología está en UTP Huancayo!", h52zjffXTQc.
+- Shorts del canal oficial: 1DgcJ81djWE y Eo8HOh6pVWs.
+
+Se extrajeron fotogramas solo para referencia local privada, en `guias-generadas/` (ignorado por git). No se describen personas.
+
+| Rasgo | Observación | Fuente | Confianza |
+|---|---|---|---|
+| Atrio | Vacío central alto (≥6 niveles visibles en un encuadre) con pasillos perimetrales en todo el contorno. Frentes de losa blancos, lisos y de canto grueso; fondo de losa blanco o gris azulado claro | short 1Dgc t≈11–13 s; institucional t≈24 s | Alta |
+| Barandas | Acero inoxidable de tubos horizontales con pasamanos superior, en los bordes del vacío y en ambos lados de cada tramo de escalera | ídem | Alta |
+| **Escaleras** | **Tramos rectos ABIERTOS dentro del vacío del atrio**, uno por nivel, superpuestos en zigzag (cambian de sentido en cada nivel) y conectados a los pasillos. Zancas y fondo grises, peldaños claros | short 1Dgc; institucional t≈24 s | Alta (existencia y tipo) / Media (posición exacta) |
+| **Ascensores** | **El muro negro brillante con puertas de acero da al atrio**, frente al espectador, en cada nivel. Se distinguen unas 3 puertas, con pequeños paneles o indicadores sobre ellas | short 1Dgc; institucional t≈24 s; foto interior real | Alta (orientación) / Media (número exacto) |
+| Aulas hacia el pasillo | Muros blancos, puertas de madera clara y franjas altas de vidrio | institucional t≈24 s | Media |
+| Fachada | Muro cortina azul con montantes verticales oscuros; marco blanco con juntas de panel; letrero rojo de la UTP en la esquina superior derecha (en el modelo: acento rojo sin logotipo) | institucional t≈10 s | Alta |
+| Interiores | Laboratorios de cómputo con mesas largas y monitores; laboratorio con mesones blancos y pozas; taller de pintura; biblioteca con sillas rojas | institucional | Alta (existencia) |
+
+**Contradicciones con el modelo v1** (que se corrigen en v2):
+- Las escaleras eran en U, en las esquinas: deben ser tramos abiertos en el vacío.
+- Las puertas de los ascensores miraban al pasillo +Z: deben mirar al atrio.
+
+**Sigue sin verificar:**
+- Dimensiones del vacío y número de tramos exactos.
+- Escaleras de evacuación cerradas.
+- Distribución de aulas por piso.
