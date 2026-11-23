@@ -85,7 +85,11 @@ export default function ARPage() {
     if (colors) handleRef.current?.setColors(colors);
   }, [colors]);
 
-  useEffect(() => handleRef.current?.setWidth(width), [width]);
+  // Cuerpo con llaves: un efecto NUNCA debe devolver el resultado de una llamada (React lo
+  // trataria como limpieza; three devuelve objetos encadenables -> "destroy is not a function").
+  useEffect(() => {
+    handleRef.current?.setWidth(width);
+  }, [width]);
 
   // Los toques sobre los controles del overlay no deben colocar ni seleccionar en la escena.
   useEffect(() => {

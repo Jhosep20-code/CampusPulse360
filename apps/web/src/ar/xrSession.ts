@@ -103,7 +103,9 @@ export function startArSession(opts: XrStartOptions): Promise<XrHandle> {
     scene.add(holder);
     applySpaceColors(model, opts.colors);
 
-    const applyWidth = (w: number) => model.group.scale.setScalar(scaleForWidth(w, model.widthM));
+    const applyWidth = (w: number): void => {
+      model.group.scale.setScalar(scaleForWidth(w, model.widthM));
+    };
     applyWidth(opts.widthM);
 
     const reticleGeo = new RingGeometry(0.06, 0.08, 32).rotateX(-Math.PI / 2);

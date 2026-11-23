@@ -98,6 +98,25 @@ export function EmptyState({ title, hint, icon }: { title: string; hint?: string
   );
 }
 
+/** Error de carga de un fragmento JS (tipico tras un nuevo despliegue con la pestana abierta). */
+export function isChunkLoadError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  return /dynamically imported module|Importing a module script failed|error loading dynamically imported module|ChunkLoadError|Failed to fetch dynamically/i.test(msg);
+}
+
+/** Mensaje comprensible para el usuario final (sin detalles tecnicos en produccion). */
+export function friendlyError(error: Error | null): string {
+  if (!error) return "Ocurrió un error inesperado.";
+  const status = (error as { status?: unknown }).status;
+  if (isChunkLoadError(error)) return "Hay una versión nueva de la aplicación. Recarga la página para continuar.";
+  if (status === 0 || /Failed to fetch|NetworkError|conectar con la API/i.test(error.message)) {
+    return "No hay conexión con el servidor. Revisa tu conexión a internet e inténtalo de nuevo.";
+  }
+  if (typeof status === "number" && status >= 500) return "El servidor no pudo completar la solicitud. Inténtalo de nuevo en unos segundos.";
+  if (typeof status === "number" && status >= 400) return error.message;
+  return "Ocurrió un error inesperado al mostrar esta sección.";
+}
+
 export function ErrorState({
   error,
   onRetry,
@@ -111,11 +130,13 @@ export function ErrorState({
     <div role="alert" className="flex flex-col items-center gap-2 px-4 py-8 text-center">
       <CircleAlert size={28} className="text-crit" aria-hidden="true" />
       <p className="font-medium text-ink">{title}</p>
-      <p className="max-w-md text-sm text-ink-2">
-        {error?.message ?? "Error desconocido"}
-        {error instanceof Error && "detail" in error && typeof error.detail === "string" ? ` (${error.detail})` : ""}
-      </p>
-      <p className="max-w-md text-xs text-ink-2">Verifica que la API esté levantada (wrangler dev en el puerto 8787).</p>
+      <p className="max-w-md text-sm text-ink-2">{friendlyError(error)}</p>
+      {import.meta.env.DEV && error ? (
+        <p className="max-w-md font-mono text-xs text-ink-2">
+          {error.message}
+          {"detail" in error && typeof error.detail === "string" ? ` (${error.detail})` : ""}
+        </p>
+      ) : null}
       {onRetry ? (
         <button type="button" className="btn btn-sm mt-1" onClick={onRetry}>
           <RefreshCw size={14} aria-hidden="true" /> Reintentar
@@ -201,6 +222,17 @@ export class ErrorBoundary extends Component<
   }
   override componentDidCatch(error: Error, info: ErrorInfo) {
     console.error("ErrorBoundary", error, info.componentStack);
+    // Tras un despliegue, los fragmentos antiguos ya no existen: una recarga (una sola vez) lo resuelve.
+    if (isChunkLoadError(error)) {
+      try {
+        if (!sessionStorage.getItem("cp-chunk-reload")) {
+          sessionStorage.setItem("cp-chunk-reload", "1");
+          location.reload();
+        }
+      } catch {
+        /* almacenamiento no disponible */
+      }
+    }
   }
   override render() {
     if (this.state.error) return this.props.fallback(this.state.error, () => this.setState({ error: null }));

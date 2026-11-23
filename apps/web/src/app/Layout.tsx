@@ -145,7 +145,9 @@ function BottomBar() {
   const [open, setOpen] = useState(false);
   const { pathname } = useLocation();
 
-  useEffect(() => setOpen(false), [pathname]);
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
@@ -248,7 +250,9 @@ export function Layout() {
         <main id="contenido" tabIndex={-1} className="mx-auto w-full max-w-[1600px] flex-1 px-4 pb-28 pt-5 outline-none sm:px-6 lg:pb-10">
           <ErrorBoundary
             key={pathname}
-            fallback={(error, reset) => <ErrorState error={error} onRetry={reset} title="Error al mostrar la página" />}
+            fallback={(error, reset) => (
+              <ErrorState error={error} onRetry={reset} title="No se pudo mostrar esta sección" />
+            )}
           >
             <Suspense fallback={<PageSkeleton />}>
               <Outlet />

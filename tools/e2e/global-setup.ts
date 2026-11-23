@@ -14,6 +14,13 @@ export const ADMIN_STATE = resolve(here, ".auth/admin.json");
  */
 export default async function globalSetup(): Promise<void> {
   const base = process.env.E2E_BASE_URL ?? "http://localhost:8787";
+  // Contra un entorno remoto (p. ej. produccion) NUNCA se crean sesiones: solo pruebas de visitante.
+  const host = new URL(base).hostname;
+  if (host !== "localhost" && host !== "127.0.0.1") {
+    mkdirSync(dirname(ADMIN_STATE), { recursive: true });
+    writeFileSync(ADMIN_STATE, JSON.stringify({ cookies: [], origins: [] }));
+    return;
+  }
   // Espera a que la API responda (el stack puede estar arrancando).
   for (let i = 0; i < 60; i++) {
     try {
