@@ -129,3 +129,20 @@ Las capturas están en `docs/entregables/FINAL/capturas/glb/`.
 - La vista completa de Fachada usa 73 draw calls, por encima de la meta de 60.
 - En el móvil emulado con el panel oculto, el GLB tardó unos 45 s en aparecer: con la pestaña en segundo plano no se puede medir el tiempo de carga real.
 - `campus-ar.glb` (Scene Viewer) sigue exportándose desde el gemelo procedural (`apps/web/scripts/export-twin-glb.ts`), no desde Blender.
+
+## 9. Despliegue del modelo v2 (23-nov-2026, 13:25 aprox.)
+- **Regresión previa (local):**
+  - 258 pruebas unitarias e integración: contratos 9, API 77, web 162, simulador 10.
+  - e2e contra el stack Docker reconstruido con el GLB v2: 15 aprobadas y 3 omitidas a propósito.
+  - gitleaks sobre lo preparado: sin hallazgos.
+- **Versión desplegada:** `fdf7a207-5ad4-4a89-a47d-1daae54a2b9f` (commit 3e99078), con las mismas variables que la anterior (`CLOUD_SIM=on`, `ENVIRONMENT=production`, host de passkeys).
+- **Rollback:** a la versión anterior con `npx wrangler rollback 4852654b-796a-4af4-827d-febc1813084a` desde apps/api.
+- **Verificado en producción:**
+  - `/system/health` ok, con `commit 3e99078`.
+  - `/`, `/ar`, `/reloj`, `/acceso`, `/incidencias` y `/asistente` responden 200.
+  - GLB de escritorio 2.843.452 bytes y móvil 1.242.076; `/live` con datos simulados.
+- **GPU en el navegador integrado, con clics reales:**
+  - Fachada: source glb, 73 draw calls, 0 degeneradas.
+  - P10 aislado: 47 draw calls, 0 de otros pisos, sin cubierta ni vecinos.
+  - Atrio: 62 draw calls.
+  - Restablecer: Fachada, sin aislamiento ni explosión.

@@ -1,8 +1,9 @@
 ## Hito 2–5: despliegue público, IA real, gemelo de 10 pisos con modelo Blender, AR y correcciones
 
 **Producción:** https://campuspulse.campuspulse-api.workers.dev (Cloudflare Workers Free)
-- Versión desplegada `4852654b` (commit `9c453f6`).
-- Respaldo `b23b261c` (commit `4bac699`). Para volver: `wrangler rollback b23b261c-abe9-4756-8429-d1987e28952a`.
+- Versión desplegada `fdf7a207` (commit `3e99078`, modelo Blender v2).
+- Respaldo inmediato `4852654b` (commit `9c453f6`). Para volver: `wrangler rollback 4852654b-796a-4af4-827d-febc1813084a`.
+- Respaldo anterior `b23b261c` (commit `4bac699`).
 
 > Esta PR no activa un despliegue nuevo por sí misma: el job `deploy` de CI solo se ejecuta en `main` y si la variable de repositorio `DEPLOY_ENABLED` vale `true`, que hoy está desactivada.
 
@@ -40,7 +41,8 @@
   - pruebas visuales WebGL excluidas del CI por defecto (se ejecutan con `VISUAL=1`).
 
 ### Pruebas (local, 23-nov-2026)
-- **Unitarias e integración:** 257 (contratos 9, simulador 10, web 161, API 77).
+- **Unitarias e integración:** 258 (contratos 9, simulador 10, web 162, API 77).
+- **CI:** el job `deploy` ahora pasa `CLOUD_SIM:on`, igual que la producción actual. Sin ese cambio, un deploy desde `main` habría apagado el simulador en la nube.
 - **e2e:** 15 aprobadas y 3 omitidas a propósito, contra el stack Docker con el GLB.
 - **gitleaks:** sin hallazgos en todo el historial.
 - **Validación con GPU e interacción real:** secuencias críticas de aislamiento, vistas y Restablecer superadas en local y en producción. Evidencias en `docs/evidencias/hito-5-losas-negras-y-blender.md` y `docs/entregables/FINAL/capturas/`.

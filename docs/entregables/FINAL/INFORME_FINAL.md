@@ -21,7 +21,7 @@ CampusPulse 360 propone un gemelo digital de la sede UTP Huancayo que integra da
 | OE1 IoT | ≥10 dispositivos simulados × 5 variables | 10 dispositivos × 5 variables. Ingesta HMAC verificada en producción (910 lecturas aceptadas en un backfill) y simulador en la nube cada minuto |
 | OE2 RPA | Incidencia automática y diagnóstico tras un umbral sostenido | Verificado en producción: lecturas firmadas → cron → 2 incidencias críticas → diagnóstico IA en vivo (1,8 s y 2,4 s). Cierre automático tras 10 min normalizados (verificado: "cerradas=2") |
 | OE3 IA | Respuestas útiles basadas en datos | gpt-oss-20b en Workers AI responde con citas a espacios reales (2,7 s). Unas 20 neuronas por llamada |
-| OE4 DevOps | Pruebas y despliegue automatizados | 257 pruebas unitarias e integración y 15 e2e en local. Pipeline en GitHub Actions definido (ver §5.7; **su ejecución sobre la rama está pendiente de la PR**) |
+| OE4 DevOps | Pruebas y despliegue automatizados | 258 pruebas unitarias e integración y 15 e2e en local. Pipeline en GitHub Actions definido (ver §5.7; **su ejecución sobre la rama está pendiente de la PR**) |
 | OE5 Experiencia | 3D fluido, multidispositivo y AR | Gemelo con el GLB de Blender v2, medido con GPU en local: Fachada 73 draw calls, pisos aislados 47–55, Atrio 62 y móvil 32 (meta: 60; la vista explotada llega a 458). Vista móvil verificada en navegador. **AR en dispositivo físico pendiente** |
 | OE6 Predicción | Pronóstico de CO₂ a 30 min | Holt con backtest MAE sobre datos simulados (pruebas unitarias) |
 
