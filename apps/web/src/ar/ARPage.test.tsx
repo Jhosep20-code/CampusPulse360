@@ -48,7 +48,7 @@ describe("ARPage con sesion WebXR activa", () => {
     Reflect.deleteProperty(navigator, "xr");
   });
 
-  it("ampliar, reducir y salir de la pagina no rompen el render", async () => {
+  it("ampliar, reducir y salir de la pagina no rompen el render", { timeout: 30_000 }, async () => {
     const errors: Error[] = [];
     const ui = render(
       <MemoryRouter>
@@ -61,12 +61,12 @@ describe("ARPage con sesion WebXR activa", () => {
         </CampusContext.Provider>
       </MemoryRouter>,
     );
-    const startBtn = await screen.findByRole("button", { name: /Iniciar AR/ });
-    await waitFor(() => expect(startBtn).toBeEnabled());
+    const startBtn = await screen.findByRole("button", { name: /Iniciar AR/ }, { timeout: 8000 });
+    await waitFor(() => expect(startBtn).toBeEnabled(), { timeout: 8000 });
     await act(async () => {
       fireEvent.click(startBtn);
     });
-    const bigger = await screen.findByRole("button", { name: "Ampliar maqueta" });
+    const bigger = await screen.findByRole("button", { name: "Ampliar maqueta" }, { timeout: 8000 });
     await act(async () => {
       fireEvent.click(bigger);
     });

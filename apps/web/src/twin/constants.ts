@@ -7,20 +7,16 @@
  */
 
 /**
- * Ruta del modelo GLB (p. ej. "/models/utp-huancayo.glb"). null = geometria
- * procedural provisional.
+ * Modelo GLB de Blender (assets/3d/README.md). MODEL_URL = LOD completo (perfil alto);
+ * MODEL_URL_MOBILE = LOD movil (perfil bajo). null = geometria procedural provisional.
+ * El contexto urbano es un GLB aparte y opcional. Todo se sirve desde /models (sin CDN).
  *
- * Cuando es una ruta:
- * - las mallas cuyo nombre empieza por SPC_ son los volumenes de espacio
- *   (coloreables y seleccionables, nombre = mesh_id del contrato);
- * - el resto del GLB se trata como fachada/estructura.
- * Ver assets/3d/README.md.
+ * Nodos: BUILDING > FACADE, ROOF, ATRIUM, STAIRS, ELEVATORS, FLOOR_P01..P10 (con sus
+ * volumenes SPC_*) y SENSOR_ANCHORS > ANCHOR_SPC_*. Ver src/twin/glb.ts.
  */
-export const MODEL_URL: string | null = null;
-
-export const SPACE_MESH_PREFIX = "SPC_";
-/** Nodos opcionales de fachada por piso (FLR_<piso>_*) que acompanan la vista explotada. */
-export const FLOOR_NODE_PREFIX = "FLR_";
+export const MODEL_URL: string | null = "/models/utp-huancayo.glb";
+export const MODEL_URL_MOBILE = "/models/utp-huancayo-mobile.glb";
+export const CONTEXT_URL = "/models/utp-context.glb";
 
 /** Niveles representados en el gemelo (P1-P10). El dato de 10 pisos lo aporta el equipo. */
 export const TWIN_LEVELS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];

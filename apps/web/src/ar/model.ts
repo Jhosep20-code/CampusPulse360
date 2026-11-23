@@ -9,6 +9,8 @@ import {
   type Material,
 } from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { GLB_PATH } from "./logic";
 import { DEFAULT_DIMS, PALETTE, type BuildingDims } from "../twin/constants";
 import { BATCH_KEYS, BATCH_META, buildBuilding, type Box } from "../twin/facade";
 import { computeLayout } from "../twin/layout";
@@ -138,5 +140,75 @@ export function applySpaceColors(model: CampusModel, colors: ReadonlyMap<string,
     const mat = mesh.material as MeshStandardMaterial;
     mat.color.set(hex);
     mat.emissive.set(hex);
+  }
+}
+
+/**
+ * Nivel A con el modelo REAL de Blender (LOD movil, utp-huancayo-mobile.glb) cargado con GLTFLoader
+ * de three (sin Draco ni dependencias nuevas). Cada SPC_* pasa a ser un volumen semitransparente
+ * coloreable con material propio; los emisivos se bajan (en AR no hay noche). Si la carga falla
+ * lanza el error y quien llama usa buildCampusModel (geometria procedural).
+ */
+export async function loadGlbCampusModel(campus: CampusResponse, url: string = GLB_PATH): Promise<CampusModel> {
+  const gltf = await new GLTFLoader().loadAsync(url);
+  const group = new Group();
+  group.name = "CampusPulse360_AR_GLB";
+  const root = gltf.scene;
+  root.updateMatrixWorld(true);
+  group.add(root);
+
+  const idByMesh = new Map(campus.spaces.map((s) => [s.mesh_id, s.id]));
+  const spaceMeshes = new Map<string, Mesh>();
+  const spaceIdByMesh = new Map<string, string>();
+  const okColor = new Color(PALETTE.cyan);
+  root.traverse((o) => {
+    const m = o as Mesh;
+    if (!m.isMesh) return;
+    if (/^SPC_\d{1,2}_[A-Z0-9]{2,12}$/.test(m.name)) {
+      const mat = new MeshStandardMaterial({
+        color: okColor,
+        emissive: okColor,
+        emissiveIntensity: 0.25,
+        roughness: 0.55,
+        metalness: 0.05,
+        transparent: true,
+        opacity: 0.6,
+        depthWrite: false,
+      });
+      mat.name = `MAT_${m.name}`;
+      m.material = mat;
+      m.renderOrder = 2;
+      const id = idByMesh.get(m.name);
+      if (id) {
+        m.userData["spaceId"] = id;
+        spaceMeshes.set(m.name, m);
+        spaceIdByMesh.set(m.name, id);
+      }
+      return;
+    }
+    const mat = m.material as MeshStandardMaterial;
+    if (mat.name === "WINDOW_NIGHT") mat.emissiveIntensity = 0;
+    else if (mat.name === "LED_CROWN") mat.emissiveIntensity = 0.9;
+    else if (mat.name === "LIGHT_PANEL") mat.emissiveIntensity = 0.2;
+  });
+
+  const dispose = () => {
+    root.traverse((o) => {
+      const m = o as Mesh;
+      if (!m.isMesh) return;
+      m.geometry.dispose();
+      for (const x of Array.isArray(m.material) ? m.material : [m.material]) x.dispose();
+    });
+  };
+  return { group, spaceMeshes, spaceIdByMesh, widthM: DEFAULT_DIMS.footprintW, dispose };
+}
+
+/** GLB de Blender si se puede cargar; si no, edificio procedural (nivel A siempre funciona). */
+export async function loadCampusModel(campus: CampusResponse): Promise<{ model: CampusModel; source: "glb" | "procedural" }> {
+  try {
+    return { model: await loadGlbCampusModel(campus), source: "glb" };
+  } catch (e) {
+    console.warn("[ar] No se pudo cargar el GLB; se usa el edificio procedural.", e);
+    return { model: buildCampusModel(campus), source: "procedural" };
   }
 }

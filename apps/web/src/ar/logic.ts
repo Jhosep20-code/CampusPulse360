@@ -7,7 +7,8 @@ import type { TwinLayer } from "../twin/types";
  * intent de Scene Viewer y mapeo de datos a colores/etiquetas.
  */
 
-export const GLB_PATH = "/models/campus-ar.glb";
+/** Modelo real de Blender (LOD movil) para Scene Viewer (nivel B) y WebXR (nivel A). */
+export const GLB_PATH = "/models/utp-huancayo-mobile.glb";
 export const SCENE_VIEWER_TITLE = "CampusPulse 360";
 
 /* ------------------------------------------------------------ capacidades */
@@ -101,7 +102,7 @@ export function evaluateLevels(caps: Capabilities, glbAvailable: boolean | null)
   } else if (!caps.https || caps.localhost) {
     b = "Scene Viewer necesita una URL https pública hacia el modelo; no funciona desde HTTP ni desde localhost.";
   } else if (glbAvailable === false) {
-    b = "El modelo estático (campus-ar.glb) no está publicado en este despliegue; el nivel B queda desactivado.";
+    b = "El modelo estático (utp-huancayo-mobile.glb) no está publicado en este despliegue; el nivel B queda desactivado.";
   } else if (glbAvailable === null) {
     b = "Comprobando que el modelo estático esté publicado…";
   }

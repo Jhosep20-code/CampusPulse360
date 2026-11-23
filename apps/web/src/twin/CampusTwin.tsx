@@ -65,9 +65,11 @@ import {
 } from "./compare";
 import {
   APPROX_NOTICE,
+  CONTEXT_URL,
   DEFAULT_DIMS,
   INTERIOR_NOTICE,
   MODEL_URL,
+  MODEL_URL_MOBILE,
   NO_SPACES_LABEL,
   PALETTE,
   type BuildingDims,
@@ -88,7 +90,9 @@ import {
 } from "./materials";
 import { profileSettings, resolveProfile } from "./profile";
 import type { TwinLayer, TwinProps } from "./types";
-import { useTwinModel, type TwinModel } from "./useTwinModel";
+import { floorLevelAtY, glbUrlsForProfile, type FloorBand } from "./glb";
+import { applyFloorState, applyWindowGlow, floorModeActive, glbDebugSnapshot } from "./glbRuntime";
+import { useContextModel, useTwinModel, type TwinModel } from "./useTwinModel";
 import { instanceTransform } from "./instancing";
 import {
   CAMERA_LIMITS,
@@ -103,6 +107,8 @@ import {
  * Modelo APROXIMADO basado en fotografia: dimensiones ESTIMADAS (constants.ts,
  * docs/referencias/especificacion-3d.md), sin planos verificados. Todo el edificio se
  * dibuja con una InstancedMesh por material; solo los volumenes SPC_* son mallas propias.
+ * Si hay GLB (MODEL_URL), el edificio es el modelo real de Blender (glbBuild.ts) y la geometria
+ * procedural queda como respaldo automatico si la carga falla.
  */
 
 const DIMS: BuildingDims = DEFAULT_DIMS;
@@ -128,7 +134,9 @@ interface SpaceGeom {
 interface FloorInfo {
   level: number;
   index: number;
-  /** Origen Y compacto y explotado. */
+  /** Cota de la base del piso en reposo (solo GLB; en la ruta procedural y0 ya es la base y baseY es 0). */
+  baseY: number;
+  /** Origen Y compacto y explotado (GLB: desplazamiento respecto al reposo). */
   y0: number;
   y1: number;
   height: number;
@@ -169,6 +177,8 @@ interface SceneCtx {
   anim: MutableRefObject<Anim>;
   procedural: boolean;
   model: TwinModel | null;
+  /** Igual que model (modelo GLB) o null en la ruta procedural. */
+  glb: TwinModel | null;
   building: Building;
   floors: FloorInfo[];
   spaceCap: Map<string, number>;
@@ -243,7 +253,7 @@ function buildSceneModel(
         if (box.level !== f.level || !space) continue;
         geoms.push({ space, level: f.level, pos: [box.x, box.y, box.z], size: [box.w, box.h, box.d] });
       }
-      return { level: f.level, index: f.index, y0: f.y, y1: exploded.floors[i]?.y ?? f.y, height: f.height, geoms };
+      return { level: f.level, index: f.index, baseY: 0, y0: f.y, y1: exploded.floors[i]?.y ?? f.y, height: f.height, geoms };
     });
     const b = compact.bounds;
     return {
@@ -251,20 +261,38 @@ function buildSceneModel(
       bounds: new Box3(new Vector3(b.minX, 0, b.minZ), new Vector3(b.maxX, b.maxY, b.maxZ)),
     };
   }
-  // Modelo GLB: las mallas ya estan en coordenadas de mundo; el piso solo aporta el desplazamiento.
+  // Modelo GLB: los volumenes ya estan en coordenadas de edificio; el piso solo aporta el desplazamiento.
+  const bands = floorBandsFor(campus, dims);
   const floors: FloorInfo[] = floorLevels(campus).map((level, index) => {
     const geoms: SpaceGeom[] = [];
+    const band = bands.find((b) => b.level === level);
     for (const space of campus.spaces) {
       const mesh = model.spaces.get(space.mesh_id);
       if (space.level !== level || !mesh) continue;
-      const box = new Box3().setFromObject(mesh);
+      // Caja desde la geometria y la matriz local (el piso esta en reposo): no depende de la animacion.
+      mesh.geometry.computeBoundingBox();
+      mesh.updateMatrix();
+      const box = (mesh.geometry.boundingBox ?? new Box3()).clone().applyMatrix4(mesh.matrix);
       const c = box.getCenter(new Vector3());
       const s = box.getSize(new Vector3());
       geoms.push({ space, level, pos: [c.x, c.y, c.z], size: [s.x, s.y, s.z], mesh });
     }
-    return { level, index, y0: 0, y1: index * dims.explodeGap, height: dims.floorHeight, geoms };
+    return {
+      level,
+      index,
+      baseY: band?.baseY ?? 0,
+      y0: 0,
+      y1: index * dims.explodeGap,
+      height: band?.height ?? dims.floorHeight,
+      geoms,
+    };
   });
   return { floors, bounds: model.bounds.clone() };
+}
+
+/** Franjas Y de cada piso (diseno estimado de layout.ts), usadas para recortar los grupos compartidos del GLB. */
+function floorBandsFor(campus: CampusResponse, dims: BuildingDims): FloorBand[] {
+  return computeLayout(campus, dims, 0).floors.map((f) => ({ level: f.level, index: f.index, baseY: f.baseY, height: f.height }));
 }
 
 /** Caja de mundo de un conjunto de espacios segun el estado de explosion destino. */
@@ -754,7 +782,7 @@ function SpaceVolume({ geom }: { geom: SpaceGeom }) {
         material={material}
         renderOrder={2}
         userData={{ spaceId: space.id }}
-        raycast={interactive ? geom.mesh.raycast : noRaycast}
+        raycast={interactive ? clippedRaycast : noRaycast}
         {...handlers}
       />
     );
@@ -899,14 +927,17 @@ function SpaceBeacon({ geom, anchor }: { geom: SpaceGeom; anchor: Vec3 }) {
 
 /* --------------------------------------------------------------- pisos */
 
-/** Volumenes de espacio, contornos y etiquetas de un piso (la estructura va en Batches). */
+/** Volumenes de espacio, contornos y etiquetas de un piso (la estructura va en Batches o en el GLB). */
 function FloorGroup({ floor }: { floor: FloorInfo }) {
   const ctx = useCtx();
   const { res } = ctx;
+  // GLB: el grupo FLOOR_Pxx del modelo es la raiz de este piso (GlbBuilding lo aisla y explota).
+  const glbFloor = ctx.glb?.floors.get(floor.level) ?? null;
   const groupRef = useRef<Group>(null);
   const tRef = useRef(ctx.exploded ? 1 : 0);
 
   useFrame((_, dt) => {
+    if (glbFloor) return;
     const g = groupRef.current;
     if (!g) return;
     const tTarget = ctx.exploded ? 1 : 0;
@@ -928,13 +959,14 @@ function FloorGroup({ floor }: { floor: FloorInfo }) {
     return shown(g) && (st === "warning" || st === "critical");
   });
   const outlines = floor.geoms.filter((g) => g.space.id === ctx.selectedId || g.space.id === ctx.hoveredId);
+  // Balizas y etiquetas: en el GLB van en ANCHOR_SPC_* (se mueven con el piso al explotar).
+  const anchorOf = (g: SpaceGeom): Vec3 => {
+    const a = ctx.glb?.anchors.get(g.space.mesh_id);
+    return a ? [a.x, a.y, a.z] : [g.pos[0], g.pos[1] + g.size[1] / 2 + 0.2, g.pos[2]];
+  };
 
-  return (
-    <group ref={groupRef} position={[0, floor.y0, 0]}>
-      {!ctx.procedural
-        ? (ctx.model?.floorNodes.get(floor.level) ?? []).map((n) => <primitive key={n.uuid} object={n} />)
-        : null}
-
+  const inner = (
+    <>
       {floor.geoms.map((g) => (
         <SpaceVolume key={g.space.id} geom={g} />
       ))}
@@ -954,19 +986,146 @@ function FloorGroup({ floor }: { floor: FloorInfo }) {
       })}
 
       {beaconGeoms.map((g) => (
-        <SpaceBeacon key={g.space.id} geom={g} anchor={[g.pos[0], g.pos[1] + g.size[1] / 2 + 0.2, g.pos[2]]} />
+        <SpaceBeacon key={g.space.id} geom={g} anchor={anchorOf(g)} />
       ))}
 
       {labelGeoms.map((g) => (
-        <SpaceLabel
-          key={g.space.id}
-          geom={g}
-          selected={g.space.id === ctx.selectedId}
-          anchor={[g.pos[0], g.pos[1] + g.size[1] / 2 + 0.2, g.pos[2]]}
-        />
+        <SpaceLabel key={g.space.id} geom={g} selected={g.space.id === ctx.selectedId} anchor={anchorOf(g)} />
       ))}
+    </>
+  );
+
+  if (glbFloor) {
+    const spaceHit = (e: ThreeEvent<MouseEvent | PointerEvent>) =>
+      e.intersections.some((h) => h.object.userData["spaceId"] !== undefined || h.object.userData["spaceMeshId"] !== undefined);
+    const picks = ctx.pickLevel
+      ? {
+          onClick: (e: ThreeEvent<MouseEvent>) => {
+            if (e.delta > 4 || spaceHit(e) || e.object.userData["part"] === undefined) return;
+            if (ctx.anim.current.section > 0.5 && e.point.z > ctx.sectionZ + 0.01) return;
+            e.stopPropagation();
+            ctx.pickLevel?.(floor.index);
+          },
+          onPointerOver: (e: ThreeEvent<PointerEvent>) => {
+            if (spaceHit(e) || e.object.userData["part"] === undefined) return;
+            ctx.setPickHover(true);
+          },
+          onPointerOut: () => ctx.setPickHover(false),
+        }
+      : {};
+    return (
+      <primitive object={glbFloor.group} {...picks}>
+        {inner}
+      </primitive>
+    );
+  }
+  return (
+    <group ref={groupRef} position={[0, floor.y0, 0]}>
+      {inner}
     </group>
   );
+}
+
+/**
+ * Edificio del GLB: aislamiento (group.visible) y explosion (position.y) por piso, dibujo
+ * "completo" fusionado en la vista normal y por pisos al aislar o explotar. Nunca escala.
+ */
+function GlbBuilding() {
+  const ctx = useCtx();
+  const glb = ctx.glb;
+  const expl = useRef(ctx.exploded ? 1 : 0);
+  const stateRef = useRef({ iso: ctx.isolatedLevel, exploded: ctx.exploded });
+  stateRef.current = { iso: ctx.isolatedLevel, exploded: ctx.exploded };
+
+  const apply = (t: number) => {
+    if (!glb) return;
+    const { iso, exploded } = stateRef.current;
+    applyFloorState(glb, {
+      isolatedLevel: iso,
+      explode: t,
+      gap: DIMS.explodeGap,
+      floorMode: floorModeActive(iso, exploded, t),
+    });
+  };
+
+  useLayoutEffect(() => {
+    apply(expl.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [glb, ctx.isolatedLevel, ctx.exploded]);
+
+  // Brillo nocturno de la ventana de cada espacio segun su ocupacion.
+  useLayoutEffect(() => {
+    if (!glb) return;
+    const k = new Map<string, number>();
+    for (const f of ctx.floors) {
+      for (const g of f.geoms) {
+        const l = ctx.liveMap.get(g.space.id);
+        const cap = ctx.spaceCap.get(g.space.id) ?? 0;
+        const ratio = l?.metrics && cap > 0 ? l.metrics.occupancy / cap : 0;
+        k.set(g.space.mesh_id, !l || l.status === "offline" ? 0 : emissiveForNight(ratio));
+      }
+    }
+    applyWindowGlow(glb, k);
+  }, [glb, ctx.floors, ctx.liveMap, ctx.spaceCap]);
+
+  useFrame((_, dt) => {
+    const target = stateRef.current.exploded ? 1 : 0;
+    const e = ctx.reduced ? target : MathUtils.damp(expl.current, target, 4, dt);
+    expl.current = Math.abs(e - target) < 0.002 ? target : e;
+    apply(expl.current);
+  });
+
+  if (!glb) return null;
+  const picks = ctx.pickLevel
+    ? {
+        onClick: (e: ThreeEvent<MouseEvent>) => {
+          if (e.delta > 4 || e.intersections.some((h) => h.object.userData["spaceId"] !== undefined)) return;
+          if (ctx.anim.current.section > 0.5 && e.point.z > ctx.sectionZ + 0.01) return;
+          const level = floorLevelAtY(e.point.y, glb.bands);
+          const index = ctx.floors.findIndex((f) => f.level === level);
+          if (index < 0) return;
+          e.stopPropagation();
+          ctx.pickLevel?.(index);
+        },
+        onPointerOver: (e: ThreeEvent<PointerEvent>) => {
+          if (e.intersections.some((h) => h.object.userData["spaceId"] !== undefined)) return;
+          ctx.setPickHover(true);
+        },
+        onPointerOut: () => ctx.setPickHover(false),
+      }
+    : {};
+  return <primitive object={glb.whole} {...picks} />;
+}
+
+/** Contexto urbano opcional del GLB (utp-context.glb); si falla, su ErrorBoundary no dibuja nada. */
+function GlbContext({ url, profile, shadows }: { url: string; profile: "high" | "low"; shadows: boolean }) {
+  const ctx = useCtx();
+  const model = useContextModel(url, profile, shadows);
+  useFrame(() => {
+    model.update(ctx.anim.current.night);
+  });
+  return <primitive object={model.group} />;
+}
+
+/** Draw calls reales del ultimo fotograma (renderer.info), para el inspector y un log de desarrollo. */
+function DrawCallProbe() {
+  const gl = useThree((st) => st.gl);
+  const last = useRef({ calls: -1, at: 0 });
+  useFrame((state) => {
+    const { calls, triangles } = gl.info.render;
+    // El fotograma de captura del entorno (Lightformers: 6 caras, 12 triangulos) no es una escena real.
+    if (calls > 6 || triangles > 12) {
+      DEBUG_REG.drawCalls = calls;
+      DEBUG_REG.triangles = triangles;
+    }
+    if (!LOG_DRAWS || calls <= 0) return;
+    const now = state.clock.elapsedTime;
+    if (calls !== last.current.calls && now - last.current.at > 1.5) {
+      last.current = { calls, at: now };
+      console.info(`[twin] draw calls=${calls} triangulos=${triangles} geometrias=${gl.info.memory.geometries}`);
+    }
+  });
+  return null;
 }
 
 /* ------------------------------------------------------------ ambiente */
@@ -996,6 +1155,7 @@ function Atmosphere({ shadows, shadowMapSize }: { shadows: boolean; shadowMapSiz
     ctx.clip.constant = a.section < 0.002 ? 1000 : MathUtils.lerp(70, ctx.sectionZ, a.section);
 
     updateMats(ctx.mats, a);
+    ctx.glb?.mats.update(a);
     if (hemi.current) hemi.current.intensity = MathUtils.lerp(0.72, 0.3, a.night);
     if (sun.current) {
       // Sol algo mas suave dentro del corte para equilibrarlo con la luz calida interior.
@@ -1094,7 +1254,7 @@ function CameraRig({
   const floorBox = (level: number, expl: boolean): Box3 | null => {
     const f = floors.find((x) => x.level === level);
     if (!f) return null;
-    const y = expl ? f.y1 : f.y0;
+    const y = f.baseY + (expl ? f.y1 : f.y0);
     return new Box3(
       new Vector3(-DIMS.footprintW / 2, y, -DIMS.footprintD / 2),
       new Vector3(DIMS.footprintW / 2, y + f.height, DIMS.footprintD / 2),
@@ -1213,6 +1373,8 @@ type SceneProps = Omit<TwinProps, "quality" | "className" | "cameraPreset" | "da
   dataMode: boolean;
   presetReq: PresetRequest | null;
   initialPreset: TwinPresetId;
+  /** Informa que geometria se dibuja (rotulo y inspector). */
+  onSource?: (source: "glb" | "procedural") => void;
 };
 
 function Scene({
@@ -1232,8 +1394,10 @@ function Scene({
   dataMode,
   presetReq,
   initialPreset,
-}: SceneProps) {
-  const model = useTwinModel();
+  onSource,
+  model,
+  clip,
+}: SceneProps & { model: TwinModel | null; clip: Plane }) {
   const gl = useThree((st) => st.gl);
   useLayoutEffect(() => {
     gl.localClippingEnabled = true;
@@ -1241,11 +1405,20 @@ function Scene({
       gl.localClippingEnabled = false;
     };
   }, [gl]);
-  const clip = useMemo(() => new Plane(new Vector3(0, 0, -1), 1000), []);
   const sectionZ = sectionCutZ(DIMS);
   const procedural = model === null;
   const settings = profileSettings(profile);
   const shadows = settings.shadows;
+  useEffect(() => {
+    onSource?.(procedural ? "procedural" : "glb");
+  }, [procedural, onSource]);
+  useEffect(() => {
+    if (!VISUAL_TEST || !model) return undefined;
+    DEBUG_REG.glb = model;
+    return () => {
+      DEBUG_REG.glb = null;
+    };
+  }, [model]);
 
   // Clave estructural: evita reconstruir (y recentrar la camara) si el campus se vuelve a pedir sin cambios.
   const structureKey = useMemo(
@@ -1328,6 +1501,7 @@ function Scene({
       anim,
       procedural,
       model,
+      glb: model,
       building,
       floors,
       spaceCap,
@@ -1371,10 +1545,19 @@ function Scene({
       </Environment>
 
       <mesh geometry={res.sky} material={mats.sky} renderOrder={-10} frustumCulled={false} raycast={noRaycast} />
-      <mesh geometry={res.ground} material={mats.ground} rotation-x={-Math.PI / 2} position-y={-0.2} receiveShadow={shadows} raycast={noRaycast} />
+      {/* Con GLB el suelo del contexto (GROUND, y = -0,2) se dibuja encima; este disco queda debajo como respaldo. */}
+      <mesh geometry={res.ground} material={mats.ground} rotation-x={-Math.PI / 2} position-y={procedural ? -0.2 : -0.32} receiveShadow={shadows} raycast={noRaycast} />
       <mesh geometry={res.hills} material={mats.hills} frustumCulled={false} raycast={noRaycast} />
 
-      {procedural ? <Batches /> : model ? <primitive object={model.facade} /> : null}
+      {procedural ? <Batches /> : <GlbBuilding />}
+      {!procedural ? (
+        <GlbBoundary fallback={null}>
+          <Suspense fallback={null}>
+            <GlbContext url={CONTEXT_URL} profile={profile} shadows={shadows} />
+          </Suspense>
+        </GlbBoundary>
+      ) : null}
+      <DrawCallProbe />
 
       {floors.map((f) => (
         <FloorGroup key={f.level} floor={f} />
@@ -1417,6 +1600,41 @@ class TwinErrorBoundary extends Component<{ children: ReactNode }, { failed: boo
   }
 }
 
+/** Respaldo automatico: si el GLB falla (red, archivo corrupto, WebGL), se dibuja la geometria procedural. */
+class GlbBoundary extends Component<{ children: ReactNode; fallback: ReactNode; onFail?: (e: unknown) => void }, { failed: boolean }> {
+  override state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  override componentDidCatch(error: unknown) {
+    console.warn("[twin] No se pudo cargar o construir el GLB; se usa la geometria procedural.", error);
+    this.props.onFail?.(error);
+  }
+  override render() {
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
+}
+
+function newClipPlane(): Plane {
+  return new Plane(new Vector3(0, 0, -1), 1000);
+}
+
+/** Escena con el modelo GLB (suspende mientras carga; lanza si falla). */
+function GlbScene(props: SceneProps) {
+  const clip = useMemo(newClipPlane, []);
+  const shadows = profileSettings(props.profile).shadows;
+  const bands = useMemo(() => floorBandsFor(props.campus, DIMS), [props.campus]);
+  const urls = glbUrlsForProfile(props.profile, { high: MODEL_URL ?? "", low: MODEL_URL_MOBILE, context: CONTEXT_URL });
+  const model = useTwinModel(urls.building, bands, clip, shadows);
+  return <Scene {...props} model={model} clip={clip} />;
+}
+
+/** Escena con la geometria procedural (modo provisional y respaldo del GLB). */
+function ProceduralScene(props: SceneProps) {
+  const clip = useMemo(newClipPlane, []);
+  return <Scene {...props} model={null} clip={clip} />;
+}
+
 const fill: CSSProperties = { position: "absolute", inset: 0 };
 
 const srOnly: CSSProperties = {
@@ -1444,12 +1662,17 @@ const chip: CSSProperties = {
  * dibujo para leer los pixeles reales del fotograma WebGL. No se activa en uso normal.
  */
 const VISUAL_TEST = typeof location !== "undefined" && new URLSearchParams(location.search).has("visualtest");
+/** Log de draw calls reales (renderer.info) en desarrollo o con ?visualtest. */
+const LOG_DRAWS = VISUAL_TEST || import.meta.env.DEV;
 
 /** Registro para el inspector de pruebas visuales (solo se usa con ?visualtest). */
 const DEBUG_REG: {
   batches: { refs: Partial<Record<BatchKey, InstancedMesh | null>>; building: Building; win: InstancedMesh | null } | null;
   spaces: Set<string>;
-} = { batches: null, spaces: new Set() };
+  glb: TwinModel | null;
+  drawCalls: number;
+  triangles: number;
+} = { batches: null, spaces: new Set(), glb: null, drawCalls: 0, triangles: 0 };
 
 export default function CampusTwin({
   campus,
@@ -1470,6 +1693,7 @@ export default function CampusTwin({
   className,
 }: TwinProps) {
   const reduced = usePrefersReducedMotion();
+  const [source, setSource] = useState<"loading" | "glb" | "procedural">(MODEL_URL === null ? "procedural" : "loading");
   const profile = useMemo(
     () => resolveProfile(quality, typeof window !== "undefined" && typeof window.matchMedia === "function" ? window.matchMedia.bind(window) : undefined),
     [quality],
@@ -1603,22 +1827,37 @@ export default function CampusTwin({
           });
         }
       }
-      return {
+      const common = {
         isolatedLevel: isolatedLevel ?? null,
         preset,
         exploded: Boolean(exploded),
-        degenerate,
-        visibleByLevel,
-        hiddenByLevel,
         spacesDrawn: [...DEBUG_REG.spaces],
+        source,
+        drawCalls: DEBUG_REG.drawCalls,
+        triangles: DEBUG_REG.triangles,
       };
+      const glb = DEBUG_REG.glb;
+      if (source === "glb" && glb) {
+        // GLB: mallas visibles (cadena de padres) bajo cada FLOOR_Pxx y mallas con escala degenerada.
+        const snap = glbDebugSnapshot(glb);
+        return { ...common, degenerate: snap.degenerate, visibleByLevel: snap.visibleByLevel, hiddenByLevel: {}, renderMode: snap.renderMode, stats: snap.stats };
+      }
+      return { ...common, degenerate, visibleByLevel, hiddenByLevel };
     };
     return () => {
       delete w.__twinDebug;
     };
-  }, [isolatedLevel, preset, exploded]);
+  }, [isolatedLevel, preset, exploded, source]);
 
-  const provisional = campus.building.geometry_provisional || MODEL_URL === null;
+  const provisional = campus.building.geometry_provisional || source !== "glb";
+  const sourceLabel =
+    source === "glb"
+      ? `Modelo 3D de Blender (${profile === "low" ? "LOD móvil" : "LOD completo"})`
+      : source === "procedural"
+        ? MODEL_URL === null
+          ? "Geometría procedural"
+          : "Geometría procedural (respaldo: el modelo GLB no cargó)"
+        : "Cargando modelo 3D…";
   const label = useMemo(
     () => describeTwin(campus, live, layer, provisional),
     [campus, live, layer, provisional],
@@ -1626,6 +1865,25 @@ export default function CampusTwin({
   const lines = useMemo(() => describeSpaces(campus, live, layer), [campus, live, layer]);
   const emptyLevels = useMemo(() => describeEmptyLevels(campus, floorLevels(campus)), [campus]);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const sceneProps: SceneProps = {
+    campus,
+    live,
+    layer,
+    selectedSpaceId,
+    onSelectSpace,
+    ...(onSelectLevel ? { onSelectLevel } : {}),
+    ...(focusSpaceIds ? { focusSpaceIds } : {}),
+    ...(exploded !== undefined ? { exploded } : {}),
+    ...(isolatedLevel !== undefined ? { isolatedLevel } : {}),
+    ...(night !== undefined ? { night } : {}),
+    section: sectionActive,
+    profile,
+    reduced,
+    dataMode: effectiveData,
+    presetReq,
+    initialPreset,
+    onSource: setSource,
+  };
   const isolatedHasNoSpaces =
     isolatedLevel !== null && isolatedLevel !== undefined && !campus.spaces.some((s) => s.level === isolatedLevel);
 
@@ -1657,24 +1915,18 @@ export default function CampusTwin({
               />
             ) : null}
             <Suspense fallback={null}>
-              <Scene
-                campus={campus}
-                live={live}
-                layer={layer}
-                selectedSpaceId={selectedSpaceId}
-                onSelectSpace={onSelectSpace}
-                {...(onSelectLevel ? { onSelectLevel } : {})}
-                {...(focusSpaceIds ? { focusSpaceIds } : {})}
-                {...(exploded !== undefined ? { exploded } : {})}
-                {...(isolatedLevel !== undefined ? { isolatedLevel } : {})}
-                {...(night !== undefined ? { night } : {})}
-                section={sectionActive}
-                profile={profile}
-                reduced={reduced}
-                dataMode={effectiveData}
-                presetReq={presetReq}
-                initialPreset={initialPreset}
-              />
+              {MODEL_URL === null ? (
+                <ProceduralScene {...sceneProps} />
+              ) : (
+                <GlbBoundary
+                  onFail={() => {
+                    setSource("procedural");
+                  }}
+                  fallback={<ProceduralScene {...sceneProps} />}
+                >
+                  <GlbScene {...sceneProps} />
+                </GlbBoundary>
+              )}
             </Suspense>
           </Canvas>
         </TwinErrorBoundary>
@@ -1763,7 +2015,7 @@ export default function CampusTwin({
           pointerEvents: "none",
         }}
       >
-        {MODEL_URL === null ? APPROX_NOTICE : "Modelo 3D del edificio"}
+        {sourceLabel} · {APPROX_NOTICE}
       </p>
 
       <ul style={srOnly} aria-label="Espacios y estados">

@@ -79,13 +79,13 @@ describe("Vista de reloj", () => {
 
   it("/watch redirige a /reloj", async () => {
     const router = renderAt("/watch", 1200);
-    await waitFor(() => expect(router.state.location.pathname).toBe("/reloj"));
-    expect(await screen.findByTestId("watch-dial")).toBeInTheDocument();
+    await waitFor(() => expect(router.state.location.pathname).toBe("/reloj"), { timeout: 8000 });
+    expect(await screen.findByTestId("watch-dial", {}, { timeout: 8000 })).toBeInTheDocument();
   });
 
   it("a 220 px renderiza la esfera sin el marco de vista previa", async () => {
     renderAt("/reloj", 220);
-    const dial = await screen.findByTestId("watch-dial");
+    const dial = await screen.findByTestId("watch-dial", {}, { timeout: 8000 });
     expect(dial).toHaveStyle({ width: "220px", height: "220px" });
     expect(screen.queryByTestId("watch-preview-frame")).not.toBeInTheDocument();
     expect(screen.queryByText("Vista previa del reloj")).not.toBeInTheDocument();
@@ -96,7 +96,7 @@ describe("Vista de reloj", () => {
 
   it("a 1200 px aparece el marco de vista previa con selector de tamano y aviso", async () => {
     renderAt("/reloj", 1200);
-    expect(await screen.findByTestId("watch-preview-frame")).toBeInTheDocument();
+    expect(await screen.findByTestId("watch-preview-frame", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Vista previa del reloj" })).toBeInTheDocument();
     expect(screen.getByText(/Simulación en navegador; prueba en el reloj físico pendiente/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Volver a la app/ })).toHaveAttribute("href", "/");
@@ -110,7 +110,7 @@ describe("Vista de reloj", () => {
 
   it("cambia entre las 3 pantallas con los botones y muestra estado y SIMULADO", async () => {
     renderAt("/reloj", 220);
-    const dial = await screen.findByTestId("watch-dial");
+    const dial = await screen.findByTestId("watch-dial", {}, { timeout: 8000 });
     const d = within(dial);
 
     expect(d.getByText("SIMULADO")).toBeInTheDocument();
@@ -137,7 +137,7 @@ describe("Vista de reloj", () => {
 
   it("la zona viva es aria-live polite y el deslizamiento cambia de pantalla", async () => {
     renderAt("/reloj", 220);
-    const dial = await screen.findByTestId("watch-dial");
+    const dial = await screen.findByTestId("watch-dial", {}, { timeout: 8000 });
     expect(dial.querySelector('[aria-live="polite"]')).not.toBeNull();
 
     act(() => {

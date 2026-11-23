@@ -23,7 +23,7 @@ import {
 } from "three";
 import { PALETTE } from "../twin/constants";
 import { scaleForWidth } from "./logic";
-import { applySpaceColors, buildCampusModel } from "./model";
+import { applySpaceColors, loadCampusModel } from "./model";
 
 /*
  * Sesion WebXR (nivel A) con la API de three (renderer.xr) y la del navegador.
@@ -60,6 +60,7 @@ export interface XrHandle {
 
 const TMP_M = new Matrix4();
 const TMP_V = new Vector3();
+const TMP_V2 = new Vector3();
 const TMP_Q = new Quaternion();
 
 /**
@@ -93,7 +94,7 @@ export function startArSession(opts: XrStartOptions): Promise<XrHandle> {
     scene.add(sun);
 
     // Jerarquia: holder (ancla / pose) -> yaw (orientacion hacia el usuario) -> model (escala).
-    const model = buildCampusModel(campus);
+    const { model, source: modelSource } = await loadCampusModel(campus);
     const holder = new Group();
     holder.matrixAutoUpdate = false;
     holder.visible = false;
@@ -131,9 +132,11 @@ export function startArSession(opts: XrStartOptions): Promise<XrHandle> {
         if (m.userData["spaceId"] !== spaceId) continue;
         selectedMesh = m;
         (m.material as MeshStandardMaterial).emissiveIntensity = 0.85;
-        const g = m.geometry as BoxGeometry;
+        m.geometry.computeBoundingBox();
+        const bb = m.geometry.boundingBox;
+        const sz = bb ? bb.getSize(TMP_V2) : TMP_V2.set(1, 1, 1);
         outline.position.copy(m.position);
-        outline.scale.set(g.parameters.width * 1.03, g.parameters.height * 1.03, g.parameters.depth * 1.03);
+        outline.scale.set(sz.x * 1.03, sz.y * 1.03, sz.z * 1.03);
         outline.visible = true;
       }
     };
@@ -152,7 +155,9 @@ export function startArSession(opts: XrStartOptions): Promise<XrHandle> {
       callbacks.onStatus("Este navegador no ofrece DOM overlay: no se puede mostrar el panel de control. Se cerró la sesión.");
       void session.end();
     } else {
-      callbacks.onStatus("AR iniciada. Apunta a una superficie con textura, espera el aro cian y toca para colocar la maqueta.");
+      callbacks.onStatus(
+        `AR iniciada con ${modelSource === "glb" ? "el modelo de Blender" : "la geometría procedural (el GLB no cargó)"}. Apunta a una superficie con textura, espera el aro cian y toca para colocar la maqueta.`,
+      );
     }
 
     session

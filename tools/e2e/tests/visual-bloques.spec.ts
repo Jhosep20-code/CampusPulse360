@@ -32,7 +32,7 @@ async function step(p: Page, f: () => Promise<unknown>) {
   await f();
   await p.waitForTimeout(WAIT);
 }
-const reset = (p: Page) => step(p, () => p.getByRole("button", { name: /Restablecer vista/ }).click({ force: true }));
+const reset = (p: Page) => step(p, () => p.getByRole("button", { name: /Restablecer vista/ }).evaluate((el: HTMLElement) => el.click()));
 
 test.use({ viewport: { width: 1440, height: 900 }, reducedMotion: "reduce" });
 test.beforeEach(({}, info) => test.skip(info.project.name !== "escritorio", "bloques en el proyecto escritorio"));
@@ -54,11 +54,11 @@ for (const group of [[1, 2, 3, 4, 5], [6, 7, 8, 9, 10]]) {
     await open(page);
     for (const l of group) {
       await step(page, () => sel(page).selectOption(String(l)));
-      await step(page, () => view(page, /Aérea/).click({ force: true }));
+      await step(page, () => view(page, /Aérea/).evaluate((el: HTMLElement) => el.click()));
       only(await dbg(page), l, `P${l}+Aerea`);
-      await step(page, () => page.getByRole("button", { name: /Pisos explotados/ }).click({ force: true }));
+      await step(page, () => page.getByRole("button", { name: /Pisos explotados/ }).evaluate((el: HTMLElement) => el.click()));
       only(await dbg(page), l, `P${l}+Explotado`);
-      await step(page, () => view(page, /Atrio/).click({ force: true }));
+      await step(page, () => view(page, /Atrio/).evaluate((el: HTMLElement) => el.click()));
       let d = await dbg(page);
       full(d, `P${l}->Atrio`);
       expect(d.exploded).toBe(false);
@@ -66,7 +66,7 @@ for (const group of [[1, 2, 3, 4, 5], [6, 7, 8, 9, 10]]) {
       d = await dbg(page);
       expect(d.preset).toBe("facade");
       only(d, l, `Atrio->P${l}`);
-      await step(page, () => view(page, /Referencia/).click({ force: true }));
+      await step(page, () => view(page, /Referencia/).evaluate((el: HTMLElement) => el.click()));
       full(await dbg(page), `P${l}->Referencia`);
       await expect(sel(page)).toHaveValue("all");
       await reset(page);
@@ -82,16 +82,16 @@ test("B4: Atrio, noche y dia, Fachada y Referencia tras P6/P9 (capturas)", async
   await open(page);
   for (const l of [6, 9]) {
     await step(page, () => sel(page).selectOption(String(l)));
-    await step(page, () => view(page, /Referencia/).click({ force: true }));
+    await step(page, () => view(page, /Referencia/).evaluate((el: HTMLElement) => el.click()));
     full(await dbg(page), `Referencia tras P${l}`);
     await page.screenshot({ path: `../../docs/entregables/FINAL/capturas/pisos/escritorio-referencia-tras-P${l}.png`, timeout: 180_000 });
     await reset(page);
   }
-  await step(page, () => view(page, /Atrio/).click({ force: true }));
+  await step(page, () => view(page, /Atrio/).evaluate((el: HTMLElement) => el.click()));
   full(await dbg(page), "Atrio");
   await page.screenshot({ path: "../../docs/entregables/FINAL/capturas/pisos/escritorio-atrio.png", timeout: 180_000 });
-  await step(page, () => page.getByRole("button", { name: /Modo noche/ }).click({ force: true }));
-  await step(page, () => page.getByRole("button", { name: /Modo noche/ }).click({ force: true }));
-  await step(page, () => view(page, /Fachada/).click({ force: true }));
+  await step(page, () => page.getByRole("button", { name: /Modo noche/ }).evaluate((el: HTMLElement) => el.click()));
+  await step(page, () => page.getByRole("button", { name: /Modo noche/ }).evaluate((el: HTMLElement) => el.click()));
+  await step(page, () => view(page, /Fachada/).evaluate((el: HTMLElement) => el.click()));
   full(await dbg(page), "Atrio->noche->dia->Fachada");
 });
