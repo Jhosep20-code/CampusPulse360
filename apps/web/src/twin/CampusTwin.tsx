@@ -1286,6 +1286,17 @@ function CameraRig({
   // Preset pedido por los botones o por la prop cameraPreset.
   useEffect(() => {
     if (!presetReq || !mounted.current) return;
+    // Con un piso aislado (p. ej. al aislar desde Atrio/Referencia la maquina de estados pasa a
+    // Fachada), el encuadre del piso tiene prioridad: el preset no debe sobrescribirlo.
+    if (isolatedLevel !== null && (presetReq.id === "facade" || presetReq.id === "aerial")) {
+      const box = floorBox(isolatedLevel, exploded);
+      const c = ref.current;
+      if (box && c) {
+        const v = floorFocusView(box, viewOpts());
+        void c.setLookAt(v.position.x, v.position.y, v.position.z, v.target.x, v.target.y, v.target.z, !reduced);
+        return;
+      }
+    }
     applyPreset(presetReq.id, !reduced, exploded);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [presetReq?.n]);
