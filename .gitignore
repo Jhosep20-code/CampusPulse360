@@ -31,3 +31,6 @@ Thumbs.db
 docs/referencias/utp-huancayo/fotos-originales/
 .mcp.json
 docs/referencias/utp-huancayo/guias-generadas/
+
+# Secretos del modo local con Docker Compose
+infra/local.env

@@ -1,5 +1,17 @@
-node_modules
+# Contexto de build de Docker (raiz del repo). Nunca enviar secretos ni dependencias locales.
+**/node_modules
+**/.wrangler
+**/dist
 .git
-.wrangler
-dist
-docs/referencias
+.github
+.claude
+docs
+assets
+apps/unity-*
+**/.dev.vars
+**/.dev.vars.*
+!**/.dev.vars.example
+**/.env
+**/.env.*
+infra/local.env
+*.log

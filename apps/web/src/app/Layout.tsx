@@ -10,6 +10,7 @@ import {
   Radio,
   ServerCog,
   Siren,
+  Smartphone,
   UserRound,
   Watch,
   Wifi,
@@ -43,6 +44,7 @@ const MORE_NAV: NavItem[] = [
   { to: "/automatizaciones", label: "Automatizaciones", Icon: Bot },
   { to: "/sistema", label: "Sistema", Icon: ServerCog },
   { to: "/acceso", label: "Acceso", Icon: KeyRound },
+  { to: "/ar", label: "AR", Icon: Smartphone },
   { to: "/watch", label: "Vista de reloj", Icon: Watch },
 ];
 

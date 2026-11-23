@@ -58,6 +58,39 @@ jobs:
           path: apps/web/dist
           retention-days: 7
 
+  e2e:
+    name: E2E con Docker Compose + Playwright
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Secretos efimeros solo para esta ejecucion (aleatorios)
+        run: |
+          node -e "const c=require('crypto'),fs=require('fs');const k=c.randomBytes(32).toString('hex');fs.writeFileSync('infra/local.env','GATEWAY_KEYS='+JSON.stringify({'gw-sim-01':k})+'\nGATEWAY_KEY='+k+'\nBOOTSTRAP_TOKEN='+c.randomBytes(24).toString('base64url')+'\nTELEGRAM_BOT_TOKEN=\nTELEGRAM_CHAT_ID=\n')"
+      - name: Levantar stack (Worker + D1 local + simulador + cron)
+        run: docker compose up -d --build --wait --wait-timeout 300
+      - name: Navegador de pruebas
+        run: pnpm --filter @campuspulse/e2e exec playwright install --with-deps chromium
+      - name: Pruebas e2e
+        run: pnpm --filter @campuspulse/e2e e2e
+      - name: Logs del stack si falla
+        if: failure()
+        run: docker compose logs --tail 200
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: tools/e2e/playwright-report
+          retention-days: 7
+      - if: always()
+        run: docker compose down -v
+
   simulator-image:
     name: Imagen Docker del simulador IoT
     needs: test
@@ -86,7 +119,7 @@ jobs:
 
   deploy:
     name: Deploy a Cloudflare Workers (Free)
-    needs: [test, secrets-scan]
+    needs: [test, e2e, secrets-scan]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push' && vars.DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
     environment: production

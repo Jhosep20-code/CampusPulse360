@@ -37,6 +37,7 @@ import {
   MeshPhysicalMaterial,
   MeshStandardMaterial,
   Object3D,
+  PerspectiveCamera,
   PlaneGeometry,
   Vector3,
   type AmbientLight,
@@ -59,6 +60,7 @@ import {
 } from "./facade";
 import { computeLayout, floorLevels } from "./layout";
 import type { TwinLayer, TwinProps } from "./types";
+import { initialViewFromBox } from "./view";
 import { useTwinModel, type TwinModel } from "./useTwinModel";
 
 /*
@@ -189,11 +191,14 @@ function buildSceneModel(
     });
     const b = compact.bounds;
     const m = dims.plinthMargin;
+    // El sobrerrecorrido del nucleo y los equipos sobresalen del parapeto: se incluyen en el encuadre.
+    const topFloorY = b.maxY - (dims.floorHeight + dims.slab + dims.parapetH);
+    const roofTop = topFloorY + Math.max(...buildRoofBoxes(dims).map((r) => r.y + r.sy / 2));
     return {
       floors,
       bounds: new Box3(
         new Vector3(b.minX - m, -dims.plinthH, b.minZ - m),
-        new Vector3(b.maxX + m, b.maxY, b.maxZ + m),
+        new Vector3(b.maxX + m, Math.max(b.maxY, roofTop), b.maxZ + m),
       ),
     };
   }
@@ -655,6 +660,8 @@ function CameraRig({
   reduced: boolean;
 }) {
   const ref = useRef<CameraControls>(null);
+  const camera = useThree((s) => s.camera);
+  const viewport = useThree((s) => s.size);
   const hadFocus = useRef(false);
   const mounted = useRef(false);
   const focusKey = focusIds.join(",");
@@ -663,26 +670,16 @@ function CameraRig({
 
   const home = (animate: boolean, expl: boolean) => {
     const c = ref.current;
-    if (!c) return;
+    if (!c || viewport.width < 2 || viewport.height < 2) return;
     const box = bounds.clone();
     if (expl) box.max.y += (floors.length - 1) * DIMS.explodeGap;
-    const center = box.getCenter(new Vector3());
-    const size = box.getSize(new Vector3());
-    const dir = new Vector3(1, 0.72, 1.3).normalize();
-    const dist = Math.max(size.x, size.z) * 1.1 + size.y;
-    void c.setLookAt(
-      center.x + dir.x * dist,
-      center.y + dir.y * dist,
-      center.z + dir.z * dist,
-      center.x,
-      center.y,
-      center.z,
-      animate,
-    );
-    void c.fitToBox(box, animate, { paddingTop: 1, paddingBottom: 1, paddingLeft: 1, paddingRight: 1 });
+    // Encuadre calculado desde la caja completa (losas, cubierta y volumenes), con margen.
+    const fov = camera instanceof PerspectiveCamera ? camera.fov : 35;
+    const v = initialViewFromBox(box, { fovDeg: fov, aspect: viewport.width / viewport.height });
+    void c.setLookAt(v.position.x, v.position.y, v.position.z, v.target.x, v.target.y, v.target.z, animate);
   };
 
-  // Vista inicial isometrica y limites de panoramica.
+  // Vista inicial y limites de panoramica. Solo al montar o cuando cambia la estructura del edificio.
   useEffect(() => {
     const c = ref.current;
     if (!c) return;
@@ -692,9 +689,15 @@ function CameraRig({
     c.setBoundary(limit);
     home(false, exploded);
     mounted.current = true;
-    // Solo al montar o cuando cambia la estructura del edificio.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bounds]);
+
+  // Reencuadre al cambiar el tamano del contenedor (sin animacion; no interrumpe un enfoque ni un piso aislado).
+  useEffect(() => {
+    if (!mounted.current || focusRef.current !== "" || isolatedLevel !== null) return;
+    home(false, exploded);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewport.width, viewport.height]);
 
   // Vuelo a los espacios enfocados (accion focus_spaces del asistente).
   useEffect(() => {

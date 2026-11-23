@@ -13,6 +13,7 @@ const Automations = lazy(() => import("../pages/Automations"));
 const Assistant = lazy(() => import("../pages/Assistant"));
 const SystemPage = lazy(() => import("../pages/SystemPage"));
 const Access = lazy(() => import("../pages/Access"));
+const ARPage = lazy(() => import("../ar/ARPage"));
 const WatchView = lazy(() => import("../pages/WatchView"));
 const NotFound = lazy(() => import("../pages/NotFound"));
 
@@ -40,6 +41,7 @@ export const routes = [
           { path: "asistente", element: <Assistant /> },
           { path: "sistema", element: <SystemPage /> },
           { path: "acceso", element: <Access /> },
+          { path: "ar", element: <ARPage /> },
           { path: "*", element: <NotFound /> },
         ],
       },

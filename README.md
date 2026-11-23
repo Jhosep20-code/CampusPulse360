@@ -47,5 +47,22 @@ pnpm dev:web    # http://localhost:5173 (proxy /api → 8787)
 
 Pruebas: `pnpm typecheck` y `pnpm test`.
 
+## Modo local de contingencia (Docker Compose)
+Levanta el Worker con D1 local, la SPA, el simulador IoT y el cron del bot. No depende de servicios externos. Sin internet, el diagnóstico usa el respaldo por reglas, rotulado "sin IA".
+
+```powershell
+Copy-Item infra/local.env.example infra/local.env   # completar con valores aleatorios locales
+```
+
+```powershell
+docker compose up -d --build --wait
+```
+
+Abrir http://localhost:8787. Pruebas e2e contra ese stack:
+
+```powershell
+pnpm --filter @campuspulse/e2e e2e
+```
+
 ## Presupuesto
 S/ 0.00 adicionales. Plan Free de Cloudflare (Workers, D1, Workers AI) y GitHub Actions en repositorio público. No se activa facturación.
