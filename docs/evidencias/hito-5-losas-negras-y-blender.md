@@ -99,3 +99,33 @@ Las capturas están en `docs/entregables/FINAL/capturas/glb/`.
 - Version anterior de reserva: `b23b261c-abe9-4756-8429-d1987e28952a` (commit 4bac699). Para volver: `npx wrangler rollback b23b261c-abe9-4756-8429-d1987e28952a` desde apps/api.
 - Version desplegada: `4852654b-796a-4af4-827d-febc1813084a` (commit 9c453f6).
 - Verificado en produccion con GPU: source glb, 61 draw calls, 0 degeneradas; P6 aislado con 16 mallas y 0 de otros pisos (`capturas/glb/produccion-glb-*.jpg`).
+
+## 8. Modelo Blender v2 integrado en el visor (23-nov-2026, local, GPU)
+**Cambios del modelo (v2, rasgos contrastados con los videos oficiales; medidas estimadas):** tramos de escalera abiertos en zigzag dentro del atrio, muro negro de ascensores frente al atrio con 3 puertas e indicadores por nivel, juntas de panel en la fachada y la coronación, y materiales nuevos. Renders y comparación: `docs/entregables/FINAL/capturas/blender/` (`comparacion-v1-v2.png`, `escaleras.png`, `ascensores.png`; v1 en `v1/`).
+
+| Métrica (build-report.json) | v1 | v2 |
+|---|---|---|
+| GLB escritorio | 1,85 MB · ~37k triángulos | 2,84 MB · 52.836 triángulos |
+| GLB móvil | 0,98 MB · ~19k triángulos | 1,24 MB |
+
+**Defectos encontrados al integrar v2 y corregidos:**
+1. **La cubierta tapaba P10 aislado.** La cubierta se fusiona con el último piso y solo se ocultaba el cielo raso. Ahora las piezas de cubierta llevan `part: "roof"` y se ocultan siempre que hay un piso aislado. Hay una prueba de regresión en `glbBuild.test.ts`.
+2. **El entorno distraía en los pisos aislados.** Los edificios vecinos del contexto urbano entraban en el encuadre de P10. Con un piso aislado ahora solo quedan el suelo, la vereda y la calle.
+
+**Verificación con GPU en el navegador integrado** (Vite local, 1440×900; clics reales en los botones y `form_input` en el selector). Valores del inspector `__twinDebug`:
+
+| Paso | Resultado |
+|---|---|
+| Aislar P10 | 0 mallas de otros pisos, 0 degeneradas, 47 draw calls, 9.280 triángulos; interior visible (hueco del atrio, claraboya, núcleo) y sin vecinos |
+| Aislar P9 | 0 de otros pisos, 0 degeneradas, 49 draw calls |
+| Aislar P1 | Espacios `SPC_1_BIB` y `SPC_1_LOBBY` dibujados, 0 de otros pisos, 55 draw calls |
+| Clic en Atrio | Aislamiento limpiado, preset `atrium`, escaleras, muro de ascensores y baliza A301 visibles, 62 draw calls |
+| Clic en Pisos explotados (desde Atrio) | Pasa a Fachada y explota el edificio; 0 degeneradas, **458 draw calls** (ver riesgo) |
+| Clic en Referencia → Restablecer vista | Referencia limpia la explosión; Restablecer deja Fachada, sin aislamiento ni explosión, 73 draw calls |
+| Móvil 375×812, aislar P10 | LOD móvil, 32 draw calls, 4.696 triángulos, 0 degeneradas, 0 de otros pisos |
+
+**Riesgos registrados (no resueltos):**
+- La vista **explotada** dibuja unas 458 draw calls, porque cada piso se dibuja con sus rebanadas. Es una vista transitoria, pero puede bajar los fps en el S25. Hay que medirla en el dispositivo.
+- La vista completa de Fachada usa 73 draw calls, por encima de la meta de 60.
+- En el móvil emulado con el panel oculto, el GLB tardó unos 45 s en aparecer: con la pestaña en segundo plano no se puede medir el tiempo de carga real.
+- `campus-ar.glb` (Scene Viewer) sigue exportándose desde el gemelo procedural (`apps/web/scripts/export-twin-glb.ts`), no desde Blender.

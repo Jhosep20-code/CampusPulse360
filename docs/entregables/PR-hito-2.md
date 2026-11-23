@@ -15,7 +15,9 @@
 
 ### Gemelo digital
 - **Modelo real de Blender 5.3:** script reproducible `assets/3d/blender/build_utp_huancayo.py` y fuente `.blend`.
-  - Exporta GLB de escritorio (1,85 MB, 37k triángulos), móvil (0,98 MB, 19k triángulos) y entorno (87 KB).
+  - **v2:** escaleras abiertas en zigzag en el atrio, muro negro de ascensores con 3 puertas por nivel y juntas de panel. Son rasgos contrastados con videos oficiales; las medidas son estimadas.
+  - Exporta GLB de escritorio (2,84 MB, 52.836 triángulos), móvil (1,24 MB) y entorno (89 KB).
+  - Comparación v1/v2 en `docs/entregables/FINAL/capturas/blender/comparacion-v1-v2.png`.
   - Jerarquía `BUILDING / FACADE / ROOF / ATRIUM / STAIRS / ELEVATORS / FLOOR_P01–P10 / SPC_* / SENSOR_ANCHORS`.
 - **Visor Three.js/R3F con el GLB:** aislar un piso oculta su grupo (`visible=false`, sin escalar matrices); la explosión desplaza cada grupo en Y. Si el GLB falla, el visor vuelve a la geometría procedural.
 - **Corrección de las "losas negras":** las matrices degeneradas (escala 0 en un solo eje) producían normales NaN en el shader de instancing de three. Pruebas visuales WebGL: P6 bajó de 55,2 % a 0,7 % de píxeles negros y P9 de 39,0 % a 0,7 %.
@@ -23,6 +25,7 @@
 - **Vista Referencia:** comparación con una foto local que no sale del dispositivo.
 - **Atrio:** corte de sección.
 - **Encuadre:** el piso aislado tiene prioridad sobre el preset de cámara.
+- **Pisos altos:** al aislar un piso, la cubierta se oculta (antes tapaba P10) y el contexto urbano solo conserva suelo y calles.
 - Diez pisos y los 10 espacios instrumentados se conservan. P6–P10 se rotulan "sin espacios instrumentados".
 - Aviso visible: "Modelo aproximado basado en fotografía · dimensiones estimadas · sin planos verificados".
 
@@ -45,7 +48,8 @@
 ### Pendiente (no se declara completado)
 - Bloques visuales automáticos B3 y B4 (10 pisos × 5 vistas): bloqueados en WebGL por software; hay que ejecutarlos con GPU.
 - Pruebas físicas: AR en Galaxy S25 Ultra, `/reloj` en Galaxy Watch6 Classic y fps en dispositivo.
-- Fidelidad arquitectónica interior (atrio, ascensores y escaleras): esquemática, pendiente de contrastar con referencias reales.
+- Fidelidad arquitectónica: los rasgos del atrio, las escaleras y los ascensores se contrastaron con videos oficiales, pero la distribución y las medidas siguen siendo estimadas, sin planos.
+- Rendimiento: la vista explotada dibuja unas 458 draw calls y la Fachada 73 (meta: 60). Falta medir los fps en el S25.
 - Unity/VR de la TA5: en la rama `feature/ta5-unity`, sin ejecutar.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
