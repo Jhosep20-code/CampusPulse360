@@ -115,12 +115,12 @@ Es una representacion aproximada, **no una replica exacta**. Todas las dimension
 
 | Grupo | Contenido |
 | --- | --- |
-| `FLOOR_Pxx` | **Todo lo especifico del piso**, para ocultarlo con `visible=false` sin escalar matrices: losa con vacios de atrio y escaleras, frentes de losa del atrio, vidrio del muro cortina y sus montantes (P2-P10), planta baja con pilastras, vidrio oscuro, banda de rotulo, marquesina y puertas (P1), bandas genericas posterior/derecha, ventanas `WINDOW_NIGHT`, pasillo de porcelanato, falso cielo con luminarias, tabiques con puertas de madera, barandas del atrio, tramos de escalera que unen el piso con el siguiente, puertas de acero de los 3 ascensores, mobiliario (solo P1 biblioteca, P2 aula, P3 y P4 laboratorios, P5 auditorio), el volumen `SPC_*` de cada espacio de ese piso. |
-| `FACADE` | Volumenes macizos blancos continuos de todo el alto: lateral izquierdo ciego, muro posterior, lateral derecho (borde de 0,6 m) y pilastra izquierda de 4 m. |
+| `FLOOR_Pxx` | **Todo lo especifico del piso**, para ocultarlo con `visible=false` sin escalar matrices: losa con el vacio del atrio, frentes de losa blancos del atrio, vidrio del muro cortina y sus montantes (P2-P10), planta baja con pilastras, vidrio oscuro, banda de rotulo, marquesina y puertas (P1), bandas genericas posterior/derecha, ventanas `WINDOW_NIGHT`, pasillo de porcelanato, falso cielo con luminarias, tabiques con puertas de madera, barandas de tubo en todo el borde del vacio, tramo recto abierto de escalera que une el piso con el siguiente (zancas, peldanos, fondo y barandas), puertas de acero con marco, indicador y botonera de los 3 ascensores (cara oeste del nucleo, hacia el atrio), mobiliario (solo P1 biblioteca, P2 aulas A201/A202, P3 laboratorio de computo, P4 laboratorio con mesones y pozas, P5 auditorio), el volumen `SPC_*` de cada espacio de ese piso. |
+| `FACADE` | Volumenes macizos blancos continuos de todo el alto: lateral izquierdo ciego, muro posterior, lateral derecho (borde de 0,6 m) y pilastra izquierda de 4 m, con juntas horizontales de paneles (`PANEL_JOINT`). |
 | `ROOF` | Losa de cubierta (con hueco bajo la claraboya), coronacion de 2,4 m, acento rojo (sin logotipo), linea LED `LED_CROWN`, caja tecnica y equipos genericos. |
-| `ATRIUM` | Compartido: 4 pilares continuos en las esquinas del atrio y claraboya. (Las barandas y frentes de losa van en cada `FLOOR_Pxx`.) |
-| `STAIRS` | Compartido: tabique central de cada escalera en U. (Los tramos, descansos y barandas van en cada `FLOOR_Pxx`.) |
-| `ELEVATORS` | Compartido: nucleo de 7 x 9 m en `CORE_BLACK`. (Las puertas de acero van en cada `FLOOR_Pxx`.) |
+| `ATRIUM` | Compartido: 4 pilares continuos en las esquinas del vacio (12 x 9 m, estimado) y claraboya. (Las barandas y frentes de losa van en cada `FLOOR_Pxx`.) |
+| `STAIRS` | v2: **sin geometria** (nodo vacio). Nada es compartido: cada tramo pertenece al `FLOOR_Pxx` de su nivel inferior. |
+| `ELEVATORS` | Compartido: nucleo continuo de 6 x 9 m en `CORE_BLACK`, a 2,4 m del vacio, con su cara oeste mirando al atrio. (Las puertas, indicadores y botoneras van en cada `FLOOR_Pxx`.) |
 | `SPC_<piso>_<codigo>` | Los 10 volumenes del seed, hijos de su `FLOOR_Pxx`, material `SPC_VOLUME` (el visor lo sustituye). |
 | `SENSOR_ANCHORS` | 10 empties `ANCHOR_SPC_*` en el centro superior de cada volumen. No se mueven con el piso: en vista explotada el visor debe sumarles el desplazamiento de su piso (`level` en los extras). |
 
@@ -143,3 +143,36 @@ espacios (cada fila es un unico espacio de ancho completo), mobiliario, fachadas
 tecnica, equipos de cubierta y el contexto urbano (manzanas pseudoaleatorias). Lo unico "observado" es cualitativo: 6 franjas de
 muro cortina, pilastra blanca a la izquierda, lateral ciego, planta baja con vidrio oscuro y marquesina, acento rojo y atrio con
 3 ascensores sobre muro negro (fotografias privadas, no incluidas).
+
+## v2: rasgos verificados con video oficial (23-nov-2026)
+
+Fuente: seccion 9 de `docs/referencias/especificacion-3d.md` (video institucional y 2 shorts del canal oficial de la UTP;
+fotogramas solo en local privado). Se mantienen jerarquia y nombres de nodos. Renders v1 conservados en
+`docs/entregables/FINAL/capturas/blender/v1/`; hoja `comparacion-v1-v2.png` (solo renders propios).
+
+### Que cambio
+
+| Elemento | v1 | v2 |
+| --- | --- | --- |
+| Escaleras | 2 en U en las esquinas | 9 tramos rectos ABIERTOS dentro del vacio, uno por nivel, en zigzag (sentido y carril alternados cada nivel). Zancas y fondo `STAIR_STRINGER` (#6B7380), peldanos abiertos `TILE`, barandas de 2 tubos y pasamanos, umbrales en cada extremo. Cada tramo cuelga de `FLOOR_Pxx` (nivel inferior); `STAIRS` queda vacio |
+| Ascensores | puertas hacia el pasillo +Z | nucleo negro desplazado al este: su cara oeste da al atrio, con pasillo de 2,4 m entre muro y vacio. 3 puertas de acero por nivel con marco, indicador emisivo (`ELEV_INDICATOR`) y botonera entre puertas |
+| Atrio | losa gris, 3 lados con frente | frentes de losa blancos lisos (`SLAB_FACE`, 0,6 m de canto) en los 4 lados; fondo de losa #C9D3DD; barandas de tubo en todo el borde salvo en los arranques de tramo |
+| Aulas | tabique con antepecho y vidrio | tabique blanco, puertas de madera clara y franja alta de vidrio hacia el pasillo; falso cielo blanco con paneles LED cuadrados |
+| Fachada | proporciones iguales | juntas de panel horizontales (`PANEL_JOINT`) en marco, laterales y coronacion; montantes oscuros mas anchos y salientes; vidrio mas reflectante; acento rojo sin letras ni logotipo |
+| Mobiliario (P1-P5, solo LOD0) | biblioteca con libreros, aula A202, 2 labs iguales, auditorio | biblioteca con mesas y sillas rojas (`CHAIR_RED`), carpetas en A201 y A202, laboratorio de computo con mesas largas y monitores (P3), laboratorio con mesones blancos y pozas (P4) |
+| Vacio del atrio | 14 x 9 m | 12 x 9 m (estimado; se ajusto para que el nucleo quede con pasillo delante) |
+| Materiales nuevos | | `SLAB_FACE`, `STAIR_STRINGER`, `STEEL_DOOR`, `ELEV_INDICATOR` (emisivo), `CHAIR_RED`, `PANEL_JOINT`; `SLAB`, `WOOD` y `GLASS_CURTAIN` cambian de color/reflejo. Sin texturas ni Draco |
+
+### Verificado frente a estimado
+
+- **Verificado (video oficial; existencia, tipo y orientacion):** vacio central alto con pasillos en todo el contorno; frentes de
+  losa blancos, lisos y gruesos; barandas de tubos horizontales de acero con pasamanos; escaleras como tramos rectos abiertos
+  en el vacio, en zigzag; muro negro brillante de ascensores con puertas de acero que da al atrio; muros de aula blancos con
+  puertas de madera clara y franjas altas de vidrio; muro cortina azul con montantes oscuros y marco blanco con juntas de panel;
+  existencia de laboratorios de computo, laboratorio con mesones y pozas, biblioteca con sillas rojas.
+- **Estimado (no medido):** dimensiones del vacio (12 x 9 m), numero de tramos (9) y su carril/pendiente, ancho de escalera (1,5 m),
+  canto del frente de losa (0,6 m), numero exacto de puertas por nivel (3), posicion y tamano del nucleo, modulo de juntas (1,2 m),
+  todo el mobiliario y su distribucion, huella 38 x 30 m, alturas, distribucion de espacios.
+- **No incluido por falta de evidencia:** escaleras de evacuacion cerradas, taller de pintura, logotipo y letras (el rojo es solo un
+  panel liso), distribucion real de aulas por piso, medidas reales.
+- Los renders de Blender (EEVEE) son visualizaciones de validacion, no mediciones ni AR.

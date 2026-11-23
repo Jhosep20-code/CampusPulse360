@@ -38,3 +38,6 @@ infra/local.env
 # Despliegue: worktree temporal y secretos de produccion (nunca versionar)
 .deploy-wt/
 infra/*.secrets.local*
+
+# Copias de seguridad automaticas de Blender
+*.blend1

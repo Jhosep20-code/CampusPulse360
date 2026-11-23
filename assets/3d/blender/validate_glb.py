@@ -21,6 +21,7 @@ BUILDING_NODES = ["BUILDING", "FACADE", "ROOF", "ATRIUM", "STAIRS", "ELEVATORS",
 BUILDING_MATS = [
     "GLASS_CURTAIN", "WHITE_PANEL", "FRAME_DARK", "GLASS_GROUND", "ROOF", "BRAND_RED", "SLAB",
     "CORE_BLACK", "STEEL", "TILE", "WOOD", "CEILING", "LIGHT_PANEL", "WINDOW_NIGHT",
+    "SLAB_FACE", "STAIR_STRINGER", "STEEL_DOOR", "ELEV_INDICATOR", "PANEL_JOINT",   # v2
 ]
 
 
@@ -82,7 +83,7 @@ def validate(path):
                     problems.append(f"{a} cuelga de {par}")
         mats = {m["name"]: m for m in j.get("materials", [])}
         for mname in BUILDING_MATS:
-            if mname == "LIGHT_PANEL" and "mobile" in os.path.basename(path):
+            if mname in ("LIGHT_PANEL",) and "mobile" in os.path.basename(path):
                 continue  # LOD1 no lleva luminarias individuales
             if mname not in mats:
                 problems.append(f"falta material {mname}")

@@ -433,7 +433,7 @@ export function buildGlbModel(scene: Object3D, opts: GlbBuildOptions): GlbModel 
     const own = structural.filter((p) => p.level === band.level && p.shared === null);
     const parts: Mesh[] = mergeInto(own, group.name, (n) => mainMat(n), ud);
     if (band.level === topLevel) {
-      parts.push(...mergeInto(structural.filter((p) => p.shared === "ROOF"), `${group.name}_ROOF`, (n) => mainMat(n), ud));
+      parts.push(...mergeInto(structural.filter((p) => p.shared === "ROOF"), `${group.name}_ROOF`, (n) => mainMat(n), { ...ud, part: "roof" }));
     }
     for (const sb of sliceBuckets) {
       const src = sb.pieces[0]!.material;
@@ -518,6 +518,8 @@ interface CtxEntry {
 export interface ContextModel {
   group: Group;
   update: (night: number) => void;
+  /** Con un piso aislado solo quedan suelo, vereda y calle: los edificios vecinos distraen del piso. */
+  setFocus: (floorIsolated: boolean) => void;
   dispose: () => void;
 }
 
@@ -571,6 +573,9 @@ export function buildContextModel(scene: Object3D, profile: "high" | "low", shad
   });
   return {
     group,
+    setFocus: (floorIsolated) => {
+      for (const m of meshes) m.visible = !floorIsolated || contextMaterialAllowed("low", (m.material as Material).name);
+    },
     update: (night) => {
       for (const e of entries.values()) {
         e.mat.color.lerpColors(e.day, e.night, night);

@@ -31,7 +31,8 @@ export function applyFloorState(model: GlbModel, s: FloorState): void {
     fl.group.visible = s.isolatedLevel === null || s.isolatedLevel === fl.level;
     for (const m of fl.parts) {
       // Con un piso aislado se quita su falso cielo para ver los espacios desde arriba (es un nodo, no una escala).
-      const openTop = s.isolatedLevel !== null && m.userData["material"] === "CEILING";
+      // Tambien la cubierta (fusionada en el ultimo piso) se oculta al aislar: si no, tapa P10.
+      const openTop = s.isolatedLevel !== null && (m.userData["material"] === "CEILING" || m.userData["part"] === "roof");
       m.visible = s.floorMode && !openTop;
       m.userData["swapHidden"] = !s.floorMode;
     }

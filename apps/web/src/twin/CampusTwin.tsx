@@ -1101,6 +1101,10 @@ function GlbBuilding() {
 function GlbContext({ url, profile, shadows }: { url: string; profile: "high" | "low"; shadows: boolean }) {
   const ctx = useCtx();
   const model = useContextModel(url, profile, shadows);
+  const isolated = ctx.isolatedLevel !== null;
+  useEffect(() => {
+    model.setFocus(isolated);
+  }, [model, isolated]);
   useFrame(() => {
     model.update(ctx.anim.current.night);
   });

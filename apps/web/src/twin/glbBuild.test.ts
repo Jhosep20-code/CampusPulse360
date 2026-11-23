@@ -125,6 +125,17 @@ describe("aislamiento y explosion del GLB", () => {
     expect(snap.renderMode).toBe("floors");
   });
 
+  it("al aislar el ultimo piso la cubierta se oculta (no tapa P10) y vuelve al explotar sin aislar", () => {
+    const m = build();
+    const roof = () => m.floors.get(3)!.parts.filter((p) => p.userData["part"] === "roof");
+    expect(roof().length).toBeGreaterThan(0);
+    applyFloorState(m, { isolatedLevel: 3, explode: 0, gap: 4, floorMode: true });
+    for (const p of roof()) expect(p.visible).toBe(false);
+    expect(m.floors.get(3)!.parts.some((p) => p.userData["part"] !== "roof" && p.visible)).toBe(true);
+    applyFloorState(m, { isolatedLevel: null, explode: 1, gap: 4, floorMode: true });
+    for (const p of roof()) expect(p.visible).toBe(true);
+  });
+
   it("sin aislamiento ni explosion se dibuja el edificio completo fusionado", () => {
     const m = build();
     applyFloorState(m, { isolatedLevel: null, explode: 0, gap: 4, floorMode: false });

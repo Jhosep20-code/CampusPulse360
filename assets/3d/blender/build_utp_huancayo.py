@@ -45,6 +45,8 @@ ARGV = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 SKIP_RENDER = "--skip-render" in ARGV
 USE_MESHOPT = "--meshopt" in ARGV
 ONLY_RENDER = "--only-render" in ARGV
+RENDER_ONLY = [a.split("=", 1)[1].split(",") for a in ARGV if a.startswith("--render=")]
+RENDER_ONLY = RENDER_ONLY[0] if RENDER_ONLY else None   # p. ej. --render=escaleras.png,ascensores.png
 
 # --------------------------------------------------------------------------- dimensiones (ESTIMADAS)
 # Mismos valores que apps/web/src/twin/constants.ts (DEFAULT_DIMS). Ninguno es una medicion real.
@@ -54,8 +56,8 @@ H_GROUND, H_FLOOR, CROWN = 4.8, 3.6, 2.4
 SLAB_T, WALL_T = 0.3, 0.6
 HEADROOM, WALL_INSET, FRONT_SETBACK = 0.4, 0.8, 1.8
 CORR = 2.4
-ATR_W, ATR_D, ATR_X = 14.0, 9.0, 2.0
-CORE_W, CORE_D = 7.0, 9.0
+ATR_W, ATR_D, ATR_X = 12.0, 9.0, 2.0   # v2: vacio de 12 x 9 m (ESTIMADO), deja pasillo de 2,4 m ante el nucleo
+CORE_W, CORE_D = 6.0, 9.0
 BAYS, PANES = 6, 4
 PIER_L, EDGE_R = 4.0, 0.6
 G_PIERS, PIER_S, G_SETBACK, SIGN_H = 7, 0.6, 1.5, 1.0
@@ -63,23 +65,32 @@ MARQ_W, MARQ_D, MARQ_T, MARQ_Y = 10.0, 4.0, 0.25, 3.5
 ROOFBOX_W, ROOFBOX_D, ROOFBOX_H, ROOFBOX_X, ROOFBOX_Z = 14.0, 8.0, 3.0, -6.0, -6.0
 
 ATR = dict(minX=ATR_X - ATR_W / 2, maxX=ATR_X + ATR_W / 2, minZ=-ATR_D / 2, maxZ=ATR_D / 2)
-CORE = dict(minX=ATR["maxX"], maxX=ATR["maxX"] + CORE_W, minZ=-CORE_D / 2, maxZ=CORE_D / 2)
+CORE = dict(minX=ATR["maxX"] + CORR, maxX=ATR["maxX"] + CORR + CORE_W, minZ=-CORE_D / 2, maxZ=CORE_D / 2)
 OUTER_Z = ATR_D / 2 + CORR
 XR = (-W / 2 + WALL_INSET, W / 2 - WALL_INSET)
 _INNER = OUTER_Z + 0.1
 FRONT_Z = (_INNER, DP / 2 - FRONT_SETBACK)
 BACK_Z = (-(DP / 2 - WALL_INSET), -_INNER)
-# Escaleras (centro X, ancho, rango Z). ESTIMACION. La segunda va entre el nucleo y el muro este.
-STAIRS = [
-    dict(cx=-14.2, width=3.0, z0=-3.0, z1=3.0),
-    dict(cx=(CORE["maxX"] + (W / 2 - WALL_INSET)) / 2, width=2.0, z0=-3.0, z1=3.0),
-]
+# Escaleras v2 (verificado: tramos rectos abiertos en el vacio, zigzag). Carril A (niveles pares) y B (impares);
+# posiciones y numero de tramos ESTIMADOS.
+STAIR_W = 1.5
+STAIR_LANES = (ATR_X - 1.3, ATR_X + 1.3)
 CWX0, CWX1 = -W / 2 + PIER_L, W / 2 - EDGE_R
 CWW = CWX1 - CWX0
 CWCX = (CWX0 + CWX1) / 2
 COLS = BAYS * PANES
 COLW = CWW / COLS
 GLASS_Z = DP / 2 - 0.15
+
+
+def stair_lane(k):
+    """Centro X del carril del tramo que sale del piso k (0-based)."""
+    return STAIR_LANES[k % 2]
+
+
+def stair_edge_z(k):
+    """Borde del vacio (z) donde ARRANCA el tramo del piso k y donde TERMINA el del piso k-1."""
+    return ATR["minZ"] if k % 2 == 0 else ATR["maxZ"]
 
 
 def base(k):
@@ -101,24 +112,31 @@ SPACES = [
     [("SPC_4_A401", 0), ("SPC_4_LAB2", 1)],
     [("SPC_5_OFI", 0), ("SPC_5_AUD", 1)],
 ]
-FURNISH = {"SPC_1_BIB": "library", "SPC_2_A202": "classroom", "SPC_3_LAB1": "lab", "SPC_4_LAB2": "lab", "SPC_5_AUD": "auditorium"}
+FURNISH = {"SPC_1_BIB": "library", "SPC_2_A201": "classroom", "SPC_2_A202": "classroom", "SPC_3_LAB1": "lab",
+           "SPC_4_LAB2": "wetlab", "SPC_5_AUD": "auditorium"}
 BOOK_MATS = ["BOOKS_A", "BOOKS_B", "BOOKS_C"]
 
 # --------------------------------------------------------------------------- materiales PBR
 # nombre: (hex sRGB, roughness, metallic, alpha, emision hex | None)
 MATERIAL_SPECS = {
-    "GLASS_CURTAIN": ("#3A78C2", 0.04, 0.55, 0.93, None),
+    "GLASS_CURTAIN": ("#4585CF", 0.03, 0.68, 0.9, None),
     "WHITE_PANEL": ("#E6E8EA", 0.6, 0.0, 1.0, None),
     "FRAME_DARK": ("#1A1F26", 0.4, 0.6, 1.0, None),
     "GLASS_GROUND": ("#0E1724", 0.1, 0.3, 0.85, None),
     "GLASS_CLEAR": ("#8FD0DC", 0.05, 0.1, 0.4, None),
     "ROOF": ("#B9BEC4", 0.85, 0.0, 1.0, None),
     "BRAND_RED": ("#C8102E", 0.5, 0.0, 1.0, None),
-    "SLAB": ("#8E97A4", 0.7, 0.1, 1.0, None),
+    "SLAB": ("#C9D3DD", 0.75, 0.0, 1.0, None),          # fondo de losa gris azulado claro
+    "SLAB_FACE": ("#F4F6F8", 0.5, 0.0, 1.0, None),      # frente de losa blanco y liso
+    "STAIR_STRINGER": ("#6B7380", 0.45, 0.6, 1.0, None),
+    "STEEL_DOOR": ("#D5DAE0", 0.35, 0.85, 1.0, None),
+    "ELEV_INDICATOR": ("#FFB454", 0.5, 0.0, 1.0, "#FFB454"),
+    "CHAIR_RED": ("#B3262E", 0.6, 0.0, 1.0, None),
+    "PANEL_JOINT": ("#8E97A4", 0.7, 0.0, 1.0, None),
     "CORE_BLACK": ("#0B0C0F", 0.12, 0.6, 1.0, None),
     "STEEL": ("#B7C0CC", 0.3, 0.9, 1.0, None),
     "TILE": ("#D9D2C5", 0.55, 0.0, 1.0, None),
-    "WOOD": ("#C8955A", 0.55, 0.0, 1.0, None),
+    "WOOD": ("#D8B07A", 0.55, 0.0, 1.0, None),
     "CEILING": ("#F2F2EF", 0.9, 0.0, 1.0, None),
     "LIGHT_PANEL": ("#FFF6E6", 0.5, 0.0, 1.0, "#FFF6E6"),
     "WINDOW_NIGHT": ("#FFF1E2", 0.5, 0.0, 1.0, "#FFF1E2"),
@@ -139,7 +157,7 @@ MATERIAL_SPECS = {
     "CONTEXT_ROOF": ("#B9BEC4", 0.9, 0.0, 1.0, None),
     "LAMP_HEAD": ("#FFE9B8", 0.5, 0.0, 1.0, "#FFE9B8"),
 }
-EMISSIVE = ("LIGHT_PANEL", "WINDOW_NIGHT", "LED_CROWN", "LAMP_HEAD")
+EMISSIVE = ("LIGHT_PANEL", "WINDOW_NIGHT", "LED_CROWN", "LAMP_HEAD", "ELEV_INDICATOR")
 
 # --------------------------------------------------------------------------- estado global
 FINE = True          # True = LOD0 (detalle fino); False = LOD1 movil
@@ -332,6 +350,14 @@ def build_facade():
     box(g, "WHITE_PANEL", 0, h / 2, -DP / 2 + WALL_T / 2, W, h, WALL_T)
     box(g, "WHITE_PANEL", W / 2 - WALL_T / 2, h / 2, 0.3, WALL_T, h, DP - 0.6)
     box(g, "WHITE_PANEL", -W / 2 + PIER_L / 2, h / 2, DP / 2 - 0.5, PIER_L, h, 1.0)
+    # Juntas horizontales de los paneles de revestimiento (verificado en video; modulo de 1,2 m ESTIMADO).
+    ys = [1.2 * i for i in range(1, int(h / 1.2) + 1) if 1.2 * i < h - 0.1]
+    for y in ys:
+        box(g, "PANEL_JOINT", -W / 2 - 0.006, y, -0.2, 0.012, 0.035, DP - 1.6)
+        box(g, "PANEL_JOINT", 0, y, -DP / 2 - 0.006, W, 0.035, 0.012)
+        box(g, "PANEL_JOINT", W / 2 + 0.006, y, 0.3, 0.012, 0.035, DP - 0.6)
+        box(g, "PANEL_JOINT", -W / 2 + PIER_L / 2, y, DP / 2 + 0.006, PIER_L, 0.035, 0.012)
+        box(g, "PANEL_JOINT", W / 2 - EDGE_R / 2, y, DP / 2 + 0.006, EDGE_R, 0.035, 0.012)
 
 
 # --------------------------------------------------------------------------- pisos
@@ -348,14 +374,15 @@ def build_floor_slab(k):
         box(g, "SLAB", 0, yc, 0, sw, SLAB_T, sd)
         return
     holes = [(ATR["minX"], ATR["maxX"], ATR["minZ"], ATR["maxZ"])]
-    holes += [(s["cx"] - s["width"] / 2, s["cx"] + s["width"] / 2, s["z0"], s["z1"]) for s in STAIRS]
     slab_cells(g, "SLAB", yc, SLAB_T, (-sw / 2, sw / 2, -sd / 2, sd / 2), holes)
-    # Frentes de losa del atrio (gris #8E97A4): vigas peraltadas bajo el borde del vacio.
+    # Frentes de losa del atrio: blancos, lisos, de ~0,6 m de canto (estimado), en los 4 lados del vacio.
     f = 0.12
     fy, fh = b, 0.6
-    box(g, "SLAB", (ATR["minX"] + ATR["maxX"]) / 2, fy, ATR["maxZ"] + f / 2, ATR_W, fh, f, fine=True)
-    box(g, "SLAB", (ATR["minX"] + ATR["maxX"]) / 2, fy, ATR["minZ"] - f / 2, ATR_W, fh, f, fine=True)
-    box(g, "SLAB", ATR["minX"] - f / 2, fy, 0, f, fh, ATR_D + 2 * f, fine=True)
+    cxm = (ATR["minX"] + ATR["maxX"]) / 2
+    box(g, "SLAB_FACE", cxm, fy, ATR["maxZ"] + f / 2, ATR_W, fh, f)
+    box(g, "SLAB_FACE", cxm, fy, ATR["minZ"] - f / 2, ATR_W, fh, f)
+    box(g, "SLAB_FACE", ATR["minX"] - f / 2, fy, 0, f, fh, ATR_D + 2 * f)
+    box(g, "SLAB_FACE", ATR["maxX"] + f / 2, fy, 0, f, fh, ATR_D + 2 * f)
 
 
 def build_curtain_and_generic(k):
@@ -407,15 +434,15 @@ def build_curtain_and_generic(k):
     else:
         # Muro cortina: vidrio continuo por piso, junta de losa, montantes principales y secundarios.
         box(g, "GLASS_CURTAIN", CWCX, yc, GLASS_Z, CWW, H - 0.1, 0.08)
-        box(g, "FRAME_DARK", CWCX, b + 0.05, GLASS_Z + 0.03, CWW, 0.1, 0.25)
+        box(g, "FRAME_DARK", CWCX, b + 0.08, GLASS_Z + 0.04, CWW, 0.18, 0.3)
         for bay in range(BAYS + 1):
-            box(g, "FRAME_DARK", CWX0 + bay * CWW / BAYS, yc, GLASS_Z + 0.05, 0.25, H, 0.35)
+            box(g, "FRAME_DARK", CWX0 + bay * CWW / BAYS, yc, GLASS_Z + 0.08, 0.36, H, 0.45)
         for c in range(1, COLS):
             if c % PANES == 0:
                 continue
             if not FINE and c % PANES != 2:
                 continue  # LOD1: solo el montante secundario central de cada franja
-            box(g, "FRAME_DARK", CWX0 + c * COLW, yc, GLASS_Z + 0.03, 0.08, H, 0.15)
+            box(g, "FRAME_DARK", CWX0 + c * COLW, yc, GLASS_Z + 0.04, 0.1, H, 0.25)
         # Ventanas encendidas: MISMA geometria con emision (el visor modula la intensidad).
         for c in range(COLS):
             x = CWX0 + (c + 0.5) * COLW
@@ -446,22 +473,25 @@ def build_corridors_ceilings(k):
     def ceiling(x0, x1, z0, z1):
         box(g, "CEILING", (x0 + x1) / 2, ceil_y + 0.02, (z0 + z1) / 2, x1 - x0, 0.04, z1 - z0)
 
+    def tile(x0, x1, z0, z1):
+        box(g, "TILE", (x0 + x1) / 2, tile_y, (z0 + z1) / 2, x1 - x0, 0.02, z1 - z0)
+
     def light(x, z):
         box(g, "LIGHT_PANEL", x, ceil_y - 0.015, z, 0.6, 0.03, 0.6, fine=True)
 
+    # Pasillo perimetral: rodea el vacio por los cuatro lados; el nucleo queda al este con un pasillo delante.
     if k == 0:
-        box(g, "TILE", (tx0 + ATR["maxX"]) / 2, tile_y, 0, ATR["maxX"] - tx0, 0.02, 2 * OUTER_Z)
+        tile(tx0, CORE["maxX"], -OUTER_Z, OUTER_Z)
     else:
-        box(g, "TILE", (tx0 + ATR["maxX"]) / 2, tile_y, (ATR["maxZ"] + OUTER_Z) / 2, ATR["maxX"] - tx0, 0.02, OUTER_Z - ATR["maxZ"])
-        box(g, "TILE", (tx0 + ATR["maxX"]) / 2, tile_y, -(ATR["maxZ"] + OUTER_Z) / 2, ATR["maxX"] - tx0, 0.02, OUTER_Z - ATR["maxZ"])
-        box(g, "TILE", (tx0 + ATR["minX"]) / 2, tile_y, 0, ATR["minX"] - tx0, 0.02, ATR["maxZ"] - ATR["minZ"])
-    for sgn in (1, -1):  # pasillo que rodea el nucleo por delante y por detras
-        box(g, "TILE", (ATR["maxX"] + CORE["maxX"]) / 2, tile_y, sgn * (ATR["maxZ"] + OUTER_Z) / 2,
-            CORE["maxX"] - ATR["maxX"], 0.02, OUTER_Z - ATR["maxZ"])
-    # Falso cielo sobre los pasillos (el vacio del atrio queda abierto) y luminarias cuadradas.
+        tile(tx0, CORE["maxX"], ATR["maxZ"], OUTER_Z)
+        tile(tx0, CORE["maxX"], -OUTER_Z, ATR["minZ"])
+        tile(tx0, ATR["minX"], ATR["minZ"], ATR["maxZ"])
+        tile(ATR["maxX"], CORE["minX"], ATR["minZ"], ATR["maxZ"])
+    # Falso cielo blanco sobre los pasillos (el vacio del atrio queda abierto) y luminarias LED cuadradas.
     ceiling(tx0, CORE["maxX"], ATR["maxZ"], OUTER_Z)
     ceiling(tx0, CORE["maxX"], -OUTER_Z, ATR["minZ"])
     ceiling(tx0, ATR["minX"], ATR["minZ"], ATR["maxZ"])
+    ceiling(ATR["maxX"], CORE["minX"], ATR["minZ"], ATR["maxZ"])
     x = tx0 + 0.9
     while x < CORE["maxX"] - 0.3:
         light(x, (ATR["maxZ"] + OUTER_Z) / 2)
@@ -469,10 +499,12 @@ def build_corridors_ceilings(k):
         x += 3
     for z in (-3, 0, 3):
         light((tx0 + ATR["minX"]) / 2, z)
+        light((ATR["maxX"] + CORE["minX"]) / 2, z)
 
 
 def build_rooms(k):
-    """Ambientes de cada piso: piso, falso cielo, luminarias, tabique con puertas de madera y mobiliario (P1-P5)."""
+    """Ambientes de cada piso: piso, falso cielo, luminarias, tabique blanco con puertas de madera clara y franja alta
+    de vidrio hacia el pasillo, y mobiliario representativo (P1-P5)."""
     g = fl(k)
     b = base(k)
     H = height(k)
@@ -492,7 +524,7 @@ def build_rooms(k):
         for i in range(nx):
             for zz in rows_z:
                 box(g, "LIGHT_PANEL", x0 + (i + 0.5) * sx / nx, ceil_y - 0.015, zz, 0.6, 0.03, 0.6, fine=True)
-        # Tabique del lado del pasillo con puertas de madera; el fondo lleva antepecho + vidrio.
+        # Tabique blanco hacia el pasillo: puertas de madera clara y, encima, franja alta de vidrio (ambas filas).
         wz = z0 - 0.05 if row == 0 else z1 + 0.05
         n_doors = max(1, round(sx / 7.5))
         door_w = 0.95
@@ -500,11 +532,7 @@ def build_rooms(k):
         cursor = x0
 
         def part(xc, ln):
-            if row == 1:
-                box(g, "WHITE_PANEL", xc, y0 + 0.45, wz, ln, 0.9, 0.1)
-                box(g, "GLASS_CLEAR", xc, y0 + 1.6, wz, ln, 1.4, 0.04)
-            else:
-                box(g, "WHITE_PANEL", xc, y0 + 1.15, wz, ln, 2.3, 0.1)
+            box(g, "WHITE_PANEL", xc, y0 + 1.15, wz, ln, 2.3, 0.1)
 
         for i in range(n_doors):
             xd = x0 + (i + 0.5) * sx / n_doors
@@ -516,54 +544,97 @@ def build_rooms(k):
             cursor = xd + door_w / 2
         if x1 - cursor > 0.05:
             part((cursor + x1) / 2, x1 - cursor)
-        box(g, "WHITE_PANEL", cx, y0 + 2.3 + (wall_top - 2.3) / 2, wz, sx, wall_top - 2.3, 0.1)
+        gl_h = min(0.65, wall_top - 2.3)
+        box(g, "GLASS_CLEAR", cx, y0 + 2.3 + gl_h / 2, wz, sx, gl_h, 0.04)
+        rest = wall_top - 2.3 - gl_h
+        if rest > 0.02:
+            box(g, "WHITE_PANEL", cx, y0 + 2.3 + gl_h + rest / 2, wz, sx, rest, 0.1)
         kind = FURNISH.get(sid) if sid else None
         if kind and FINE:
             furnish(g, kind, row, cx, cz, sx, sz, y0)
 
 
 def furnish(g, kind, row, sx_c, sz_c, sx, sz, y0):
-    """Mobiliario representativo (solo LOD0, solo P1-P5)."""
-    wall_z = sz_c - sz / 2 if row == 1 else sz_c + sz / 2
-    d = 1 if row == 1 else -1
+    """Mobiliario representativo (solo LOD0, solo P1-P5). Existencia verificada en video; distribucion NO verificada."""
+    wall_z = sz_c - sz / 2 if row == 1 else sz_c + sz / 2   # muro del fondo (lejos del pasillo)
+    d = 1 if row == 1 else -1                               # sentido hacia el interior del ambiente
     fl_y = y0 + 0.02
     x0 = sx_c - sx / 2
-    if kind in ("classroom", "lab"):
+
+    def chair(x, z, face, mat="FURN_DARK"):
+        """Silla de asiento 0,42 m mirando hacia face (+1/-1 en z)."""
+        box(g, mat, x, fl_y + 0.45, z, 0.42, 0.04, 0.42)
+        box(g, mat, x, fl_y + 0.68, z - face * 0.2, 0.42, 0.42, 0.04)
+        box(g, "STEEL", x, fl_y + 0.22, z, 0.05, 0.44, 0.05)
+
+    if kind in ("classroom", "lab", "wetlab") and row == 1:
         nb = max(1, int(sx // 9))
         for i in range(nb):
             box(g, "CEILING", x0 + (i + 0.5) * sx / nb, fl_y + 1.6, wall_z + d * 0.04, 3.2, 1.2, 0.04)  # pizarras
     if kind == "classroom":
-        cols = max(1, int((sx - 3) // 3) + 1)
-        xs = sx_c - (cols - 1) * 3 / 2
+        # Aula con carpetas (pupitres unipersonales) en cuadricula.
+        step = 1.5
+        cols = max(1, int((sx - 3) // step) + 1)
+        xs = sx_c - (cols - 1) * step / 2
         for r in range(4):
-            z = wall_z + d * (1.9 + r * 1.25)
+            z = wall_z + d * (1.9 + r * 1.2)
             for i in range(cols):
-                x = xs + i * 3
-                box(g, "FURN_DARK", x, fl_y + 0.45, z - d * 0.2, 2.3, 0.5, 0.03)
-                box(g, "CEILING", x, fl_y + 0.75, z, 2.4, 0.04, 0.5)
+                x = xs + i * step
+                box(g, "WOOD", x, fl_y + 0.74, z, 0.6, 0.04, 0.45)
+                box(g, "FURN_DARK", x, fl_y + 0.37, z, 0.06, 0.72, 0.06)
+                box(g, "FURN_DARK", x, fl_y + 0.45, z + d * 0.42, 0.4, 0.04, 0.38)
+                box(g, "FURN_DARK", x, fl_y + 0.65, z + d * 0.6, 0.4, 0.34, 0.04)
     elif kind == "lab":
+        # Laboratorio de computo: mesas largas con monitores y sillas.
         segs = max(1, int((sx - 2) // 3.4))
         xs = sx_c - (segs - 1) * 3.4 / 2
         for r in range(2):
             z = wall_z + d * (2.6 + r * 3.0)
             for i in range(segs):
                 x = xs + i * 3.4
-                box(g, "CEILING", x, fl_y + 0.74, z, 2.9, 0.05, 0.8)
-                box(g, "FURN_DARK", x, fl_y + 0.38, z - d * 0.34, 2.8, 0.72, 0.04)
+                box(g, "WOOD", x, fl_y + 0.74, z, 3.0, 0.05, 0.8)
+                box(g, "FURN_DARK", x, fl_y + 0.38, z - d * 0.34, 2.9, 0.72, 0.04)
                 for dx in (-0.75, 0.75):
-                    box(g, "FURN_DARK", x + dx, fl_y + 0.99, z - d * 0.1, 0.58, 0.36, 0.03)
-                    box(g, "SCREEN", x + dx, fl_y + 0.99, z - d * 0.1 + d * 0.02, 0.52, 0.3, 0.012)
+                    box(g, "FURN_DARK", x + dx, fl_y + 0.98, z - d * 0.1, 0.58, 0.36, 0.03)
+                    box(g, "SCREEN", x + dx, fl_y + 0.98, z - d * 0.1 + d * 0.02, 0.52, 0.3, 0.012)
+                    box(g, "FURN_DARK", x + dx, fl_y + 0.82, z - d * 0.1, 0.06, 0.12, 0.06)
+                    chair(x + dx, z + d * 0.85, -d)
+    elif kind == "wetlab":
+        # Laboratorio con mesones blancos y pozas (lavaderos) con grifo.
+        segs = max(1, int((sx - 2) // 3.4))
+        xs = sx_c - (segs - 1) * 3.4 / 2
+        for r in range(2):
+            z = wall_z + d * (2.8 + r * 2.8)
+            for i in range(segs):
+                x = xs + i * 3.4
+                box(g, "WHITE_PANEL", x, fl_y + 0.43, z, 3.0, 0.86, 0.9)
+                box(g, "CEILING", x, fl_y + 0.89, z, 3.06, 0.05, 0.96)
+                for dx in (-0.8, 0.8):
+                    box(g, "FURN_DARK", x + dx, fl_y + 0.915, z, 0.6, 0.02, 0.4)
+                    box(g, "STEEL", x + dx, fl_y + 1.1, z - d * 0.3, 0.03, 0.4, 0.03)
+                    box(g, "STEEL", x + dx, fl_y + 1.3, z - d * 0.22, 0.03, 0.03, 0.2)
     elif kind == "library":
+        # Biblioteca: estantes al fondo, mesas de lectura con sillas rojas.
         units = max(1, int((sx - 2) // 2.7))
         xs = sx_c - (units - 1) * 2.7 / 2
         rnd = random.Random(1301)
-        for r in range(3):
-            z = wall_z + d * (1.8 + r * 2.2)
+        for r in range(2):
+            z = wall_z + d * (1.0 + r * 1.8)
             for i in range(units):
                 x = xs + i * 2.7
                 box(g, "WOOD", x, fl_y + 1.0, z, 2.3, 2.0, 0.45)
                 for bk in range(3):
                     box(g, rnd.choice(BOOK_MATS), x, fl_y + 0.5 + bk * 0.5, z + d * 0.255, 2.15, 0.28, 0.07)
+        tabs = max(1, int((sx - 2) // 3.2))
+        xt = sx_c - (tabs - 1) * 3.2 / 2
+        for i in range(tabs):
+            x = xt + i * 3.2
+            z = wall_z + d * 5.0
+            box(g, "WOOD", x, fl_y + 0.74, z, 2.6, 0.05, 0.9)
+            box(g, "FURN_DARK", x, fl_y + 0.37, z, 2.4, 0.72, 0.06)
+            for dx in (-0.9, 0.0, 0.9):
+                chair(x + dx, z - 0.7, 1, "CHAIR_RED")
+                chair(x + dx, z + 0.7, -1, "CHAIR_RED")
     elif kind == "auditorium":
         # Auditorio esquematico: revestimiento de madera, escenario y gradas con butacas.
         box(g, "WOOD", sx_c, fl_y + 1.5, wall_z + d * 0.05, sx - 0.4, 3.0, 0.1)
@@ -579,77 +650,127 @@ def furnish(g, kind, row, sx_c, sz_c, sx, sz, y0):
 
 
 def build_core_doors(k):
-    """Puertas de acero (3 ascensores, 2 hojas c/u) sobre el muro negro del nucleo, hacia el pasillo +Z."""
+    """3 ascensores por nivel sobre la cara OESTE del nucleo negro (CORE_BLACK), que MIRA AL ATRIO.
+    Verificado en video: muro negro brillante con puertas de acero frente al vacio. Cada puerta: marco de acero,
+    2 hojas, indicador emisivo encima; botonera entre puertas. Numero exacto de puertas: estimado (se ven ~3)."""
     g = fl(k)
     y0 = base(k) + SLAB_T
-    pitch = CORE_W / 3
-    for i in range(3):
-        xc = CORE["minX"] + (i + 0.5) * pitch
-        for dx in (-0.29, 0.29):
-            box(g, "STEEL", xc + dx, y0 + 1.1, CORE["maxZ"] + 0.025, 0.56, 2.2, 0.05)
-        box(g, "LIGHT_PANEL", xc, y0 + 2.42, CORE["maxZ"] + 0.02, 0.32, 0.07, 0.03, fine=True)
+    xf = CORE["minX"]
+    pitch = CORE_D / 3
+    zs = [-pitch, 0.0, pitch]
+    for zc in zs:
+        box(g, "STEEL", xf - 0.03, y0 + 2.25, zc, 0.06, 0.1, 1.5)
+        for sgn in (-1, 1):
+            box(g, "STEEL", xf - 0.03, y0 + 1.15, zc + sgn * 0.72, 0.06, 2.3, 0.08)
+        for sgn in (-1, 1):
+            box(g, "STEEL_DOOR", xf - 0.02, y0 + 1.09, zc + sgn * 0.33, 0.04, 2.18, 0.65)
+        box(g, "ELEV_INDICATOR", xf - 0.03, y0 + 2.55, zc, 0.03, 0.1, 0.3)
+    for zb in (-pitch / 2, pitch / 2):
+        box(g, "STEEL", xf - 0.02, y0 + 1.1, zb, 0.03, 0.34, 0.12)
+        box(g, "ELEV_INDICATOR", xf - 0.04, y0 + 1.18, zb, 0.015, 0.04, 0.04, fine=True)
+        box(g, "ELEV_INDICATOR", xf - 0.04, y0 + 1.04, zb, 0.015, 0.04, 0.04, fine=True)
 
 
 def build_stairs(k):
-    """2 escaleras en U (tramos, descanso, barandas inclinadas) que unen el piso k con el k+1."""
+    """Tramo recto ABIERTO del piso k al k+1, dentro del vacio del atrio (verificado en video). Zancas laterales de acero
+    gris, peldanos abiertos claros, fondo gris y barandas de tubos con pasamanos. Direccion alternada por nivel y carril
+    alternado (zigzag superpuesto): pares de pared posterior a frente por el carril A; impares de frente a posterior por B."""
     if k >= N - 1:
         return
     g = fl(k)
-    y0 = base(k) + SLAB_T
-    H = height(k)
-    half = H / 2
-    steps = max(6, round(half / 0.19)) if FINE else 5
-    riser = half / steps
-    landing, gap = 1.6, 0.08
-    for s in STAIRS:
-        run_len = s["z1"] - s["z0"] - landing
-        run = run_len / steps
-        lane = (s["width"] - gap) / 2
-        ca = s["cx"] - (lane + gap) / 2
-        cb = s["cx"] + (lane + gap) / 2
-        for j in range(1, steps + 1):
-            h1 = j * riser
-            box(g, "SLAB", ca, y0 + h1 / 2, s["z0"] + (j - 0.5) * run, lane, h1, run)
-            h2 = half + j * riser
-            box(g, "SLAB", cb, y0 + h2 / 2, s["z0"] + run_len - (j - 0.5) * run, lane, h2, run)
-        box(g, "SLAB", s["cx"], y0 + half - 0.1, s["z1"] - landing / 2, s["width"], 0.2, landing)
-        ln = math.hypot(run_len, half)
-        th = math.atan2(half, run_len)
-        zm = s["z0"] + run_len / 2
-        ry1 = y0 + 0.9 + half / 2
-        ry2 = y0 + half + 0.9 + half / 2
-        box(g, "STEEL", ca - lane / 2, ry1, zm, 0.04, 0.04, ln, rx=-th)
-        box(g, "STEEL", ca + lane / 2, ry1, zm, 0.04, 0.04, ln, rx=-th)
-        box(g, "STEEL", cb - lane / 2, ry2, zm, 0.04, 0.04, ln, rx=th)
-        box(g, "STEEL", cb + lane / 2, ry2, zm, 0.04, 0.04, ln, rx=th)
-        box(g, "STEEL", s["cx"], y0 + half + 0.9, s["z1"] - 0.04, s["width"], 0.04, 0.04)
+    R = height(k)
+    y_lo = base(k) + SLAB_T
+    y_hi = base(k + 1) + SLAB_T
+    d = 1 if k % 2 == 0 else -1
+    z_s = stair_edge_z(k)
+    L = ATR_D
+    cx = stair_lane(k)
+    w = STAIR_W
+    n = round(R / (0.18 if FINE else 0.3))
+    riser = R / n
+    p = L / (n - 1)
+    for j in range(1, n):
+        box(g, "TILE", cx, y_lo + j * riser - 0.025, z_s + d * (j - 0.5) * p, w - 0.12, 0.05, p + 0.03)
+    th = math.atan2(R, L)
+    Ls = math.hypot(L, R) + 0.1
+    rx = -th if d > 0 else th
+    ym, zm = y_lo + R / 2, z_s + d * L / 2
+    off = 0.17
+    # Zancas y fondo: el extremo inferior se prolonga 0,1 m hacia el frente de losa para que quede empotrado (sin cara colgante).
+    ext = 0.1
+    Lz = Ls + ext
+    yz, zz0 = ym - 0.5 * ext * math.sin(th), zm - d * 0.5 * ext * math.cos(th)
+    for s in (-1, 1):
+        box(g, "STAIR_STRINGER", cx + s * (w / 2 - 0.03), yz - 0.02, zz0, 0.06, 0.34, Lz, rx=rx)
+    box(g, "STAIR_STRINGER", cx, yz - 0.02 - off * math.cos(th), zz0 + d * off * math.sin(th), w - 0.06, 0.04, Lz, rx=rx)
+    heights = (0.45, 0.8) if FINE else (0.7,)
+    for s in (-1, 1):
+        xr = cx + s * (w / 2 - 0.03)
+        for hh in heights:
+            box(g, "STEEL", xr, ym + hh, zm, 0.04, 0.04, Ls, rx=rx)
+        box(g, "STEEL", xr, ym + 1.12, zm, 0.06, 0.06, Ls, rx=rx)
+        m = max(2, round(L / (1.5 if FINE else 3.0)))
+        for i in range(m + 1):
+            t = i * L / m
+            box(g, "STEEL", xr, y_lo + R * t / L + 0.63, z_s + d * t, 0.05, 1.02, 0.05)
+    # Encuentros con el borde del pasillo en cada extremo (umbral de acero).
+    for zz, yy in ((z_s - d * 0.15, y_lo), (z_s + d * (L + 0.15), y_hi)):
+        box(g, "STAIR_STRINGER", cx, yy + 0.015, zz, w + 0.1, 0.03, 0.3)
 
 
 def build_atrium_rails(k):
-    """Barandas de tubos horizontales en los bordes del atrio (el borde este es el nucleo)."""
+    """Barandas de tubos horizontales de acero en TODO el borde del vacio, salvo donde arrancan o terminan los tramos."""
     if k == 0:
         return
     g = fl(k)
     y0 = base(k) + SLAB_T
-    rw, rd, cx = ATR_W, ATR_D, ATR_X
     detailed = k < 5 and FINE
     rows = [0.35, 0.7, 1.05] if detailed else [0.55, 1.05]
-    for dy in rows:
-        box(g, "STEEL", cx, y0 + dy, ATR["maxZ"] - 0.06, rw, 0.045, 0.045)
-        box(g, "STEEL", cx, y0 + dy, ATR["minZ"] + 0.06, rw, 0.045, 0.045)
-        box(g, "STEEL", ATR["minX"] + 0.06, y0 + dy, 0, 0.045, 0.045, rd)
-    if detailed:
-        box(g, "STEEL", cx, y0 + 1.1, ATR["maxZ"] - 0.06, rw, 0.07, 0.07)
-        box(g, "STEEL", cx, y0 + 1.1, ATR["minZ"] + 0.06, rw, 0.07, 0.07)
-        box(g, "STEEL", ATR["minX"] + 0.06, y0 + 1.1, 0, 0.07, 0.07, rd)
-    px_n = round(rw / (2 if detailed else 3.5))
-    for i in range(px_n + 1):
-        px = ATR["minX"] + 0.06 + i * (rw - 0.12) / px_n
-        box(g, "STEEL", px, y0 + 0.525, ATR["maxZ"] - 0.06, 0.05, 1.05, 0.05)
-        box(g, "STEEL", px, y0 + 0.525, ATR["minZ"] + 0.06, 0.05, 1.05, 0.05)
-    pz = 4 if detailed else 2
-    for i in range(1, pz):
-        box(g, "STEEL", ATR["minX"] + 0.06, y0 + 0.525, ATR["minZ"] + i * rd / pz, 0.05, 1.05, 0.05)
+    lanes = []
+    if k >= 1:
+        lanes.append(stair_lane(k - 1))   # llega el tramo del nivel inferior
+    if k <= N - 2:
+        lanes.append(stair_lane(k))       # arranca el tramo hacia el nivel superior
+    gaps = sorted((c - STAIR_W / 2 - 0.08, c + STAIR_W / 2 + 0.08) for c in lanes)
+    z_open = stair_edge_z(k)
+
+    def split(a, b, gp):
+        out, cur = [], a
+        for g0, g1 in gp:
+            if g0 > cur + 0.05:
+                out.append((cur, min(g0, b)))
+            cur = max(cur, g1)
+        if b > cur + 0.05:
+            out.append((cur, b))
+        return out
+
+    def post(x, z):
+        box(g, "STEEL", x, y0 + 0.525, z, 0.05, 1.05, 0.05)
+
+    def run_x(z, a, b):
+        for dy in rows:
+            box(g, "STEEL", (a + b) / 2, y0 + dy, z, b - a, 0.045, 0.045)
+        if detailed:
+            box(g, "STEEL", (a + b) / 2, y0 + 1.1, z, b - a, 0.07, 0.07)
+        m = max(1, round((b - a) / (2.0 if detailed else 3.5)))
+        for i in range(m + 1):
+            post(a + i * (b - a) / m, z)
+
+    def run_z(x, a, b):
+        for dy in rows:
+            box(g, "STEEL", x, y0 + dy, (a + b) / 2, 0.045, 0.045, b - a)
+        if detailed:
+            box(g, "STEEL", x, y0 + 1.1, (a + b) / 2, 0.07, 0.07, b - a)
+        m = max(1, round((b - a) / (2.0 if detailed else 3.5)))
+        for i in range(m + 1):
+            post(x, a + i * (b - a) / m)
+
+    xa, xb = ATR["minX"] + 0.06, ATR["maxX"] - 0.06
+    for z, edge in ((ATR["maxZ"] - 0.06, ATR["maxZ"]), (ATR["minZ"] + 0.06, ATR["minZ"])):
+        for a, b in split(xa, xb, gaps if abs(edge - z_open) < 1e-6 else []):
+            run_x(z, a, b)
+    run_z(xa, ATR["minZ"] + 0.06, ATR["maxZ"] - 0.06)
+    run_z(xb, ATR["minZ"] + 0.06, ATR["maxZ"] - 0.06)
 
 
 # --------------------------------------------------------------------------- cubierta / compartidos
@@ -662,6 +783,12 @@ def build_roof():
     box(g, "WHITE_PANEL", 0, cy, -DP / 2 + WALL_T / 2, W, CROWN, WALL_T)
     box(g, "WHITE_PANEL", -W / 2 + WALL_T / 2, cy, 0, WALL_T, CROWN, DP - 2 * WALL_T)
     box(g, "WHITE_PANEL", W / 2 - WALL_T / 2, cy, 0, WALL_T, CROWN, DP - 2 * WALL_T)
+    red_x0 = W / 2 - EDGE_R - CROWN - 0.4
+    for dy in (CROWN / 3, 2 * CROWN / 3):
+        box(g, "PANEL_JOINT", (-W / 2 + red_x0 - 0.1) / 2, ROOF_Y + dy, DP / 2 + 0.006, red_x0 - 0.1 + W / 2, 0.035, 0.012)
+        box(g, "PANEL_JOINT", -W / 2 - 0.006, ROOF_Y + dy, 0, 0.012, 0.035, DP - 2 * WALL_T)
+        box(g, "PANEL_JOINT", W / 2 + 0.006, ROOF_Y + dy, 0, 0.012, 0.035, DP - 2 * WALL_T)
+        box(g, "PANEL_JOINT", 0, ROOF_Y + dy, -DP / 2 - 0.006, W, 0.035, 0.012)
     # Acento rojo arriba a la derecha: panel liso, SIN letras ni logotipo.
     box(g, "BRAND_RED", W / 2 - EDGE_R - CROWN / 2 - 0.4, cy, DP / 2 + 0.03, CROWN, CROWN, 0.06)
     # Linea LED de la coronacion (frente y laterales); material emisivo aparte de las ventanas.
@@ -695,17 +822,14 @@ def build_atrium_shared():
 
 
 def build_stairs_shared():
-    g = "STAIRS"
-    top = base(N - 1) + SLAB_T + 1.1
-    for s in STAIRS:
-        run_len = s["z1"] - s["z0"] - 1.6
-        box(g, "WHITE_PANEL", s["cx"], (SLAB_T + top) / 2, s["z0"] + run_len / 2, 0.06, top - SLAB_T, run_len)
+    """v2: los tramos pertenecen a cada FLOOR_Pxx; el grupo STAIRS queda como nodo vacio (nada es compartido)."""
+    return
 
 
 def build_elevators_shared():
     g = "ELEVATORS"
     cx = (CORE["minX"] + CORE["maxX"]) / 2
-    box(g, "CORE_BLACK", cx, (SLAB_T + ROOF_Y) / 2, 0, CORE_W, ROOF_Y - SLAB_T, CORE_D)
+    box(g, "CORE_BLACK", cx, (SLAB_T + ROOF_Y) / 2, 0, CORE_W, ROOF_Y - SLAB_T, CORE_D)  # su cara oeste da al atrio
 
 
 # --------------------------------------------------------------------------- espacios y anclas
@@ -937,7 +1061,7 @@ def add_sun(energy, color, direction_gltf, name="SUN"):
     ld = bpy.data.lights.new(name, "SUN")
     ld.energy = energy
     ld.color = color
-    ld.angle = math.radians(1.2)
+    ld.angle = math.radians(2.5)   # sol algo difuso: sombras de contacto suaves
     ob = bpy.data.objects.new(name, ld)
     bpy.context.scene.collection.objects.link(ob)
     d = gb(*direction_gltf).normalized()
@@ -1020,7 +1144,20 @@ def render_setup(path):
         except TypeError:
             continue
     if sc.render.engine.startswith("BLENDER_EEVEE"):
-        sc.eevee.taa_render_samples = 24
+        sc.eevee.taa_render_samples = 48
+        # Reflejo del vidrio y sombras de contacto suaves (trazado de rayos en pantalla + GI rapido); cada ajuste es opcional.
+        for attr, val in (("use_raytracing", True), ("use_shadows", True), ("shadow_ray_count", 2), ("shadow_step_count", 8),
+                          ("fast_gi_method", "GLOBAL_ILLUMINATION"), ("fast_gi_ray_count", 4), ("fast_gi_step_count", 8),
+                          ("gtao_distance", 1.5)):
+            try:
+                setattr(sc.eevee, attr, val)
+            except Exception as e:
+                print("EEVEE_OPT_SKIP", attr, type(e).__name__)
+        try:
+            sc.eevee.ray_tracing_options.resolution_scale = "1"
+            sc.eevee.ray_tracing_options.use_denoise = True
+        except Exception as e:
+            print("EEVEE_RT_OPT_SKIP", type(e).__name__)
     else:
         sc.cycles.samples = 24
         sc.cycles.use_denoising = False
@@ -1093,7 +1230,27 @@ def setup_atrium():
     add_sun(2.6, (1.0, 0.96, 0.9), SUN_DIR)
     add_area((-6, 14, 42), (2, 9, 0), 30, 5500)
     set_emission({"LED_CROWN": 0.0, "LIGHT_PANEL": 4.0})
-    set_camera((-12, 10.5, 46), (2.0, 10.5, 0), 36)
+    set_camera((-17, 11, 40), (4, 12.5, 0), 40)
+
+
+def interior_lights():
+    """Luz de relleno para vistas interiores: abertura frontal de la seccion + relleno cenital suave sobre el vacio."""
+    set_world("day")
+    set_world_strength(0.65)
+    add_sun(2.2, (1.0, 0.96, 0.9), SUN_DIR)
+    add_area((-6, 14, 42), (2, 9, 0), 30, 4200)
+    add_area((ATR_X, 33, 0), (ATR_X, 5, 0), 12, 4500, "FILL_TOP")
+    set_emission({"LED_CROWN": 0.0, "LIGHT_PANEL": 4.0, "ELEV_INDICATOR": 4.0})
+
+
+def setup_stairs():
+    interior_lights()
+    set_camera((-3.5, 6.7, 3.0), (7.0, 17.5, -1.5), 64)
+
+
+def setup_elevators():
+    interior_lights()
+    set_camera((-3.6, 10.2, 0.5), (10.4, 16.5, 0), 56)
 
 
 def setup_floor_p03():
@@ -1122,10 +1279,17 @@ FLOOR_CLIP = dict(
 
 
 def render_all():
-    do_render("exterior-dia.png", setup_day)
-    do_render("exterior-noche.png", setup_night, dict(win_split=True))
-    do_render("atrio.png", setup_atrium, dict(clip=ATRIUM_CLIP))
-    do_render("piso-P03-aislado.png", setup_floor_p03, dict(clip=FLOOR_CLIP, extra=floor_ground))
+    jobs = [
+        ("exterior-dia.png", setup_day, None),
+        ("exterior-noche.png", setup_night, dict(win_split=True)),
+        ("atrio.png", setup_atrium, dict(clip=ATRIUM_CLIP)),
+        ("piso-P03-aislado.png", setup_floor_p03, dict(clip=FLOOR_CLIP, extra=floor_ground)),
+        ("escaleras.png", setup_stairs, dict(clip=ATRIUM_CLIP)),
+        ("ascensores.png", setup_elevators, dict(clip=ATRIUM_CLIP)),
+    ]
+    for name, fn, rb in jobs:
+        if RENDER_ONLY is None or name in RENDER_ONLY:
+            do_render(name, fn, rb)
 
 
 # --------------------------------------------------------------------------- main
