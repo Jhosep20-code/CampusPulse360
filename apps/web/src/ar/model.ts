@@ -1,11 +1,13 @@
 import type { CampusResponse } from "@campuspulse/contracts";
 import {
+  Box3,
   BoxGeometry,
   BufferGeometry,
   Color,
   Group,
   Mesh,
   MeshStandardMaterial,
+  Vector3,
   type Material,
 } from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
@@ -18,7 +20,7 @@ import { MATERIAL_SPECS } from "../twin/materials";
 
 /*
  * Edificio PROCEDURAL para AR y exportacion GLB. Sin React ni DOM: lo usan la
- * pagina /ar (nivel A) y apps/web/scripts/export-twin-glb.ts (nivel B).
+ * pagina /ar (nivel A) como respaldo si el GLB de Blender no carga.
  *
  * Reutiliza las funciones puras de twin/ (layout, facade, materials, constants):
  * el mismo edificio de 10 pisos del gemelo, una malla fusionada por material, sin
@@ -144,7 +146,7 @@ export function applySpaceColors(model: CampusModel, colors: ReadonlyMap<string,
 }
 
 /**
- * Nivel A con el modelo REAL de Blender (LOD movil, utp-huancayo-mobile.glb) cargado con GLTFLoader
+ * Nivel A con el modelo REAL de Blender (utp-huancayo-ar.glb, el mismo de Scene Viewer) cargado con GLTFLoader
  * de three (sin Draco ni dependencias nuevas). Cada SPC_* pasa a ser un volumen semitransparente
  * coloreable con material propio; los emisivos se bajan (en AR no hay noche). Si la carga falla
  * lanza el error y quien llama usa buildCampusModel (geometria procedural).
@@ -200,7 +202,11 @@ export async function loadGlbCampusModel(campus: CampusResponse, url: string = G
       for (const x of Array.isArray(m.material) ? m.material : [m.material]) x.dispose();
     });
   };
-  return { group, spaceMeshes, spaceIdByMesh, widthM: DEFAULT_DIMS.footprintW, dispose };
+  // El GLB de AR viene a escala de maqueta: el ancho real se mide (frente X de la caja) para que el control de tamano
+  // de la AR (metros de maqueta) siga funcionando con cualquier escala de exportacion.
+  const size = new Box3().setFromObject(root).getSize(new Vector3());
+  const widthM = Number.isFinite(size.x) && size.x > 0 ? size.x : DEFAULT_DIMS.footprintW;
+  return { group, spaceMeshes, spaceIdByMesh, widthM, dispose };
 }
 
 /** GLB de Blender si se puede cargar; si no, edificio procedural (nivel A siempre funciona). */

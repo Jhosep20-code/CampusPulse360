@@ -111,7 +111,7 @@ describe("buildSceneViewerIntent", () => {
     const file = glbUrl("https://campuspulse.example.dev");
     expect(file).toBe(`https://campuspulse.example.dev${GLB_PATH}`);
     const i = buildSceneViewerIntent({ glbUrl: file, fallbackUrl: "https://campuspulse.example.dev/ar" });
-    expect(i.startsWith("intent://arvr.google.com/scene-viewer/1.2?file=https://campuspulse.example.dev/models/utp-huancayo-mobile.glb")).toBe(true);
+    expect(i.startsWith("intent://arvr.google.com/scene-viewer/1.2?file=https://campuspulse.example.dev/models/utp-huancayo-ar.glb")).toBe(true);
     expect(i).toContain("&mode=ar_preferred&title=CampusPulse%20360#Intent;");
     expect(i).toContain("scheme=https;package=com.google.ar.core;action=android.intent.action.VIEW;");
     expect(i).toContain("S.browser_fallback_url=https%3A%2F%2Fcampuspulse.example.dev%2Far;end;");

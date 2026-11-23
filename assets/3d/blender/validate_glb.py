@@ -55,6 +55,7 @@ def validate(path):
     by_name = {n.get("name"): i for i, n in enumerate(j["nodes"])}
     problems = []
     is_context = "utp-context" in os.path.basename(path)
+    is_ar = "-ar" in os.path.basename(path)
     if magic != "glTF":
         problems.append(f"cabecera {magic!r}")
     if hdr_len != real_len:
@@ -83,8 +84,10 @@ def validate(path):
                     problems.append(f"{a} cuelga de {par}")
         mats = {m["name"]: m for m in j.get("materials", [])}
         for mname in BUILDING_MATS:
-            if mname in ("LIGHT_PANEL",) and "mobile" in os.path.basename(path):
+            if mname in ("LIGHT_PANEL",) and ("mobile" in os.path.basename(path) or is_ar):
                 continue  # LOD1 no lleva luminarias individuales
+            if mname == "WINDOW_NIGHT" and is_ar:
+                continue  # la AR no lleva ventanas nocturnas
             if mname not in mats:
                 problems.append(f"falta material {mname}")
         for forbidden in ("EXT_meshopt_compression", "KHR_draco_mesh_compression"):
@@ -107,11 +110,19 @@ def validate(path):
             n.get("name"): len(n.get("children", [])) for n in j["nodes"] if n.get("name") in FLOORS + ["FACADE", "ROOF", "ATRIUM", "STAIRS", "ELEVATORS"]
         }
         result["emissive_WINDOW_NIGHT"] = mats.get("WINDOW_NIGHT", {}).get("emissiveFactor")
+        result["banded_meshes"] = sum(1 for n in j["nodes"] if "band_level" in (n.get("extras") or {}))
+        if is_ar:
+            sc = j["nodes"][by_name["BUILDING"]].get("scale", [1, 1, 1]) if "BUILDING" in by_name else None
+            result["root_scale"] = sc
+            if not sc or abs(sc[0] - 1 / 60) > 1e-4:
+                problems.append(f"escala de maqueta inesperada {sc}")
+            if "WINDOW_NIGHT" in mats:
+                problems.append("la AR no debe llevar WINDOW_NIGHT (Scene Viewer lo mostraria encendido)")
     return result
 
 
 if __name__ == "__main__":
-    paths = sys.argv[1:] or [os.path.join(MODELS, f) for f in ("utp-huancayo.glb", "utp-huancayo-mobile.glb", "utp-context.glb")]
+    paths = sys.argv[1:] or [os.path.join(MODELS, f) for f in ("utp-huancayo.glb", "utp-huancayo-mobile.glb", "utp-huancayo-ar.glb", "utp-context.glb")]
     bad = False
     for p in paths:
         r = validate(p)

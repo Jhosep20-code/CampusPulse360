@@ -21,8 +21,8 @@ CampusPulse 360 propone un gemelo digital de la sede UTP Huancayo que integra da
 | OE1 IoT | ≥10 dispositivos simulados × 5 variables | 10 dispositivos × 5 variables. Ingesta HMAC verificada en producción (910 lecturas aceptadas en un backfill) y simulador en la nube cada minuto |
 | OE2 RPA | Incidencia automática y diagnóstico tras un umbral sostenido | Verificado en producción: lecturas firmadas → cron → 2 incidencias críticas → diagnóstico IA en vivo (1,8 s y 2,4 s). Cierre automático tras 10 min normalizados (verificado: "cerradas=2") |
 | OE3 IA | Respuestas útiles basadas en datos | gpt-oss-20b en Workers AI responde con citas a espacios reales (2,7 s). Unas 20 neuronas por llamada |
-| OE4 DevOps | Pruebas y despliegue automatizados | 258 pruebas unitarias e integración y 15 e2e en local. Pipeline en GitHub Actions definido (ver §5.7; **su ejecución sobre la rama está pendiente de la PR**) |
-| OE5 Experiencia | 3D fluido, multidispositivo y AR | Gemelo con el GLB de Blender v2, medido con GPU en local: Fachada 73 draw calls, pisos aislados 47–55, Atrio 62 y móvil 32 (meta: 60; la vista explotada llega a 458). Vista móvil verificada en navegador. **AR en dispositivo físico pendiente** |
+| OE4 DevOps | Pruebas y despliegue automatizados | 260 pruebas unitarias e integración y 15 e2e en local. Pipeline en GitHub Actions definido (ver §5.7; **su ejecución sobre la rama está pendiente de la PR**) |
+| OE5 Experiencia | 3D fluido, multidispositivo y AR | Gemelo con el GLB de Blender v3, medido con GPU en local: Fachada 43 draw calls (29 en móvil), pisos aislados 25–27, Atrio 33 y explotado 222 (antes: 73, 47–55, 62 y 458). Vista móvil verificada en navegador. **AR en dispositivo físico pendiente** |
 | OE6 Predicción | Pronóstico de CO₂ a 30 min | Holt con backtest MAE sobre datos simulados (pruebas unitarias) |
 
 ## 3. Tecnologías seleccionadas y justificación
@@ -80,6 +80,12 @@ Decisiones registradas en `docs/decisiones/ADR-001..004`.
 - **10 pisos** (dato del equipo); los 10 espacios instrumentados están en P1–P5, y P6–P10 se rotulan "sin espacios instrumentados".
 - **Vistas:** Fachada, Aérea, Atrio (corte), Referencia (comparación con una foto local que no sale del dispositivo), aislar P1–P10, pisos explotados, modo datos, día/noche y Restablecer vista, gobernadas por una máquina de estados.
 - **Defecto corregido "losas negras":** las matrices de instancia degeneradas (escala 0 en un eje) producían normales NaN en el shader de three. La prueba visual pasó de 55,2 % a 0,7 % de píxeles negros.
+- **Corrección v3:** la matriz referencia → observación → cambio está en `docs/referencias/matriz-correspondencia-v3.md`. Cambios principales:
+  - fachada con paño blanco, 7 franjas, marco gris y marca UTP;
+  - bandas del atrio gris azulado;
+  - escaleras en zigzag en el borde oeste (posición inferida).
+
+  La AR usa un GLB exportado por Blender desde la misma fuente.
 - **Fidelidad (v2):** los rasgos del atrio, las escaleras y los ascensores se contrastaron con videos oficiales (`docs/referencias/especificacion-3d.md` §9):
   - escaleras abiertas en zigzag;
   - muro negro de ascensores con 3 puertas por nivel;

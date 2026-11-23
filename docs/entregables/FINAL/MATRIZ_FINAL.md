@@ -6,7 +6,7 @@
 |---|---|---|---|---|
 | 1 | Problema y objetivo | 2 | INFORME_FINAL §1–2 con objetivos medibles y resultados medidos | ✅ |
 | 2 | Tecnologías articuladas | 3 | Cadena IoT → D1 → RPA → IA → gemelo verificada **en producción** (`docs/evidencias/hito-3-despliegue.md`) | ✅ |
-| 3 | Desarrollo técnico | 3 | Monorepo modular; 258 pruebas unitarias e integración; 15 e2e (Docker con el GLB v2) | ✅ |
+| 3 | Desarrollo técnico | 3 | Monorepo modular; 260 pruebas unitarias e integración; 15 e2e (Docker con el GLB v3) | ✅ |
 | 4 | CI/CD y contenedores | 3 | Workflow completo y Docker (simulador, Compose y e2e). La ejecución en GitHub sobre la rama **depende de la PR**; la única ejecución previa tuvo 2 jobs en rojo, ya corregidos en la rama | 🟡 hasta ver Actions en verde |
 | 5 | IA y prompt engineering | 3 | Diagnóstico JSON y asistente con IA real en producción (gpt-oss-20b). Limitación: no es la API oficial de OpenAI (ADR-002) | ✅ con limitación declarada |
 | 6 | Interfaz (Web/AR/VR) | 1,5 | SPA responsive, gemelo de Blender, reloj y AR web. AR física pendiente | 🟡 |

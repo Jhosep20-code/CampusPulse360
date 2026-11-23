@@ -8,7 +8,12 @@ import type { TwinLayer } from "../twin/types";
  */
 
 /** Modelo real de Blender (LOD movil) para Scene Viewer (nivel B) y WebXR (nivel A). */
-export const GLB_PATH = "/models/utp-huancayo-mobile.glb";
+/**
+ * GLB de AR exportado por Blender desde la MISMA fuente que el gemelo (assets/3d/blender): LOD movil fusionado por
+ * material, sin ventanas nocturnas ni luminarias encendidas y a escala de maqueta 1:60. Lo usan Scene Viewer
+ * (nivel B, estatico) y la AR web (nivel A, que mide su caja y la reescala).
+ */
+export const GLB_PATH = "/models/utp-huancayo-ar.glb";
 export const SCENE_VIEWER_TITLE = "CampusPulse 360";
 
 /* ------------------------------------------------------------ capacidades */
@@ -102,7 +107,7 @@ export function evaluateLevels(caps: Capabilities, glbAvailable: boolean | null)
   } else if (!caps.https || caps.localhost) {
     b = "Scene Viewer necesita una URL https pública hacia el modelo; no funciona desde HTTP ni desde localhost.";
   } else if (glbAvailable === false) {
-    b = "El modelo estático (utp-huancayo-mobile.glb) no está publicado en este despliegue; el nivel B queda desactivado.";
+    b = "El modelo estático (utp-huancayo-ar.glb) no está publicado en este despliegue; el nivel B queda desactivado.";
   } else if (glbAvailable === null) {
     b = "Comprobando que el modelo estático esté publicado…";
   }

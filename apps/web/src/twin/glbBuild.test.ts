@@ -82,8 +82,8 @@ describe("buildGlbModel", () => {
     const m = build();
     expect(m.floors.size).toBe(3);
     expect(m.stats.wholeMeshes).toBeLessThan(m.stats.sourceMeshes);
-    // WHOLE: SLAB, TILE, WHITE_PANEL (4 piezas fusionadas en 1), WINDOW_NIGHT (GEN x3), ROOF, LED_CROWN
-    expect(m.stats.wholeMeshes).toBe(6);
+    // WHOLE: MATTE (SLAB + TILE + ROOF por color de vertice), WHITE_PANEL (4 piezas en 1), WINDOW_NIGHT (GEN x3), LED_CROWN
+    expect(m.stats.wholeMeshes).toBe(4);
     expect(m.stats.windowMeshes).toBe(1);
   });
 
@@ -101,6 +101,38 @@ describe("buildGlbModel", () => {
     expect(names(3).some((n) => n.includes("ROOF"))).toBe(true);
     expect(names(1).some((n) => n.includes("ROOF"))).toBe(false);
     for (const l of [1, 2, 3]) expect(names(l).some((n) => n.includes("SLICE_WHITE_PANEL"))).toBe(true);
+  });
+});
+
+describe("reduccion de draw calls", () => {
+  it("la clase MATTE conserva el color de cada material como color de vertice", () => {
+    const m = build();
+    const matte = m.whole.children.find((o) => o.name === "WHOLE_MATTE") as Mesh;
+    expect(matte).toBeDefined();
+    const col = matte.geometry.getAttribute("color");
+    expect(col).toBeDefined();
+    expect(col.count).toBe(matte.geometry.getAttribute("position").count);
+    expect((matte.material as MeshStandardMaterial).vertexColors).toBe(true);
+    // WHITE_PANEL queda fuera de la clase: el modo datos cambia su opacidad.
+    expect(m.whole.children.some((o) => o.name === "WHOLE_WHITE_PANEL")).toBe(true);
+  });
+
+  it("las piezas compartidas cortadas por franja (band_level) van con su piso y no generan rebanadas", () => {
+    const scene = fakeScene();
+    const facade = scene.children.find((o) => o.name === "FACADE")!;
+    facade.clear();
+    for (const b of BANDS) facade.add(mesh(`FACADE_WHITE_PANEL_L0${b.level}`, "WHITE_PANEL", b.baseY + 1, { band_level: b.level }));
+    const stairs = scene.children.find((o) => o.name === "STAIRS")!;
+    stairs.clear();
+    const m = buildGlbModel(scene, { bands: BANDS, clip: new Plane(new Vector3(0, 0, -1), 1000), shadows: false });
+    for (const b of BANDS) {
+      const parts = m.floors.get(b.level)!.parts;
+      expect(parts.some((p) => p.name.includes("SLICE"))).toBe(false);
+      const wp = parts.find((p) => p.name === `FLOOR_P0${b.level}_WHITE_PANEL`)!;
+      expect(wp).toBeDefined();
+      // La pieza de fachada de ESTE piso se fusiono con la estructura propia (2 cajas de 24 vertices).
+      expect(wp.geometry.getAttribute("position").count).toBe(48);
+    }
   });
 });
 

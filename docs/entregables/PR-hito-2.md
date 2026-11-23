@@ -16,9 +16,13 @@
 
 ### Gemelo digital
 - **Modelo real de Blender 5.3:** script reproducible `assets/3d/blender/build_utp_huancayo.py` y fuente `.blend`.
-  - **v2:** escaleras abiertas en zigzag en el atrio, muro negro de ascensores con 3 puertas por nivel y juntas de panel. Son rasgos contrastados con videos oficiales; las medidas son estimadas.
-  - Exporta GLB de escritorio (2,84 MB, 52.836 triángulos), móvil (1,24 MB) y entorno (89 KB).
-  - Comparación v1/v2 en `docs/entregables/FINAL/capturas/blender/comparacion-v1-v2.png`.
+  - **v3, corrección arquitectónica** (matriz en `docs/referencias/matriz-correspondencia-v3.md`):
+    - fachada con paño blanco a la izquierda, 7 franjas, marco y coronación grises y marca UTP simplificada;
+    - atrio con bandas gris azulado, sin pilares de esquina e indicadores rojos;
+    - escaleras en zigzag en el borde oeste, posición **inferida** de las referencias.
+    - Las medidas siguen siendo estimadas.
+  - Exporta GLB de escritorio (2,91 MB, 54.084 triángulos), móvil (1,28 MB), **AR** (1,10 MB, 29 mallas, maqueta 1:60) y entorno (89 KB).
+  - Comparación v2/v3 en `docs/entregables/FINAL/capturas/blender/comparacion-v2-v3.jpg`.
   - Jerarquía `BUILDING / FACADE / ROOF / ATRIUM / STAIRS / ELEVATORS / FLOOR_P01–P10 / SPC_* / SENSOR_ANCHORS`.
 - **Visor Three.js/R3F con el GLB:** aislar un piso oculta su grupo (`visible=false`, sin escalar matrices); la explosión desplaza cada grupo en Y. Si el GLB falla, el visor vuelve a la geometría procedural.
 - **Corrección de las "losas negras":** las matrices degeneradas (escala 0 en un solo eje) producían normales NaN en el shader de instancing de three. Pruebas visuales WebGL: P6 bajó de 55,2 % a 0,7 % de píxeles negros y P9 de 39,0 % a 0,7 %.
@@ -27,6 +31,14 @@
 - **Atrio:** corte de sección.
 - **Encuadre:** el piso aislado tiene prioridad sobre el preset de cámara.
 - **Pisos altos:** al aislar un piso, la cubierta se oculta (antes tapaba P10) y el contexto urbano solo conserva suelo y calles.
+- **Rendimiento:** clases de fusión por color de vértice y elementos compartidos cortados por piso.
+
+  | Vista | Antes (draw calls, GPU) | Ahora |
+  |---|---|---|
+  | Fachada | 73 | 43 (29 en móvil) |
+  | Pisos explotados | 458 | 222 (141 en móvil) |
+  | P10 aislado | 47 | 25 |
+- **AR:** Scene Viewer y la AR web usan `utp-huancayo-ar.glb`, exportado por Blender. Se eliminó `campus-ar.glb`, que estaba huérfano.
 - Diez pisos y los 10 espacios instrumentados se conservan. P6–P10 se rotulan "sin espacios instrumentados".
 - Aviso visible: "Modelo aproximado basado en fotografía · dimensiones estimadas · sin planos verificados".
 
@@ -41,7 +53,7 @@
   - pruebas visuales WebGL excluidas del CI por defecto (se ejecutan con `VISUAL=1`).
 
 ### Pruebas (local, 23-nov-2026)
-- **Unitarias e integración:** 258 (contratos 9, simulador 10, web 162, API 77).
+- **Unitarias e integración:** 260 (contratos 9, simulador 10, web 164, API 77).
 - **CI:** el job `deploy` ahora pasa `CLOUD_SIM:on`, igual que la producción actual. Sin ese cambio, un deploy desde `main` habría apagado el simulador en la nube.
 - **e2e:** 15 aprobadas y 3 omitidas a propósito, contra el stack Docker con el GLB.
 - **gitleaks:** sin hallazgos en todo el historial.
@@ -51,7 +63,7 @@
 - Bloques visuales automáticos B3 y B4 (10 pisos × 5 vistas): bloqueados en WebGL por software; hay que ejecutarlos con GPU.
 - Pruebas físicas: AR en Galaxy S25 Ultra, `/reloj` en Galaxy Watch6 Classic y fps en dispositivo.
 - Fidelidad arquitectónica: los rasgos del atrio, las escaleras y los ascensores se contrastaron con videos oficiales, pero la distribución y las medidas siguen siendo estimadas, sin planos.
-- Rendimiento: la vista explotada dibuja unas 458 draw calls y la Fachada 73 (meta: 60). Falta medir los fps en el S25.
+- Rendimiento en dispositivo: la vista explotada sigue en 222 draw calls en escritorio, por encima de la meta de 60. Faltan los fps en el S25 y la prueba de Scene Viewer con el GLB de AR.
 - Unity/VR de la TA5: en la rama `feature/ta5-unity`, sin ejecutar.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)

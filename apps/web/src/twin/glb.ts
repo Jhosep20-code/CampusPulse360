@@ -164,6 +164,36 @@ export const GLB_MATERIAL_KEY: Readonly<Record<string, BatchKey>> = {
 };
 
 /** Materiales translucidos cuya opacidad cambia con el modo datos y el corte de seccion. */
+/**
+ * Clases de fusion del visor (menos draw calls): materiales opacos sin control de opacidad ni emision se dibujan con
+ * UN material de clase y el color de cada material original va como color de vertice. WHITE_PANEL y FRAME_DARK
+ * quedan fuera (el modo datos cambia su opacidad), igual que CEILING (se oculta al aislar), vidrios y emisivos.
+ */
+export const MERGE_CLASS: Readonly<Record<string, "MATTE" | "METAL">> = {
+  SLAB: "MATTE",
+  SLAB_FACE: "MATTE",
+  TILE: "MATTE",
+  WOOD: "MATTE",
+  PANEL_JOINT: "MATTE",
+  ROOF: "MATTE",
+  BRAND_RED: "MATTE",
+  CHAIR_RED: "MATTE",
+  BOOKS_A: "MATTE",
+  BOOKS_B: "MATTE",
+  BOOKS_C: "MATTE",
+  FURN_DARK: "MATTE",
+  SCREEN: "MATTE",
+  STEEL: "METAL",
+  STEEL_DOOR: "METAL",
+  CORE_BLACK: "METAL",
+  STAIR_STRINGER: "METAL",
+};
+
+/** Nombre de la cubeta de fusion de un material de Blender (su clase o el propio nombre). */
+export function mergeClassOf(materialName: string): string {
+  return MERGE_CLASS[materialName] ?? materialName;
+}
+
 export const GLB_OPACITY_MATERIALS = ["GLASS_CURTAIN", "WHITE_PANEL", "FRAME_DARK", "GLASS_GROUND", "GLASS_CLEAR"] as const;
 
 /** Materiales que NO deben proyectar sombra (translucidos o emisivos planos). */

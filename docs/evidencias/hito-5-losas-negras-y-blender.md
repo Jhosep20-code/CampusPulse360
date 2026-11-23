@@ -128,7 +128,7 @@ Las capturas están en `docs/entregables/FINAL/capturas/glb/`.
 - La vista **explotada** dibuja unas 458 draw calls, porque cada piso se dibuja con sus rebanadas. Es una vista transitoria, pero puede bajar los fps en el S25. Hay que medirla en el dispositivo.
 - La vista completa de Fachada usa 73 draw calls, por encima de la meta de 60.
 - En el móvil emulado con el panel oculto, el GLB tardó unos 45 s en aparecer: con la pestaña en segundo plano no se puede medir el tiempo de carga real.
-- `campus-ar.glb` (Scene Viewer) sigue exportándose desde el gemelo procedural (`apps/web/scripts/export-twin-glb.ts`), no desde Blender.
+- ~~`campus-ar.glb` (Scene Viewer) sigue exportándose desde el gemelo procedural~~. **Corrección (sección 10):** la AR ya cargaba el GLB móvil de Blender desde el commit 22d4e80; `campus-ar.glb` era un archivo huérfano.
 
 ## 9. Despliegue del modelo v2 (23-nov-2026, 13:25 aprox.)
 - **Regresión previa (local):**
@@ -146,3 +146,56 @@ Las capturas están en `docs/entregables/FINAL/capturas/glb/`.
   - P10 aislado: 47 draw calls, 0 de otros pisos, sin cubierta ni vecinos.
   - Atrio: 62 draw calls.
   - Restablecer: Fachada, sin aislamiento ni explosión.
+
+## 10. Modelo Blender v3: corrección arquitectónica y rendimiento (23-nov-2026, local)
+**Estado real antes de empezar:**
+- La PR #1 está abierta y sin fusionar.
+- CI del commit bb4d89e completo y en verde. La ejecución sobre 3e99078 se canceló porque la reemplazó el siguiente push.
+- En producción, la versión fdf7a207 atiende el 100 % del tráfico.
+
+**Arquitectura:** la matriz completa está en `docs/referencias/matriz-correspondencia-v3.md`.
+- **Fachada:** paño blanco a la izquierda, 7 franjas, marco y coronación grises, y marca UTP simplificada.
+- **Atrio:** bandas gris azulado de 0,9 m, sin pilares de esquina, indicadores rojos, señalética y barandas de 4 tubos.
+- **Escaleras:** en zigzag, en dos carriles del borde oeste, con descansos en las esquinas. Su posición es **inferida**.
+
+**Comparación antes/después:**
+- Privada, con fotos: `docs/referencias/utp-huancayo/comparaciones-privadas/` (ignorada por git).
+- Pública, solo renders: `capturas/blender/comparacion-v2-v3.jpg`. Las vistas del mismo punto de vista que las referencias son `ref-exterior.png`, `ref-ascensores.png` y `ref-escaleras.png`.
+
+| GLB (build-report.json) | Triángulos | Tamaño | Mallas en el GLB |
+|---|---|---|---|
+| Escritorio (LOD0) | 54.084 | 2,91 MB | 237 |
+| Móvil (LOD1) | 23.476 | 1,28 MB | 207 |
+| **AR (nuevo, desde Blender)** | 20.140 | 1,10 MB | 29 (una por material más los 10 `SPC_*`) |
+
+**Reducción de draw calls (sin perder P1–P10 ni `SPC_*`):**
+1. **Clases de fusión en el visor (`MERGE_CLASS`):** los materiales opacos sin control de opacidad ni emisión se dibujan como `MATTE` o `METAL`, con el color original como color de vértice.
+2. **Elementos compartidos cortados por franja en Blender (`band_level`):** el visor dibuja cada tramo con su piso en lugar de 10 copias recortadas por *clipping planes*. La claraboya pasa a la cubierta.
+
+Medido con GPU en el navegador integrado (inspector `__twinDebug`; clics reales en Pisos explotados, Atrio y Restablecer, y `form_input` en el selector):
+
+| Vista | v2 | v3 escritorio | v3 móvil (375×812) |
+|---|---|---|---|
+| Fachada completa | 73 | **43** | **29** |
+| Pisos explotados | 458 | **222** | **141** |
+| P10 aislado | 47 | **25** | **19** |
+| P1 aislado | 55 | **27** (BIB y LOBBY dibujados) | — |
+| Atrio | 62 | **33** | — |
+
+En todas las vistas hubo 0 matrices degeneradas y 0 mallas de otros pisos al aislar.
+
+**AR:**
+- Scene Viewer (nivel B) y la AR web (nivel A) usan ahora `utp-huancayo-ar.glb`, exportado por Blender desde la misma fuente:
+  - LOD móvil fusionado por material;
+  - sin ventanas nocturnas ni luminarias encendidas, que Scene Viewer mostraría como paneles blancos;
+  - maqueta 1:60, Y arriba, base en y = 0.
+- El nivel A mide el ancho del modelo para su control de tamaño.
+- Se eliminaron `campus-ar.glb` y su script procedural.
+- **Pendiente en dispositivo:** escala, orientación y materiales en Scene Viewer del Galaxy S25 Ultra. Es una maqueta estática y no muestra telemetría; la telemetría en vivo solo está en el nivel A.
+
+**Medir en el S25 Ultra (pendiente):**
+1. Abrir la demo en Chrome con `?visualtest=1`.
+2. Conectar el teléfono por USB con depuración activada y abrir `chrome://inspect` en el PC.
+3. En la consola, `__twinDebug()` da `drawCalls` y `triangles`; Rendimiento → FPS meter da los fps.
+4. Repetir con Fachada, Pisos explotados y P10.
+5. Para la AR, abrir `/ar` → nivel B y anotar escala, orientación y materiales.

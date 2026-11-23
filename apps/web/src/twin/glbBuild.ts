@@ -3,6 +3,7 @@ import {
   BufferGeometry,
   Color,
   DoubleSide,
+  Float32BufferAttribute,
   Group,
   MathUtils,
   Matrix4,
@@ -20,6 +21,8 @@ import {
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { DAY_COLORS, MATERIAL_SPECS, NIGHT_COLORS, WINDOW_LIT } from "./materials";
 import {
+  MERGE_CLASS,
+  mergeClassOf,
   GLB_MATERIAL_KEY,
   GLB_NO_SHADOW,
   GLB_OPACITY_MATERIALS,
@@ -196,6 +199,27 @@ export class GlbMaterials {
     return m;
   }
 
+  /** Material de una clase de fusion (MATTE/METAL): color por vertice, propiedades PBR comunes. */
+  getClass(cls: string): MeshStandardMaterial {
+    let m = this.main.get(cls);
+    if (!m) {
+      const metal = cls === "METAL";
+      m = new MeshStandardMaterial({
+        color: "#ffffff",
+        vertexColors: true,
+        roughness: metal ? 0.32 : 0.7,
+        metalness: metal ? 0.7 : 0,
+        envMapIntensity: metal ? 1.2 : 1,
+      });
+      m.name = cls;
+      m.clippingPlanes = [this.clip];
+      m.clipShadows = true;
+      this.main.set(cls, m);
+      this.entries.push({ name: cls, mat: m });
+    }
+    return m;
+  }
+
   /** Copia del material principal recortada a la franja Y [lo, hi] de un piso. */
   slice(name: string, lo: Plane, hi: Plane): MeshStandardMaterial {
     const base = this.main.get(name);
@@ -269,9 +293,12 @@ export class GlbMaterials {
 interface Piece {
   geom: BufferGeometry;
   material: Material;
+  /** Cubeta de fusion: clase (MATTE/METAL) o nombre del material. */
   matName: string;
   level: number | null;
   shared: SharedGroup | null;
+  /** Franja de piso de una pieza compartida ya cortada en Blender (extras band_level); null = sin cortar. */
+  band: number | null;
   /** mesh_id del espacio si es una ventana nocturna propia de un espacio. */
   windowOf: string | null;
 }
@@ -314,11 +341,29 @@ function mergePieces(geoms: BufferGeometry[], owned: BufferGeometry[]): BufferGe
   return merged;
 }
 
+/** Geometria nueva (comparte posicion, normal e indice) con el color del material como color de vertice. */
+export function withVertexColor(g: BufferGeometry, color: Color): BufferGeometry {
+  const out = new BufferGeometry();
+  const pos = g.getAttribute("position");
+  out.setAttribute("position", pos);
+  const nrm = g.getAttribute("normal");
+  if (nrm) out.setAttribute("normal", nrm);
+  if (g.index) out.setIndex(g.index);
+  const c = new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i++) {
+    c[i * 3] = color.r;
+    c[i * 3 + 1] = color.g;
+    c[i * 3 + 2] = color.b;
+  }
+  out.setAttribute("color", new Float32BufferAttribute(c, 3));
+  return out;
+}
+
 function readMaterial(m: Mesh): Material {
   return Array.isArray(m.material) ? m.material[0]! : m.material;
 }
 
-const RECEIVE = new Set(["WHITE_PANEL", "SLAB", "ROOF", "TILE"]);
+const RECEIVE = new Set(["WHITE_PANEL", "SLAB", "ROOF", "TILE", "MATTE"]);
 
 /**
  * @param scene escena del GLB cargado (no se modifica ni se descarta su geometria: pertenece a la cache de useGLTF).
@@ -356,17 +401,28 @@ export function buildGlbModel(scene: Object3D, opts: GlbBuildOptions): GlbModel 
     if (c.kind === "floor" || c.kind === "floorPart") level = c.level;
     const material = readMaterial(mesh);
     const code = mesh.userData["space_code"];
+    const matName = mergeClassOf(material.name);
+    let geom = bake(mesh);
+    if (matName !== material.name) {
+      geom = withVertexColor(geom, (material as MeshStandardMaterial).color);
+      owned.push(geom);
+    }
+    const bandLevel = mesh.userData["band_level"];
     pieces.push({
-      geom: bake(mesh),
+      geom,
       material,
-      matName: material.name,
+      matName,
       level,
       shared: c.kind === "shared" ? c.group : null,
+      band: typeof bandLevel === "number" ? bandLevel : null,
       windowOf:
         material.name === "WINDOW_NIGHT" && typeof code === "string" && level !== null ? windowSpaceMeshId(level, code) : null,
     });
   });
-  for (const p of pieces) mats.get(p.material);
+  for (const p of pieces) {
+    if (MERGE_CLASS[p.material.name]) mats.getClass(p.matName);
+    else mats.get(p.material);
+  }
 
   const topLevel = Math.max(...opts.bands.map((b) => b.level));
   const mk = (geom: BufferGeometry, mat: Material, name: string, ud: Record<string, unknown>, matName: string): Mesh => {
@@ -413,7 +469,9 @@ export function buildGlbModel(scene: Object3D, opts: GlbBuildOptions): GlbModel 
 
   /* 3. Pisos. */
   const floors = new Map<number, GlbFloor>();
-  const sliceSource = structural.filter((p) => p.shared !== null && SLICED_GROUPS.includes(p.shared));
+  // Solo lo compartido SIN cortar por franja se recorta con clipping planes (GLB antiguos); lo cortado en Blender
+  // (band_level) se dibuja con su piso como estructura propia.
+  const sliceSource = structural.filter((p) => p.shared !== null && SLICED_GROUPS.includes(p.shared) && p.band === null);
   // La geometria de las rebanadas se fusiona una sola vez por material y se comparte entre pisos.
   const sliceItems = byIdx(sliceSource).map((it) => ({ ...it, group: "SLICE" }));
   const sliceBuckets = planMerge(sliceItems).map((b) => {
@@ -430,14 +488,15 @@ export function buildGlbModel(scene: Object3D, opts: GlbBuildOptions): GlbModel 
     const hi = new Plane(new Vector3(0, -1, 0), range.hi);
     const ud = { part: "struct", level: band.level };
 
-    const own = structural.filter((p) => p.level === band.level && p.shared === null);
+    const own = structural.filter(
+      (p) => (p.level === band.level && p.shared === null) || (p.shared !== null && p.shared !== "ROOF" && p.band === band.level),
+    );
     const parts: Mesh[] = mergeInto(own, group.name, (n) => mainMat(n), ud);
     if (band.level === topLevel) {
       parts.push(...mergeInto(structural.filter((p) => p.shared === "ROOF"), `${group.name}_ROOF`, (n) => mainMat(n), { ...ud, part: "roof" }));
     }
     for (const sb of sliceBuckets) {
-      const src = sb.pieces[0]!.material;
-      const mat = mats.slice(src.name, lo, hi);
+      const mat = mats.slice(sb.material, lo, hi);
       const sUd = { part: "slice", level: band.level };
       if (sb.geom) parts.push(mk(sb.geom, mat, `${group.name}_SLICE_${sb.material}`, sUd, sb.material));
       else sb.pieces.forEach((p, k) => parts.push(mk(p.geom, mat, `${group.name}_SLICE_${sb.material}_${k}`, sUd, sb.material)));

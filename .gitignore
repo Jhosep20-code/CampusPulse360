@@ -41,3 +41,6 @@ infra/*.secrets.local*
 
 # Copias de seguridad automaticas de Blender
 *.blend1
+
+# Comparaciones con fotos y fotogramas autenticos: privadas, no se publican
+docs/referencias/utp-huancayo/comparaciones-privadas/

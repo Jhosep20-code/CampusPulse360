@@ -47,6 +47,8 @@ USE_MESHOPT = "--meshopt" in ARGV
 ONLY_RENDER = "--only-render" in ARGV
 RENDER_ONLY = [a.split("=", 1)[1].split(",") for a in ARGV if a.startswith("--render=")]
 RENDER_ONLY = RENDER_ONLY[0] if RENDER_ONLY else None   # p. ej. --render=escaleras.png,ascensores.png
+_OUT = [a.split("=", 1)[1] for a in ARGV if a.startswith("--out=")]   # carpeta alternativa de renders (antes/despues)
+RES = None           # resolucion de la vista en curso (None = 1280 x 800)
 
 # --------------------------------------------------------------------------- dimensiones (ESTIMADAS)
 # Mismos valores que apps/web/src/twin/constants.ts (DEFAULT_DIMS). Ninguno es una medicion real.
@@ -58,8 +60,10 @@ HEADROOM, WALL_INSET, FRONT_SETBACK = 0.4, 0.8, 1.8
 CORR = 2.4
 ATR_W, ATR_D, ATR_X = 12.0, 9.0, 2.0   # v2: vacio de 12 x 9 m (ESTIMADO), deja pasillo de 2,4 m ante el nucleo
 CORE_W, CORE_D = 6.0, 9.0
-BAYS, PANES = 6, 4
-PIER_L, EDGE_R = 4.0, 0.6
+# v3: 7 franjas grandes con un montante fino intermedio (videos: vidrio estructural con montantes oscuros marcados).
+# El paño blanco ciego de la izquierda ocupa ~28 % del frente (foto exterior); ancho ESTIMADO.
+BAYS, PANES = 7, 2
+PIER_L, EDGE_R = 10.5, 0.6
 G_PIERS, PIER_S, G_SETBACK, SIGN_H = 7, 0.6, 1.5, 1.0
 MARQ_W, MARQ_D, MARQ_T, MARQ_Y = 10.0, 4.0, 0.25, 3.5
 ROOFBOX_W, ROOFBOX_D, ROOFBOX_H, ROOFBOX_X, ROOFBOX_Z = 14.0, 8.0, 3.0, -6.0, -6.0
@@ -71,10 +75,16 @@ XR = (-W / 2 + WALL_INSET, W / 2 - WALL_INSET)
 _INNER = OUTER_Z + 0.1
 FRONT_Z = (_INNER, DP / 2 - FRONT_SETBACK)
 BACK_Z = (-(DP / 2 - WALL_INSET), -_INNER)
-# Escaleras v2 (verificado: tramos rectos abiertos en el vacio, zigzag). Carril A (niveles pares) y B (impares);
-# posiciones y numero de tramos ESTIMADOS.
+# Escaleras v3. Tres referencias autenticas coinciden en tramos rectos abiertos en zigzag, paralelos al muro de
+# ascensores y en el borde del vacio OPUESTO al nucleo: el short y el video los muestran delante de la camara con el
+# muro negro al fondo, y la foto tomada frente al muro de ascensores no los muestra delante del muro.
+# Dos carriles contiguos (ida y vuelta) y descansos en las esquinas oeste del vacio, unidos a los pasillos.
+# Lado y forma INFERIDOS de esas tres vistas; longitudes y anchos ESTIMADOS (sin planos).
 STAIR_W = 1.5
-STAIR_LANES = (ATR_X - 1.3, ATR_X + 1.3)
+STAIR_GAP = 0.12
+STAIR_LANES = (ATR_X - ATR_W / 2 + 0.1 + STAIR_W / 2, ATR_X - ATR_W / 2 + 0.1 + STAIR_W * 1.5 + STAIR_GAP)
+STAIR_RUN = 6.8                                   # proyeccion horizontal de cada tramo (Z)
+STAIR_X1 = STAIR_LANES[1] + STAIR_W / 2           # borde este de los descansos
 CWX0, CWX1 = -W / 2 + PIER_L, W / 2 - EDGE_R
 CWW = CWX1 - CWX0
 CWCX = (CWX0 + CWX1) / 2
@@ -88,9 +98,9 @@ def stair_lane(k):
     return STAIR_LANES[k % 2]
 
 
-def stair_edge_z(k):
-    """Borde del vacio (z) donde ARRANCA el tramo del piso k y donde TERMINA el del piso k-1."""
-    return ATR["minZ"] if k % 2 == 0 else ATR["maxZ"]
+def stair_end(k):
+    """Extremo (+1 frente / -1 fondo) donde ARRANCA el tramo del piso k: alli esta el descanso del nivel k."""
+    return 1 if k % 2 == 0 else -1
 
 
 def base(k):
@@ -127,16 +137,16 @@ MATERIAL_SPECS = {
     "ROOF": ("#B9BEC4", 0.85, 0.0, 1.0, None),
     "BRAND_RED": ("#C8102E", 0.5, 0.0, 1.0, None),
     "SLAB": ("#C9D3DD", 0.75, 0.0, 1.0, None),          # fondo de losa gris azulado claro
-    "SLAB_FACE": ("#F4F6F8", 0.5, 0.0, 1.0, None),      # frente de losa blanco y liso
-    "STAIR_STRINGER": ("#6B7380", 0.45, 0.6, 1.0, None),
+    "SLAB_FACE": ("#949FAD", 0.55, 0.0, 1.0, None),     # v3: bandas gris azulado alrededor del vacio (foto y short)
+    "STAIR_STRINGER": ("#3A3F48", 0.45, 0.6, 1.0, None),  # zancas y fondo oscuros (video)
     "STEEL_DOOR": ("#D5DAE0", 0.35, 0.85, 1.0, None),
-    "ELEV_INDICATOR": ("#FFB454", 0.5, 0.0, 1.0, "#FFB454"),
+    "ELEV_INDICATOR": ("#FF3B30", 0.5, 0.0, 1.0, "#FF3B30"),  # indicadores rojos (foto)
     "CHAIR_RED": ("#B3262E", 0.6, 0.0, 1.0, None),
     "PANEL_JOINT": ("#8E97A4", 0.7, 0.0, 1.0, None),
     "CORE_BLACK": ("#0B0C0F", 0.12, 0.6, 1.0, None),
     "STEEL": ("#B7C0CC", 0.3, 0.9, 1.0, None),
     "TILE": ("#D9D2C5", 0.55, 0.0, 1.0, None),
-    "WOOD": ("#D8B07A", 0.55, 0.0, 1.0, None),
+    "WOOD": ("#D7A24C", 0.55, 0.0, 1.0, None),          # puertas mostaza/madera (foto y video)
     "CEILING": ("#F2F2EF", 0.9, 0.0, 1.0, None),
     "LIGHT_PANEL": ("#FFF6E6", 0.5, 0.0, 1.0, "#FFF6E6"),
     "WINDOW_NIGHT": ("#FFF1E2", 0.5, 0.0, 1.0, "#FFF1E2"),
@@ -188,6 +198,7 @@ def gb(x, y, z):
 # --------------------------------------------------------------------------- escena base
 def reset_scene():
     bpy.ops.wm.read_factory_settings(use_empty=True)
+    FONT.clear()
     ACC.clear()
     MATS.clear()
     EMPTIES.clear()
@@ -285,7 +296,24 @@ def box(group, mat, x, y, z, sx, sy, sz, rx=0.0, ry=0.0, fine=False, tag=None):
                 z, sz = (lo + hi) / 2, hi - lo
             elif z > CLIP["zmax"]:
                 return
-    key = (group, mat, tag)
+    if group in BANDED and rx == 0 and ry == 0:
+        # v3: los elementos compartidos de todo el alto se cortan por franja de piso (band_level). El visor dibuja cada
+        # tramo con su piso al aislar/explotar, sin copias recortadas por clipping planes (menos draw calls).
+        y0, y1 = y - sy / 2, y + sy / 2
+        for lv in range(1, N + 1):
+            lo = -1e9 if lv == 1 else base(lv - 1)
+            hi = 1e9 if lv == N else base(lv)
+            a, b_ = max(y0, lo), min(y1, hi)
+            if b_ - a > 1e-4:
+                _emit((group, mat, tag, lv), x, (a + b_) / 2, z, sx, b_ - a, sz, rx, ry)
+        return
+    _emit((group, mat, tag, None), x, y, z, sx, sy, sz, rx, ry)
+
+
+BANDED = {"FACADE", "ELEVATORS"}
+
+
+def _emit(key, x, y, z, sx, sy, sz, rx, ry):
     bm = ACC.get(key)
     if bm is None:
         bm = bmesh.new()
@@ -301,8 +329,8 @@ def box(group, mat, x, y, z, sx, sy, sz, rx=0.0, ry=0.0, fine=False, tag=None):
 
 def flush():
     """Convierte los acumuladores en objetos Mesh (uno por grupo+material[+etiqueta])."""
-    for (group, mat, tag), bm in ACC.items():
-        name = f"{group}_{mat}" + (f"_{tag}" if tag else "")
+    for (group, mat, tag, band), bm in ACC.items():
+        name = f"{group}_{mat}" + (f"_{tag}" if tag else "") + (f"_L{band:02d}" if band else "")
         bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
         me = bpy.data.meshes.new(name)
         bm.to_mesh(me)
@@ -315,6 +343,8 @@ def flush():
             ob["level"] = FLOOR_GROUPS.index(group) + 1
         if tag and tag != "GEN":
             ob["space_code"] = tag
+        if band:
+            ob["band_level"] = band
     ACC.clear()
 
 
@@ -341,6 +371,42 @@ def slab_cells(group, mat, yc, th, outer, holes):
             box(group, mat, (a + b) / 2, yc, zc, b - a, th, zb - za)
 
 
+FONT = {}
+
+
+def glyph(group, mat, ch, x, y, z, size, depth=0.08):
+    """Letra extruida (fuente integrada de Blender, reproducible) en el plano de la fachada principal (+Z glTF)."""
+    if CLIP is not None:
+        if group in CLIP.get("skip", ()) or ("zmax" in CLIP and z > CLIP["zmax"]):
+            return
+        if "y" in CLIP and group in CLIP.get("y_groups", ()) and not (CLIP["y"][0] <= y <= CLIP["y"][1]):
+            return
+    if "f" not in FONT:
+        FONT["f"] = bpy.data.fonts.load("<builtin>")
+    cu = bpy.data.curves.new("GLYPH", "FONT")
+    cu.body = ch
+    cu.font = FONT["f"]
+    cu.align_x, cu.align_y = "CENTER", "CENTER"
+    cu.size = size
+    cu.extrude = depth / 2
+    cu.resolution_u = 4 if FINE else 2
+    ob = bpy.data.objects.new("GLYPH", cu)
+    bpy.context.scene.collection.objects.link(ob)
+    me = bpy.data.meshes.new_from_object(ob.evaluated_get(bpy.context.evaluated_depsgraph_get()))
+    bpy.data.objects.remove(ob)
+    bpy.data.curves.remove(cu)
+    # Local del texto: X derecha, Y arriba, Z hacia fuera -> Blender: X, Z(arriba), -Y (fachada +Z glTF).
+    rot = Matrix(((1, 0, 0, 0), (0, 0, -1, 0), (0, 1, 0, 0), (0, 0, 0, 1)))
+    me.transform(Matrix.Translation(gb(x, y, z)) @ rot)
+    key = (group, mat, None, None)
+    bm = ACC.get(key)
+    if bm is None:
+        bm = bmesh.new()
+        ACC[key] = bm
+    bm.from_mesh(me)
+    bpy.data.meshes.remove(me)
+
+
 # --------------------------------------------------------------------------- FACADE (compartido)
 def build_facade():
     g = "FACADE"
@@ -358,6 +424,13 @@ def build_facade():
         box(g, "PANEL_JOINT", W / 2 + 0.006, y, 0.3, 0.012, 0.035, DP - 0.6)
         box(g, "PANEL_JOINT", -W / 2 + PIER_L / 2, y, DP / 2 + 0.006, PIER_L, 0.035, 0.012)
         box(g, "PANEL_JOINT", W / 2 - EDGE_R / 2, y, DP / 2 + 0.006, EDGE_R, 0.035, 0.012)
+    # v3: bruna vertical que separa el paño ciego en dos volumenes (foto exterior; posicion ESTIMADA).
+    box(g, "PANEL_JOINT", -W / 2 + 4.2, h / 2, DP / 2 + 0.01, 0.12, h, 0.02)
+    # v3: marco de aluminio gris claro alrededor del muro cortina (foto y video), del 2.o nivel a la coronacion.
+    fy0 = H_GROUND - 0.55
+    fh = ROOF_Y - fy0
+    box(g, "ROOF", CWX0 - 0.3, fy0 + fh / 2, DP / 2 - 0.2, 0.6, fh, 0.8)
+    box(g, "ROOF", (CWX1 + W / 2) / 2 + 0.01, fy0 + fh / 2, DP / 2 - 0.2, W / 2 - CWX1 + 0.04, fh, 0.8)
 
 
 # --------------------------------------------------------------------------- pisos
@@ -375,9 +448,10 @@ def build_floor_slab(k):
         return
     holes = [(ATR["minX"], ATR["maxX"], ATR["minZ"], ATR["maxZ"])]
     slab_cells(g, "SLAB", yc, SLAB_T, (-sw / 2, sw / 2, -sd / 2, sd / 2), holes)
-    # Frentes de losa del atrio: blancos, lisos, de ~0,6 m de canto (estimado), en los 4 lados del vacio.
+    # Frentes de losa del atrio: bandas gris azulado de ~0,9 m de canto (foto y short; canto ESTIMADO) en los 4 lados.
     f = 0.12
-    fy, fh = b, 0.6
+    fh = 0.9
+    fy = b + SLAB_T + 0.02 - fh / 2
     cxm = (ATR["minX"] + ATR["maxX"]) / 2
     box(g, "SLAB_FACE", cxm, fy, ATR["maxZ"] + f / 2, ATR_W, fh, f)
     box(g, "SLAB_FACE", cxm, fy, ATR["minZ"] - f / 2, ATR_W, fh, f)
@@ -397,7 +471,7 @@ def build_curtain_and_generic(k):
     if k == 0:
         glass_h = H - SIGN_H
         box(g, "GLASS_GROUND", CWCX, glass_h / 2, DP / 2 - G_SETBACK, CWW, glass_h, 0.1)
-        box(g, "WHITE_PANEL", CWCX, H - SIGN_H / 2, DP / 2 - 0.25, CWW, SIGN_H, 0.5)
+        box(g, "ROOF", CWCX, H - SIGN_H / 2, DP / 2 - 0.25, CWW + 0.6, SIGN_H, 0.5)   # banda gris bajo el muro cortina (foto)
         box(g, "LED_CROWN", CWCX, H - SIGN_H / 2, DP / 2 + 0.02, CWW, 0.07, 0.03)
         span = CWW - PIER_S
         for i in range(G_PIERS):
@@ -442,7 +516,7 @@ def build_curtain_and_generic(k):
                 continue
             if not FINE and c % PANES != 2:
                 continue  # LOD1: solo el montante secundario central de cada franja
-            box(g, "FRAME_DARK", CWX0 + c * COLW, yc, GLASS_Z + 0.04, 0.1, H, 0.25)
+            box(g, "FRAME_DARK", CWX0 + c * COLW, yc, GLASS_Z + 0.04, 0.06, H, 0.12)
         # Ventanas encendidas: MISMA geometria con emision (el visor modula la intensidad).
         for c in range(COLS):
             x = CWX0 + (c + 0.5) * COLW
@@ -666,110 +740,108 @@ def build_core_doors(k):
             box(g, "STEEL_DOOR", xf - 0.02, y0 + 1.09, zc + sgn * 0.33, 0.04, 2.18, 0.65)
         box(g, "ELEV_INDICATOR", xf - 0.03, y0 + 2.55, zc, 0.03, 0.1, 0.3)
     for zb in (-pitch / 2, pitch / 2):
+        box(g, "WHITE_PANEL", xf - 0.02, y0 + 1.75, zb, 0.02, 0.42, 0.3, fine=True)   # senaletica (foto: placas claras)
         box(g, "STEEL", xf - 0.02, y0 + 1.1, zb, 0.03, 0.34, 0.12)
         box(g, "ELEV_INDICATOR", xf - 0.04, y0 + 1.18, zb, 0.015, 0.04, 0.04, fine=True)
         box(g, "ELEV_INDICATOR", xf - 0.04, y0 + 1.04, zb, 0.015, 0.04, 0.04, fine=True)
 
 
 def build_stairs(k):
-    """Tramo recto ABIERTO del piso k al k+1, dentro del vacio del atrio (verificado en video). Zancas laterales de acero
-    gris, peldanos abiertos claros, fondo gris y barandas de tubos con pasamanos. Direccion alternada por nivel y carril
-    alternado (zigzag superpuesto): pares de pared posterior a frente por el carril A; impares de frente a posterior por B."""
+    """v3: tramo recto ABIERTO del nivel k al k+1, paralelo al muro de ascensores, en el borde oeste del vacio.
+    Ida y vuelta en dos carriles contiguos (zigzag visto de frente) con descansos en las esquinas oeste del vacio.
+    Zancas y fondo oscuros, peldanos claros sin contrahuella y barandas de acero de tubos horizontales."""
+    g = fl(k)
+    y_lo = base(k) + SLAB_T
+    if k >= 1:
+        # Descanso del nivel k (llega el tramo k-1 por un carril y sale el tramo k por el otro).
+        e = stair_end(k)
+        za, zb = sorted((e * STAIR_RUN / 2, e * (ATR_D / 2)))
+        x0 = ATR["minX"]
+        box(g, "SLAB", (x0 + STAIR_X1) / 2, base(k) + SLAB_T / 2, (za + zb) / 2, STAIR_X1 - x0, SLAB_T, zb - za)
+        box(g, "STAIR_STRINGER", (x0 + STAIR_X1) / 2, base(k) - 0.12, (za + zb) / 2, STAIR_X1 - x0, 0.24, zb - za)
+        # Baranda del borde libre del descanso (lado del vacio).
+        for dy in ((0.3, 0.55, 0.8, 1.05) if FINE else (0.55, 1.05)):
+            box(g, "STEEL", STAIR_X1 - 0.03, y_lo + dy, (za + zb) / 2, 0.045, 0.045, zb - za)
+        for zz in (za, zb):
+            box(g, "STEEL", STAIR_X1 - 0.03, y_lo + 0.525, zz, 0.05, 1.05, 0.05)
     if k >= N - 1:
         return
-    g = fl(k)
     R = height(k)
-    y_lo = base(k) + SLAB_T
-    y_hi = base(k + 1) + SLAB_T
-    d = 1 if k % 2 == 0 else -1
-    z_s = stair_edge_z(k)
-    L = ATR_D
+    e = stair_end(k)
+    d = -e                       # sentido de avance en Z
+    z_s = e * STAIR_RUN / 2
+    L = STAIR_RUN
     cx = stair_lane(k)
     w = STAIR_W
     n = round(R / (0.18 if FINE else 0.3))
     riser = R / n
     p = L / (n - 1)
     for j in range(1, n):
-        box(g, "TILE", cx, y_lo + j * riser - 0.025, z_s + d * (j - 0.5) * p, w - 0.12, 0.05, p + 0.03)
+        box(g, "SLAB", cx, y_lo + j * riser - 0.025, z_s + d * (j - 0.5) * p, w - 0.12, 0.05, min(p + 0.03, 0.34))
     th = math.atan2(R, L)
     Ls = math.hypot(L, R) + 0.1
     rx = -th if d > 0 else th
     ym, zm = y_lo + R / 2, z_s + d * L / 2
     off = 0.17
-    # Zancas y fondo: el extremo inferior se prolonga 0,1 m hacia el frente de losa para que quede empotrado (sin cara colgante).
-    ext = 0.1
-    Lz = Ls + ext
-    yz, zz0 = ym - 0.5 * ext * math.sin(th), zm - d * 0.5 * ext * math.cos(th)
-    for s in (-1, 1):
-        box(g, "STAIR_STRINGER", cx + s * (w / 2 - 0.03), yz - 0.02, zz0, 0.06, 0.34, Lz, rx=rx)
-    box(g, "STAIR_STRINGER", cx, yz - 0.02 - off * math.cos(th), zz0 + d * off * math.sin(th), w - 0.06, 0.04, Lz, rx=rx)
-    heights = (0.45, 0.8) if FINE else (0.7,)
-    for s in (-1, 1):
-        xr = cx + s * (w / 2 - 0.03)
+    for s_ in (-1, 1):
+        box(g, "STAIR_STRINGER", cx + s_ * (w / 2 - 0.03), ym - 0.02, zm, 0.06, 0.34, Ls, rx=rx)
+    box(g, "STAIR_STRINGER", cx, ym - 0.02 - off * math.cos(th), zm + d * off * math.sin(th), w - 0.06, 0.04, Ls, rx=rx)
+    heights = (0.3, 0.55, 0.8) if FINE else (0.6,)
+    for s_ in (-1, 1):
+        xr = cx + s_ * (w / 2 - 0.03)
         for hh in heights:
             box(g, "STEEL", xr, ym + hh, zm, 0.04, 0.04, Ls, rx=rx)
-        box(g, "STEEL", xr, ym + 1.12, zm, 0.06, 0.06, Ls, rx=rx)
-        m = max(2, round(L / (1.5 if FINE else 3.0)))
+        box(g, "STEEL", xr, ym + 1.05, zm, 0.06, 0.06, Ls, rx=rx)
+        m = max(2, round(L / (1.4 if FINE else 3.0)))
         for i in range(m + 1):
             t = i * L / m
-            box(g, "STEEL", xr, y_lo + R * t / L + 0.63, z_s + d * t, 0.05, 1.02, 0.05)
-    # Encuentros con el borde del pasillo en cada extremo (umbral de acero).
-    for zz, yy in ((z_s - d * 0.15, y_lo), (z_s + d * (L + 0.15), y_hi)):
-        box(g, "STAIR_STRINGER", cx, yy + 0.015, zz, w + 0.1, 0.03, 0.3)
+            box(g, "STEEL", xr, y_lo + R * t / L + 0.55, z_s + d * t, 0.05, 1.0, 0.05)
 
 
 def build_atrium_rails(k):
-    """Barandas de tubos horizontales de acero en TODO el borde del vacio, salvo donde arrancan o terminan los tramos."""
+    """Barandas de acero de tubos horizontales en el borde del vacio (foto: 4-5 tubos y pasamanos). El borde oeste
+    queda libre junto a los tramos; en la esquina del descanso de cada nivel la baranda se abre hacia el pasillo."""
     if k == 0:
         return
     g = fl(k)
     y0 = base(k) + SLAB_T
     detailed = k < 5 and FINE
-    rows = [0.35, 0.7, 1.05] if detailed else [0.55, 1.05]
-    lanes = []
-    if k >= 1:
-        lanes.append(stair_lane(k - 1))   # llega el tramo del nivel inferior
-    if k <= N - 2:
-        lanes.append(stair_lane(k))       # arranca el tramo hacia el nivel superior
-    gaps = sorted((c - STAIR_W / 2 - 0.08, c + STAIR_W / 2 + 0.08) for c in lanes)
-    z_open = stair_edge_z(k)
-
-    def split(a, b, gp):
-        out, cur = [], a
-        for g0, g1 in gp:
-            if g0 > cur + 0.05:
-                out.append((cur, min(g0, b)))
-            cur = max(cur, g1)
-        if b > cur + 0.05:
-            out.append((cur, b))
-        return out
+    rows = [0.25, 0.5, 0.75, 1.0] if detailed else ([0.35, 0.7, 1.0] if FINE else [0.55, 1.0])
 
     def post(x, z):
         box(g, "STEEL", x, y0 + 0.525, z, 0.05, 1.05, 0.05)
 
     def run_x(z, a, b):
+        if b - a < 0.05:
+            return
         for dy in rows:
-            box(g, "STEEL", (a + b) / 2, y0 + dy, z, b - a, 0.045, 0.045)
-        if detailed:
-            box(g, "STEEL", (a + b) / 2, y0 + 1.1, z, b - a, 0.07, 0.07)
-        m = max(1, round((b - a) / (2.0 if detailed else 3.5)))
+            box(g, "STEEL", (a + b) / 2, y0 + dy, z, b - a, 0.04, 0.04)
+        box(g, "STEEL", (a + b) / 2, y0 + 1.08, z, b - a, 0.07, 0.07)
+        m = max(1, round((b - a) / (1.5 if detailed else 3.0)))
         for i in range(m + 1):
             post(a + i * (b - a) / m, z)
 
     def run_z(x, a, b):
+        if b - a < 0.05:
+            return
         for dy in rows:
-            box(g, "STEEL", x, y0 + dy, (a + b) / 2, 0.045, 0.045, b - a)
-        if detailed:
-            box(g, "STEEL", x, y0 + 1.1, (a + b) / 2, 0.07, 0.07, b - a)
-        m = max(1, round((b - a) / (2.0 if detailed else 3.5)))
+            box(g, "STEEL", x, y0 + dy, (a + b) / 2, 0.04, 0.04, b - a)
+        box(g, "STEEL", x, y0 + 1.08, (a + b) / 2, 0.07, 0.07, b - a)
+        m = max(1, round((b - a) / (1.5 if detailed else 3.0)))
         for i in range(m + 1):
             post(x, a + i * (b - a) / m)
 
     xa, xb = ATR["minX"] + 0.06, ATR["maxX"] - 0.06
-    for z, edge in ((ATR["maxZ"] - 0.06, ATR["maxZ"]), (ATR["minZ"] + 0.06, ATR["minZ"])):
-        for a, b in split(xa, xb, gaps if abs(edge - z_open) < 1e-6 else []):
-            run_x(z, a, b)
-    run_z(xa, ATR["minZ"] + 0.06, ATR["maxZ"] - 0.06)
+    e = stair_end(k)
+    for sgn, z in ((1, ATR["maxZ"] - 0.06), (-1, ATR["minZ"] + 0.06)):
+        # En el extremo del descanso, la baranda del pasillo frente/fondo empieza donde acaba el descanso.
+        run_x(z, STAIR_X1 if sgn == e else xa, xb)
+    # Borde oeste: baranda entre los dos extremos de tramo (los tramos corren pegados a este borde).
+    run_z(xa, -STAIR_RUN / 2, STAIR_RUN / 2)
+    if e != 1:
+        run_z(xa, STAIR_RUN / 2, ATR["maxZ"] - 0.06)
+    if e != -1:
+        run_z(xa, ATR["minZ"] + 0.06, -STAIR_RUN / 2)
     run_z(xb, ATR["minZ"] + 0.06, ATR["maxZ"] - 0.06)
 
 
@@ -779,18 +851,29 @@ def build_roof():
     cy = ROOF_Y + CROWN / 2
     holes = [(ATR["minX"], ATR["maxX"], ATR["minZ"], ATR["maxZ"])]  # el atrio se cierra con la claraboya (ATRIUM)
     slab_cells(g, "ROOF", ROOF_Y + SLAB_T / 2, SLAB_T, (-(W - 0.2) / 2, (W - 0.2) / 2, -(DP - 0.2) / 2, (DP - 0.2) / 2), holes)
-    box(g, "WHITE_PANEL", 0, cy, DP / 2 - WALL_T / 2, W, CROWN, WALL_T)
+    xs = CWX0 - 0.6   # v3: coronacion de aluminio gris sobre el muro cortina y blanca sobre el paño ciego (foto)
+    box(g, "WHITE_PANEL", (-W / 2 + xs) / 2, cy, DP / 2 - WALL_T / 2, xs + W / 2, CROWN, WALL_T)
+    box(g, "ROOF", (xs + W / 2) / 2, cy, DP / 2 - WALL_T / 2 + 0.004, W / 2 - xs, CROWN, WALL_T)
     box(g, "WHITE_PANEL", 0, cy, -DP / 2 + WALL_T / 2, W, CROWN, WALL_T)
     box(g, "WHITE_PANEL", -W / 2 + WALL_T / 2, cy, 0, WALL_T, CROWN, DP - 2 * WALL_T)
     box(g, "WHITE_PANEL", W / 2 - WALL_T / 2, cy, 0, WALL_T, CROWN, DP - 2 * WALL_T)
-    red_x0 = W / 2 - EDGE_R - CROWN - 0.4
+    red_x0 = W / 2 - 0.3
     for dy in (CROWN / 3, 2 * CROWN / 3):
         box(g, "PANEL_JOINT", (-W / 2 + red_x0 - 0.1) / 2, ROOF_Y + dy, DP / 2 + 0.006, red_x0 - 0.1 + W / 2, 0.035, 0.012)
         box(g, "PANEL_JOINT", -W / 2 - 0.006, ROOF_Y + dy, 0, 0.012, 0.035, DP - 2 * WALL_T)
         box(g, "PANEL_JOINT", W / 2 + 0.006, ROOF_Y + dy, 0, 0.012, 0.035, DP - 2 * WALL_T)
         box(g, "PANEL_JOINT", 0, ROOF_Y + dy, -DP / 2 - 0.006, W, 0.035, 0.012)
-    # Acento rojo arriba a la derecha: panel liso, SIN letras ni logotipo.
-    box(g, "BRAND_RED", W / 2 - EDGE_R - CROWN / 2 - 0.4, cy, DP / 2 + 0.03, CROWN, CROWN, 0.06)
+    # Marca institucional (foto exterior y video): tres cuadros escalonados U (rojo) T (oscuro) / P (rojo) con letras
+    # blancas, arriba a la derecha del muro cortina. Representacion geometrica simplificada; tamano ESTIMADO.
+    sq, gp = 2.9, 0.12
+    xt = CWX1 - 0.9 - sq / 2
+    xu = xt - sq - gp
+    yt = ROOF_Y - 0.6 - sq / 2
+    yp = yt - sq - gp
+    zl = DP / 2 + 0.32
+    for (xx, yy, mat, ch) in ((xu, yt, "BRAND_RED", "U"), (xt, yt, "FRAME_DARK", "T"), (xt, yp, "BRAND_RED", "P")):
+        box(g, mat, xx, yy, zl, sq, sq, 0.14)
+        glyph(g, "WHITE_PANEL", ch, xx, yy - 0.05, zl + 0.07 + 0.04, sq * 0.78)
     # Linea LED de la coronacion (frente y laterales); material emisivo aparte de las ventanas.
     box(g, "LED_CROWN", 0, ROOF_Y + 0.5, DP / 2 + 0.02, W - 1.0, 0.08, 0.04)
     box(g, "LED_CROWN", -W / 2 - 0.02, ROOF_Y + 0.5, 0, 0.04, 0.08, DP - 1.0)
@@ -804,11 +887,8 @@ def build_roof():
 
 
 def build_atrium_shared():
-    g = "ATRIUM"
-    # Pilares continuos en las esquinas del atrio (compartidos por todos los pisos).
-    for sx in (ATR["minX"] - 0.2, ATR["maxX"] + 0.2):
-        for sz in (ATR["minZ"] - 0.2, ATR["maxZ"] + 0.2):
-            box(g, "SLAB", sx, ROOF_Y / 2 + SLAB_T / 2, sz, 0.4, ROOF_Y - SLAB_T, 0.4)
+    g = "ROOF"   # v3: la claraboya viaja con la cubierta (se oculta al aislar un piso); ATRIUM queda como nodo
+    # v3: sin pilares en las esquinas del vacio (no aparecen en ninguna referencia: las losas vuelan sobre el vacio).
     # Claraboya del atrio: brocal metalico y vidrio claro.
     top = ROOF_Y + SLAB_T
     cx, cz = (ATR["minX"] + ATR["maxX"]) / 2, 0.0
@@ -983,12 +1063,13 @@ def EMPTIES_BY_NAME(name):
     return bpy.data.objects[name]
 
 
-def export_glb(root_name, path):
+def export_glb(root_name, path, keep=None):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     bpy.ops.object.select_all(action="DESELECT")
     objs = descendants(bpy.data.objects[root_name])
     for o in objs:
-        o.select_set(True)
+        if keep is None or keep(o):
+            o.select_set(True)
     bpy.context.view_layer.objects.active = bpy.data.objects[root_name]
     kw = dict(
         filepath=path, export_format="GLB", use_selection=True, export_yup=True, export_apply=True,
@@ -1000,6 +1081,37 @@ def export_glb(root_name, path):
         kw["export_meshopt_compression_enable"] = True
     bpy.ops.export_scene.gltf(**kw)
     return os.path.getsize(path)
+
+
+AR_SCALE = 60   # maqueta 1:60 (~0,63 m de frente) para Scene Viewer; la AR web (nivel A) mide la caja y reescala
+
+
+def export_ar(path):
+    """GLB de AR desde la MISMA fuente (LOD1): sin ventanas nocturnas ni luminarias encendidas (Scene Viewer no tiene
+    modo noche y las mostraria como paneles blancos), escala de maqueta en el nodo raiz, Y arriba, base en y = 0."""
+    for name, val in (("LIGHT_PANEL", 0.0), ("LED_CROWN", 0.0), ("ELEV_INDICATOR", 1.0)):
+        m = MATS.get(name)
+        if m:
+            next(n for n in m.node_tree.nodes if n.type == "BSDF_PRINCIPLED").inputs["Emission Strength"].default_value = val
+    root = bpy.data.objects["BUILDING"]
+    keep = lambda o: not (o.type == "MESH" and o.data.materials and o.data.materials[0].name == "WINDOW_NIGHT")
+    # Maqueta estatica: una malla por material (pocas draw calls en Scene Viewer). SPC_* y anclas quedan aparte
+    # (la AR web los colorea y los toca). Se hace al final: esta escena ya no se vuelve a exportar.
+    by_mat = {}
+    for o in descendants(root):
+        if o.type == "MESH" and keep(o) and not o.name.startswith("SPC_") and o.data.materials:
+            by_mat.setdefault(o.data.materials[0].name, []).append(o)
+    for mname, objs in by_mat.items():
+        if len(objs) > 1:
+            with bpy.context.temp_override(active_object=objs[0], selected_editable_objects=objs, selected_objects=objs):
+                bpy.ops.object.join()
+        objs[0].name = f"AR_{mname}"
+    root.scale = (1 / AR_SCALE,) * 3
+    size = export_glb("BUILDING", path, keep)
+    root.scale = (1, 1, 1)
+    objs = [o for o in descendants(root) if keep(o) and o.type == "MESH"]
+    tris = sum(sum(len(p.vertices) - 2 for p in o.data.polygons) for o in objs)
+    return dict(meshes=len(objs), triangles=tris, glb_bytes=size, scale=f"1:{AR_SCALE}")
 
 
 def build_and_export():
@@ -1017,6 +1129,7 @@ def build_and_export():
     build(False)
     report["LOD1"] = stats("BUILDING")
     report["LOD1"]["glb_bytes"] = export_glb("BUILDING", os.path.join(MODELS, "utp-huancayo-mobile.glb"))
+    report["AR"] = export_ar(os.path.join(MODELS, "utp-huancayo-ar.glb"))
     with open(REPORT, "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2)
     print("BUILD_REPORT", json.dumps(report))
@@ -1132,7 +1245,8 @@ def boolean(ob, cut, op):
 
 def render_setup(path):
     sc = bpy.context.scene
-    sc.render.resolution_x, sc.render.resolution_y, sc.render.resolution_percentage = 1280, 800, 100
+    rx, ry = RES or (1280, 800)
+    sc.render.resolution_x, sc.render.resolution_y, sc.render.resolution_percentage = rx, ry, 100
     sc.render.image_settings.file_format = "PNG"
     sc.render.filepath = path
     sc.view_settings.view_transform = "AgX"
@@ -1172,8 +1286,9 @@ def do_render(name, setup_fn, rebuild=None):
     for o in bpy.data.objects:
         if o.name.startswith("SPC_") or o.name.startswith("ANCHOR_"):
             o.hide_render = True
-    path = os.path.join(RENDERS, name)
-    os.makedirs(RENDERS, exist_ok=True)
+    out_dir = _OUT[0] if _OUT else RENDERS
+    path = os.path.join(out_dir, name)
+    os.makedirs(out_dir, exist_ok=True)
     setup_fn()
     render_setup(path)
     try:
@@ -1245,12 +1360,13 @@ def interior_lights():
 
 def setup_stairs():
     interior_lights()
-    set_camera((-3.5, 6.7, 3.0), (7.0, 17.5, -1.5), 64)
+    # v3: desde el pasillo de ascensores mirando al oeste: los tramos en zigzag se ven de perfil, como en el video.
+    set_camera((ATR["maxX"] + 1.4, base(2) + SLAB_T + 1.6, 1.2), (ATR["minX"], base(4) + 1.0, -0.8), 66)
 
 
 def setup_elevators():
     interior_lights()
-    set_camera((-3.6, 10.2, 0.5), (10.4, 16.5, 0), 56)
+    set_camera((ATR["minX"] - 1.8, base(2) + SLAB_T + 1.6, 2.0), (CORE["minX"], base(3) + 1.6, -0.5), 58)
 
 
 def setup_floor_p03():
@@ -1259,6 +1375,34 @@ def setup_floor_p03():
     add_sun(2.6, (1.0, 0.96, 0.9), SUN_DIR)
     set_emission({"LED_CROWN": 0.0, "LIGHT_PANEL": 3.0})
     set_camera(cam_polar(-35, 38, 52, (0, 9.5, 0)), (0, 9.5, 0), 34)
+
+
+# Vistas con el MISMO punto de vista aproximado que las referencias autenticas (comparacion antes/despues).
+# Las fotos y fotogramas no entran al repositorio; solo estos renders propios.
+def setup_ref_exterior():
+    """Como la foto exterior (vista aerea casi frontal de la fachada principal, algo desde la izquierda)."""
+    global RES
+    RES = (1000, 1000)
+    setup_day()
+    target = (2, 17, 0)
+    set_camera(cam_polar(-14, 17, 96, target), target, 33)
+
+
+def setup_ref_elevators():
+    """Como la foto del atrio: desde el pasillo oeste de un piso alto, mirando al muro de ascensores al otro lado del vacio."""
+    global RES
+    RES = (1180, 715)
+    interior_lights()
+    y = base(6) + SLAB_T + 1.6
+    set_camera((ATR["minX"] - 1.5, y, 0.0), (CORE["minX"], base(4) + 1.4, 0.0), 52)
+
+
+def setup_ref_stairs():
+    """Como el fotograma vertical del short: desde un piso bajo mirando hacia arriba el muro de ascensores y las escaleras."""
+    global RES
+    RES = (720, 1280)
+    interior_lights()
+    set_camera((ATR["minX"] - 0.15, base(1) + SLAB_T + 1.4, 0.0), (CORE["minX"], base(5) + 1.0, 0.0), 84)
 
 
 def floor_ground():
@@ -1286,9 +1430,14 @@ def render_all():
         ("piso-P03-aislado.png", setup_floor_p03, dict(clip=FLOOR_CLIP, extra=floor_ground)),
         ("escaleras.png", setup_stairs, dict(clip=ATRIUM_CLIP)),
         ("ascensores.png", setup_elevators, dict(clip=ATRIUM_CLIP)),
+        ("ref-exterior.png", setup_ref_exterior, None),
+        ("ref-ascensores.png", setup_ref_elevators, None),
+        ("ref-escaleras.png", setup_ref_stairs, None),
     ]
+    global RES
     for name, fn, rb in jobs:
         if RENDER_ONLY is None or name in RENDER_ONLY:
+            RES = None
             do_render(name, fn, rb)
 
 

@@ -103,6 +103,12 @@ Es una representacion aproximada, **no una replica exacta**. Todas las dimension
 - Salidas: `apps/web/public/models/utp-huancayo.glb` (LOD0, solo `BUILDING`),
   `utp-huancayo-mobile.glb` (LOD1: sin mobiliario, sin luminarias individuales, montantes secundarios reducidos, escaleras
   y barandas simplificadas) y `utp-context.glb` (nodo `CONTEXT`, omisible). Renders en `docs/entregables/FINAL/capturas/blender/`.
+- **v3 (23-nov-2026):**
+  - `utp-huancayo-ar.glb` es el GLB de AR (Scene Viewer y AR web), exportado de la misma fuente: LOD1 fusionado por material, sin `WINDOW_NIGHT` y a escala de maqueta 1:60.
+  - Las piezas de todo el alto de `FACADE` y `ELEVATORS` se cortan por piso, con el extra `band_level`, para que el visor no las recorte con *clipping planes*.
+  - La claraboya cuelga de `ROOF`.
+  - Las vistas `ref-*.png` reproducen el punto de vista de las referencias auténticas.
+  - Matriz de cambios: `docs/referencias/matriz-correspondencia-v3.md`.
 - Ejes: metros, +Y arriba, origen en el centro de la huella a nivel de la planta baja, fachada principal hacia +Z.
   Todos los nodos tienen transformacion identidad (los vertices estan horneados en coordenadas del edificio), salvo los
   volumenes `SPC_*` y las anclas, que tienen su centro como origen.
