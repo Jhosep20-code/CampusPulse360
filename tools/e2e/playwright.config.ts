@@ -7,6 +7,8 @@ import { defineConfig, devices } from "@playwright/test";
  */
 export default defineConfig({
   testDir: "./tests",
+  // Las pruebas visuales WebGL (lentas con renderizado por software) solo con VISUAL=1.
+  testIgnore: process.env.VISUAL ? [] : ["**/visual-*.spec.ts"],
   timeout: 60_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,
