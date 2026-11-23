@@ -199,3 +199,22 @@ En todas las vistas hubo 0 matrices degeneradas y 0 mallas de otros pisos al ais
 3. En la consola, `__twinDebug()` da `drawCalls` y `triangles`; Rendimiento → FPS meter da los fps.
 4. Repetir con Fachada, Pisos explotados y P10.
 5. Para la AR, abrir `/ar` → nivel B y anotar escala, orientación y materiales.
+
+## 11. Despliegue del modelo v3 (23-nov-2026, 17:20 aprox.)
+- **Regresión previa (local):**
+  - 260 pruebas unitarias e integración: contratos 9, API 77, web 164, simulador 10.
+  - Tipos sin errores.
+  - e2e contra el stack Docker reconstruido con v3: 15 aprobadas y 3 omitidas a propósito; el stack sirve `utp-huancayo-ar.glb` con 200.
+  - gitleaks sobre lo preparado: sin hallazgos.
+- **Versión desplegada:** `3d66c483-bf84-4d5a-a3ab-72f2046f3883` (commit b760757), con las mismas variables que la anterior.
+- **Rollback:** a la versión anterior con `npx wrangler rollback fdf7a207-5ad4-4a89-a47d-1daae54a2b9f` desde apps/api.
+- **Verificado en producción:**
+  - `/system/health` ok, con `commit b760757`.
+  - `/`, `/ar`, `/reloj`, `/acceso`, `/incidencias` y `/asistente` responden 200.
+  - GLB de escritorio 2.914.500 bytes, móvil 1.277.204 y AR 1.104.356, todos `model/gltf-binary`.
+  - `campus-ar.glb` ya no existe: devuelve la SPA.
+- **GPU con clics reales:**
+  - Fachada: 43 draw calls, 0 degeneradas.
+  - P10 aislado: 25 draw calls, 0 de otros pisos.
+  - Atrio: 33 draw calls.
+  - `/ar` detecta el GLB de AR.
