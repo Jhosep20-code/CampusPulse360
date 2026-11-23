@@ -25,10 +25,14 @@ test.describe("Plataforma publica (visitante)", () => {
     await expect(page.getByRole("link", { name: /Vista 3D \(no es AR\)/ })).toBeVisible();
   });
 
-  test("vista de reloj", async ({ page }) => {
+  test("vista de reloj: /watch redirige a /reloj y la esfera cambia de pantalla", async ({ page }) => {
     await page.goto("/watch");
-    await expect(page.getByText(/simulado/i).first()).toBeVisible();
-    await expect(page.getByText(/CO₂ medio|CO2 medio/)).toBeVisible();
+    await expect(page).toHaveURL(/\/reloj$/);
+    await expect(page.getByRole("heading", { name: "Vista previa del reloj" })).toBeVisible();
+    await expect(page.getByText("SIMULADO")).toBeVisible();
+    await expect(page.getByText(/prueba en el reloj físico pendiente/)).toBeVisible();
+    await page.getByRole("button", { name: "Pantalla siguiente" }).click();
+    await expect(page.getByText(/CO₂ medio|CO2 medio/).first()).toBeVisible();
   });
 
   test("API: firma de ingesta invalida rechazada y cabeceras de seguridad", async ({ request }) => {

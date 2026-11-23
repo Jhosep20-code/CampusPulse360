@@ -6,7 +6,7 @@ import { expect, test, type Page } from "@playwright/test";
  * dia/noche, pisos P1-P10, regreso, orientacion y sesion prolongada.
  * Falla si aparece cualquier excepcion no capturada o el fallback de error.
  */
-const PAGES = ["/", "/incidentes", "/asistente", "/iot", "/automatizaciones", "/sistema", "/acceso", "/ar", "/watch"];
+const PAGES = ["/", "/incidentes", "/asistente", "/iot", "/automatizaciones", "/sistema", "/acceso", "/ar", "/reloj"];
 
 function track(page: Page) {
   const errors: string[] = [];
@@ -73,7 +73,7 @@ test.describe("Estabilidad movil (tactil)", () => {
     const errors = track(page);
     await page.goto("/");
     await page.waitForTimeout(65_000); // ~6 ciclos de sondeo de /live
-    await page.goto("/watch");
+    await page.goto("/reloj");
     await page.waitForTimeout(25_000);
     await noFallback(page);
     expect(errors, errors.join("\n\n")).toEqual([]);

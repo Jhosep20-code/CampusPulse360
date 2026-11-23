@@ -31,6 +31,8 @@ interface NavItem {
   label: string;
   Icon: LucideIcon;
   end?: boolean;
+  /** Etiqueta alternativa en el menu "Más" del telefono. */
+  moreLabel?: string;
 }
 
 const MAIN_NAV: NavItem[] = [
@@ -45,7 +47,7 @@ const MORE_NAV: NavItem[] = [
   { to: "/sistema", label: "Sistema", Icon: ServerCog },
   { to: "/acceso", label: "Acceso", Icon: KeyRound },
   { to: "/ar", label: "AR", Icon: Smartphone },
-  { to: "/watch", label: "Vista de reloj", Icon: Watch },
+  { to: "/reloj", label: "Vista de reloj", moreLabel: "Vista de reloj (vista previa)", Icon: Watch },
 ];
 
 const DESKTOP_NAV: NavItem[] = [...MAIN_NAV, ...MORE_NAV];
@@ -173,11 +175,11 @@ function BottomBar() {
           className="safe-bottom fixed inset-x-3 bottom-[68px] z-50 rounded-2xl border border-line bg-panel p-2 shadow-2xl lg:hidden"
         >
           <ul className="m-0 list-none p-0">
-            {MORE_NAV.map(({ to, label, Icon }) => (
+            {MORE_NAV.map(({ to, label, moreLabel, Icon }) => (
               <li key={to}>
                 <NavLink to={to} className={({ isActive }) => navClass(isActive)}>
                   <Icon size={18} aria-hidden="true" />
-                  {label}
+                  {moreLabel ?? label}
                 </NavLink>
               </li>
             ))}

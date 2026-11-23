@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { createBrowserRouter, Outlet } from "react-router";
+import { createBrowserRouter, Navigate, Outlet } from "react-router";
 import { AppProviders } from "./context";
 import { Layout } from "./Layout";
 import { PageSkeleton } from "../components/ui";
@@ -45,8 +45,10 @@ export const routes = [
           { path: "*", element: <NotFound /> },
         ],
       },
+      // Alias historico: /watch redirige a /reloj.
+      { path: "watch", element: <Navigate to="/reloj" replace /> },
       {
-        path: "watch",
+        path: "reloj",
         element: (
           <Suspense fallback={<PageSkeleton />}>
             <WatchView />
