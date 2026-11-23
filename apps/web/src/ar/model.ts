@@ -10,17 +10,19 @@ import {
 } from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { DEFAULT_DIMS, PALETTE, type BuildingDims } from "../twin/constants";
-import { buildFrameBoxes, buildRoofBoxes, coreBox, type Box } from "../twin/facade";
+import { BATCH_KEYS, BATCH_META, buildBuilding, type Box } from "../twin/facade";
 import { computeLayout } from "../twin/layout";
+import { MATERIAL_SPECS } from "../twin/materials";
 
 /*
  * Edificio PROCEDURAL para AR y exportacion GLB. Sin React ni DOM: lo usan la
  * pagina /ar (nivel A) y apps/web/scripts/export-twin-glb.ts (nivel B).
  *
- * Reutiliza las funciones puras de twin/ (layout, facade, constants). Unidades:
- * metros, Y arriba, edificio centrado en X/Z con la base en y = 0. Las
- * dimensiones son ESTIMACIONES provisionales (ver twin/constants.ts); no son
- * mediciones del edificio real.
+ * Reutiliza las funciones puras de twin/ (layout, facade, materials, constants):
+ * el mismo edificio de 10 pisos del gemelo, una malla fusionada por material, sin
+ * entorno (contexto urbano, valla, cerros). Unidades: metros, Y arriba, edificio
+ * centrado en X/Z con la base en y = 0. Las dimensiones son ESTIMACIONES basadas en
+ * fotografia (twin/constants.ts); no son mediciones ni planos verificados.
  *
  * Convencion de nombres: cada volumen de espacio es una malla llamada con el
  * mesh_id del contrato (SPC_<piso>_<codigo>), igual que el GLB de Blender.
@@ -59,57 +61,37 @@ function mergedMesh(name: string, boxes: Box[], dys: number[], material: Materia
 
 export function buildCampusModel(campus: CampusResponse, dims: BuildingDims = DEFAULT_DIMS): CampusModel {
   const layout = computeLayout(campus, dims, 0);
+  const building = buildBuilding(dims, layout, "none", false);
   const group = new Group();
   group.name = "CampusPulse360_AR";
 
-  const slabMat = new MeshStandardMaterial({ color: "#3A4C6B", roughness: 0.72, metalness: 0.1 });
-  slabMat.name = "MAT_slab";
-  const frameMat = new MeshStandardMaterial({ color: "#1C2A45", roughness: 0.4, metalness: 0.5 });
-  frameMat.name = "MAT_frame";
-  const coreMat = new MeshStandardMaterial({ color: "#26385A", roughness: 0.6, metalness: 0.2 });
-  coreMat.name = "MAT_core";
+  for (const key of BATCH_KEYS) {
+    if (BATCH_META[key].env) continue;
+    const spec = MATERIAL_SPECS[key];
+    const boxes = building.boxes[key];
+    const opacity = spec.opacityAr;
+    const mat = new MeshStandardMaterial({
+      color: spec.color,
+      roughness: spec.roughness,
+      metalness: spec.metalness,
+      transparent: opacity < 0.999,
+      opacity,
+      depthWrite: opacity >= 0.999,
+      ...(key === "led" ? { emissive: new Color("#FFFFFF"), emissiveIntensity: 0.9 } : {}),
+    });
+    mat.name = `MAT_${key}`;
+    const mesh = mergedMesh(`STRUCT_${key.toUpperCase()}`, boxes, boxes.map(() => 0), mat);
+    if (mesh) group.add(mesh);
+    else mat.dispose();
+  }
+
+  const { footprintW: W, footprintD: D } = dims;
   const baseMat = new MeshStandardMaterial({ color: "#10192B", roughness: 0.9, metalness: 0 });
   baseMat.name = "MAT_plinth";
-
-  const { footprintW: W, footprintD: D, floorHeight, slab } = dims;
-  const slabs: Box[] = [];
-  const slabY: number[] = [];
-  const frames: Box[] = [];
-  const frameY: number[] = [];
-  const cores: Box[] = [];
-  const coreY: number[] = [];
-
-  const frameLocal = buildFrameBoxes(dims);
-  const coreLocal = coreBox(dims);
-  for (const f of layout.floors) {
-    slabs.push({ x: 0, y: slab / 2, z: 0, sx: W + 0.5, sy: slab, sz: D + 0.5 });
-    slabY.push(f.y);
-    for (const b of frameLocal) {
-      frames.push(b);
-      frameY.push(f.y);
-    }
-    cores.push(coreLocal);
-    coreY.push(f.y);
-  }
-  const top = layout.floors[layout.floors.length - 1]?.y ?? 0;
-  slabs.push({ x: 0, y: floorHeight + slab / 2, z: 0, sx: W + 0.5, sy: slab, sz: D + 0.5 });
-  slabY.push(top);
-  for (const b of buildRoofBoxes(dims)) {
-    frames.push(b);
-    frameY.push(top);
-  }
-
-  for (const m of [
-    mergedMesh("STRUCT_SLABS", slabs, slabY, slabMat),
-    mergedMesh("STRUCT_FRAME", frames, frameY, frameMat),
-    mergedMesh("STRUCT_CORE", cores, coreY, coreMat),
-  ]) {
-    if (m) group.add(m);
-  }
-
-  const plinth = new Mesh(new BoxGeometry(W + 2 * dims.plinthMargin, dims.plinthH, D + 2 * dims.plinthMargin), baseMat);
+  const frontExtra = dims.marqueeD + 0.5;
+  const plinth = new Mesh(new BoxGeometry(W + 3, 0.6, D + 1.5 + frontExtra), baseMat);
   plinth.name = "STRUCT_PLINTH";
-  plinth.position.y = -dims.plinthH / 2;
+  plinth.position.set(0, -0.3, (frontExtra - 1.5) / 2);
   group.add(plinth);
 
   const spaceMeshes = new Map<string, Mesh>();

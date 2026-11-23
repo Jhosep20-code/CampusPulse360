@@ -192,7 +192,7 @@ export default function ARPage() {
     <div className="space-y-5">
       <PageHeader
         title="Realidad aumentada"
-        subtitle="Coloca una maqueta del edificio sobre una mesa. Telemetría simulada; geometría provisional, no es un modelo medido de la UTP."
+        subtitle="Coloca una maqueta del edificio sobre una mesa. Telemetría simulada. Modelo aproximado basado en fotografía · dimensiones estimadas · sin planos verificados."
       />
 
       <div role="status" aria-live="polite" className="sr-only">

@@ -113,7 +113,7 @@ console.log(`Archivo : ${OUT}`);
 console.log(`Tamano  : ${buf.length} B (${(buf.length / 1024).toFixed(1)} KiB, objetivo <= 2 MiB)`);
 console.log(`Cabecera: "${magic}" v${version}, ${json.meshes?.length ?? 0} mallas, ${json.materials?.length ?? 0} materiales, ${names.length} nodos`);
 console.log(`SPC_*   : ${spc.length}/${expected.length} (${spc.join(", ")})`);
-console.log("Geometria PROVISIONAL (dimensiones estimadas, no medidas). Datos de estado fijos en 'ok'.");
+console.log("Modelo aproximado basado en fotografia (dimensiones estimadas, sin planos verificados). Datos de estado fijos en 'ok'.");
 if (problems.length > 0) {
   console.error(`FALLO: ${problems.join("; ")}`);
   process.exit(1);

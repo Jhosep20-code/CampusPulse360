@@ -2,6 +2,7 @@ import {
   Activity,
   BellRing,
   Box,
+  Eye,
   Flame,
   Layers,
   Moon,
@@ -12,6 +13,7 @@ import {
 } from "lucide-react";
 import { lazy, Suspense, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router";
+import { TWIN_LEVELS } from "../twin/constants";
 import type { TwinLayer } from "../twin/types";
 import { useCampusCtx, useLiveCtx, useSpaceIndex } from "../app/context";
 import { KpiCard } from "../components/KpiCard";
@@ -56,6 +58,7 @@ export default function CommandCenter() {
   const [layer, setLayer] = useState<TwinLayer>("status");
   const [exploded, setExploded] = useState(false);
   const [night, setNight] = useState(false);
+  const [dataMode, setDataMode] = useState(false);
   const [isolated, setIsolated] = useState<number | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
 
@@ -63,7 +66,8 @@ export default function CommandCenter() {
   const incidents = useActiveIncidents(k?.open_incidents);
   const liveBySpace = useMemo(() => new Map((live.data?.spaces ?? []).map((s) => [s.space_id, s])), [live.data]);
   const selectedSpace = selected ? spaces.get(selected) : undefined;
-  const levels = useMemo(() => [...new Set((campus.data?.floors ?? []).map((f) => f.level))].sort((a, b) => a - b), [campus.data]);
+  // P1-P10 (P6-P10 existen en el modelo aunque no tengan espacios instrumentados).
+  const levels = TWIN_LEVELS;
 
   const occRatio = k && k.capacity_total > 0 ? k.occupancy_total / k.capacity_total : 0;
   const dash = "—";
@@ -136,10 +140,13 @@ export default function CommandCenter() {
                 <option value="all">Todos los pisos</option>
                 {levels.map((l) => (
                   <option key={l} value={l}>
-                    Aislar piso {l}
+                    Aislar piso P{l}{campus.data?.spaces.some((s) => s.level === l) ? "" : " (sin espacios)"}
                   </option>
                 ))}
               </select>
+              <button type="button" className="btn btn-sm" aria-pressed={dataMode} onClick={() => setDataMode((v) => !v)}>
+                <Eye size={14} aria-hidden="true" /> Modo datos
+              </button>
               <button type="button" className="btn btn-sm" aria-pressed={night} onClick={() => setNight((v) => !v)}>
                 <Moon size={14} aria-hidden="true" /> Modo noche
               </button>
@@ -165,6 +172,8 @@ export default function CommandCenter() {
                     onSelectSpace={setSelected}
                     exploded={exploded}
                     isolatedLevel={isolated}
+                    onSelectLevel={setIsolated}
+                    dataMode={dataMode}
                     night={night}
                     {...(focusSpaceIds ? { focusSpaceIds } : {})}
                   />

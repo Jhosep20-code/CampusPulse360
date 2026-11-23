@@ -1,4 +1,5 @@
 import type { CampusResponse, LiveSnapshot } from "@campuspulse/contracts";
+import type { TwinPresetId } from "./view";
 
 /** Capa de datos que colorea los espacios del gemelo. */
 export type TwinLayer = "status" | "co2" | "temperature" | "occupancy" | "energy";
@@ -22,6 +23,12 @@ export interface TwinProps {
   exploded?: boolean;
   /** Nivel visible en aislamiento (null = todos). */
   isolatedLevel?: number | null;
+  /** Clic en la losa o el borde de un piso: aislar ese nivel (opcional; sin el, no hay seleccion por piso). */
+  onSelectLevel?: (level: number | null) => void;
+  /** Modo datos: vidrio y muros semitransparentes para ver el interior (atrio, nucleo, espacios). */
+  dataMode?: boolean;
+  /** Preset de camara inicial o solicitado desde fuera (Fachada, Aerea, Atrio, Foto). */
+  cameraPreset?: TwinPresetId;
   /** Modo noche: ventanas emisivas segun ocupacion. */
   night?: boolean;
   /** Perfil de calidad; "auto" decide por PerformanceMonitor. */

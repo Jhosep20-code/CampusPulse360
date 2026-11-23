@@ -38,8 +38,9 @@ export interface InitialView {
   distance: number;
 }
 
-export const INITIAL_ELEVATION_DEG = 22;
-export const INITIAL_AZIMUTH_DEG = 35;
+/** Camara por defecto (especificacion 5.7): azimut -30 grados y elevacion 14 grados. */
+export const INITIAL_ELEVATION_DEG = 14;
+export const INITIAL_AZIMUTH_DEG = -30;
 export const INITIAL_MARGIN = 1.12;
 
 const RAD = Math.PI / 180;
@@ -100,4 +101,92 @@ export function initialViewFromBox(box: BoxLike, opts: InitialViewOptions): Init
     target,
     distance: dist,
   };
+}
+
+/* ------------------------------------------------------------------ presets */
+
+export type TwinPresetId = "facade" | "aerial" | "atrium" | "photo";
+
+export interface TwinPreset {
+  id: TwinPresetId;
+  label: string;
+  /** Descripcion para el nombre accesible del boton. */
+  description: string;
+  azimuthDeg: number;
+  elevationDeg: number;
+  margin: number;
+  /** Distancia fija en metros (preset de comparacion con la foto). */
+  distance?: number;
+  /** Cota Y del objetivo si la distancia es fija. */
+  targetY?: number;
+}
+
+export const TWIN_PRESETS: readonly TwinPreset[] = [
+  { id: "facade", label: "Fachada", description: "Vista de la fachada principal", azimuthDeg: -30, elevationDeg: 14, margin: INITIAL_MARGIN },
+  { id: "aerial", label: "Aérea", description: "Vista aérea del edificio y su entorno", azimuthDeg: -38, elevationDeg: 42, margin: 1.45 },
+  { id: "atrium", label: "Atrio", description: "Vista del atrio y el núcleo de ascensores en modo datos", azimuthDeg: -18, elevationDeg: 9, margin: 1.05 },
+  // Preset de comparacion con la foto: azimut -30, elevacion 13, ~90 m (especificacion 5.7).
+  { id: "photo", label: "Foto", description: "Encuadre de comparación con la fotografía de referencia", azimuthDeg: -30, elevationDeg: 13, margin: 1, distance: 90, targetY: 18.5 },
+];
+
+export function presetById(id: TwinPresetId): TwinPreset {
+  return TWIN_PRESETS.find((p) => p.id === id) ?? (TWIN_PRESETS[0] as TwinPreset);
+}
+
+/**
+ * Vista de un preset sobre la caja del edificio. El preset "atrium" encuadra el
+ * vacio del atrio y el nucleo (atriumBox); los demas usan la caja del edificio.
+ */
+export function presetView(
+  id: TwinPresetId,
+  buildingBox: BoxLike,
+  atriumBox: BoxLike,
+  opts: { fovDeg: number; aspect: number },
+): InitialView {
+  const p = presetById(id);
+  if (p.distance !== undefined) {
+    const az = p.azimuthDeg * RAD;
+    const el = p.elevationDeg * RAD;
+    const target: Vec3 = {
+      x: (buildingBox.min.x + buildingBox.max.x) / 2,
+      y: p.targetY ?? (buildingBox.min.y + buildingBox.max.y) / 2,
+      z: (buildingBox.min.z + buildingBox.max.z) / 2,
+    };
+    const d = p.distance;
+    return {
+      position: {
+        x: target.x + Math.sin(az) * Math.cos(el) * d,
+        y: target.y + Math.sin(el) * d,
+        z: target.z + Math.cos(az) * Math.cos(el) * d,
+      },
+      target,
+      distance: d,
+    };
+  }
+  return initialViewFromBox(id === "atrium" ? atriumBox : buildingBox, {
+    ...opts,
+    azimuthDeg: p.azimuthDeg,
+    elevationDeg: p.elevationDeg,
+    margin: p.margin,
+  });
+}
+
+/** Enfoque de un piso aislado: vista elevada para ver su interior. */
+export function floorFocusView(floorBox: BoxLike, opts: { fovDeg: number; aspect: number }): InitialView {
+  return initialViewFromBox(floorBox, { ...opts, azimuthDeg: -25, elevationDeg: 38, margin: 1.12 });
+}
+
+/** Limites de orbita y zoom: la camara nunca queda bajo el suelo (el objetivo se acota a y >= 0). */
+export const CAMERA_LIMITS = {
+  minDistance: 10,
+  maxDistance: 230,
+  minPolarAngle: 0.1,
+  maxPolarAngle: Math.PI / 2 - 0.04,
+  /** Margen horizontal del recinto de panoramica alrededor del edificio (m). */
+  panMargin: 40,
+} as const;
+
+/** Altura minima de la camara sobre el suelo dada una elevacion maxima de orbita. */
+export function minCameraHeight(targetY: number, distance: number, polarAngle: number): number {
+  return Math.max(0, targetY) + distance * Math.cos(Math.min(polarAngle, CAMERA_LIMITS.maxPolarAngle));
 }

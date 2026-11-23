@@ -27,7 +27,7 @@ describe("describeTwin", () => {
     expect(text).toContain("1 crítico");
     expect(text).toContain("8 sin conexión"); // 8 espacios sin lectura en la instantanea de prueba
     expect(text).toContain("Datos simulados");
-    expect(text).toContain("geometría provisional");
+    expect(text).toContain("dimensiones estimadas");
   });
   it("indica carga cuando no hay datos en vivo", () => {
     expect(describeTwin(makeCampus(), null, "co2", false)).toContain("cargando");
@@ -48,9 +48,9 @@ describe("estimateBudget", () => {
   it("mantiene los draw calls estimados bajo el presupuesto de 60", () => {
     const b = estimateBudget(makeCampus(), DEFAULT_DIMS);
     console.log("[estimacion analitica]", JSON.stringify(b));
-    expect(b.drawCallsDay).toBeLessThan(60);
-    expect(b.drawCallsNight).toBeLessThan(60);
+    expect(b.drawCallsMain).toBeLessThan(60);
+    expect(b.drawCallsMain).toBeLessThan(60);
     expect(b.drawCallsPeak).toBeLessThan(60);
-    expect(b.trianglesMain).toBeLessThan(120_000);
+    expect(b.trianglesMain).toBeLessThan(40_000);
   });
 });

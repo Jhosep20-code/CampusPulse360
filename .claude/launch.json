@@ -4,8 +4,27 @@
     {
       "name": "campuspulse-local",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@campuspulse/api", "exec", "wrangler", "dev", "--local", "--port", "8787"],
+      "runtimeArgs": [
+        "--filter",
+        "@campuspulse/api",
+        "exec",
+        "wrangler",
+        "dev",
+        "--local",
+        "--port",
+        "8787"
+      ],
       "port": 8787
+    },
+    {
+      "name": "web-dev",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@campuspulse/web",
+        "dev"
+      ],
+      "port": 5173
     }
   ]
 }

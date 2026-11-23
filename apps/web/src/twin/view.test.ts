@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { boxCorners, initialViewFromBox, type BoxLike, type Vec3 } from "./view";
+import {
+  CAMERA_LIMITS,
+  TWIN_PRESETS,
+  boxCorners,
+  floorFocusView,
+  initialViewFromBox,
+  minCameraHeight,
+  presetView,
+  type BoxLike,
+  type Vec3,
+} from "./view";
 
 const BOX: BoxLike = { min: { x: -25.5, y: -0.6, z: -12.5 }, max: { x: 25.5, y: 22, z: 12.5 } };
 
@@ -41,7 +51,7 @@ describe("initialViewFromBox", () => {
   }
 
   it("mira al centro de la caja desde la fachada principal (+Z) con elevacion y azimut pedidos", () => {
-    const v = initialViewFromBox(BOX, { fovDeg: 35, aspect: 2 });
+    const v = initialViewFromBox(BOX, { fovDeg: 35, aspect: 2, elevationDeg: 22, azimuthDeg: 35 });
     expect(v.target).toEqual({ x: 0, y: 10.7, z: 0 });
     const dx = v.position.x - v.target.x;
     const dy = v.position.y - v.target.y;
@@ -65,5 +75,73 @@ describe("initialViewFromBox", () => {
     const v = initialViewFromBox(BOX, { fovDeg: 35, aspect: Number.NaN });
     expect(Number.isFinite(v.distance)).toBe(true);
     expect(Number.isFinite(v.position.x)).toBe(true);
+  });
+});
+
+describe("camara por defecto y presets", () => {
+  const BUILDING: BoxLike = { min: { x: -19, y: 0, z: -15 }, max: { x: 19, y: 40.5, z: 18.7 } };
+  const ATRIUM: BoxLike = { min: { x: -5, y: 0, z: -4.5 }, max: { x: 16, y: 39.6, z: 4.5 } };
+  const opts = { fovDeg: 35, aspect: 1000 / 560 };
+  const angles = (v: { position: Vec3; target: Vec3 }) => {
+    const dx = v.position.x - v.target.x;
+    const dy = v.position.y - v.target.y;
+    const dz = v.position.z - v.target.z;
+    return {
+      az: (Math.atan2(dx, dz) * 180) / Math.PI,
+      el: (Math.atan2(dy, Math.hypot(dx, dz)) * 180) / Math.PI,
+      dist: Math.hypot(dx, dy, dz),
+    };
+  };
+
+  it("el valor por defecto es azimut -30 y elevacion 14 (especificacion 5.7)", () => {
+    const a = angles(initialViewFromBox(BUILDING, opts));
+    expect(a.az).toBeCloseTo(-30, 5);
+    expect(a.el).toBeCloseTo(14, 5);
+  });
+
+  it("define los 4 presets: Fachada, Aerea, Atrio y Foto", () => {
+    expect(TWIN_PRESETS.map((p) => p.label)).toEqual(["Fachada", "Aérea", "Atrio", "Foto"]);
+    for (const p of TWIN_PRESETS) expect(p.description.length).toBeGreaterThan(5);
+  });
+
+  it("Foto: azimut -30, elevacion 13 y 90 m de distancia fija", () => {
+    const v = presetView("photo", BUILDING, ATRIUM, opts);
+    const a = angles(v);
+    expect(a.az).toBeCloseTo(-30, 4);
+    expect(a.el).toBeCloseTo(13, 4);
+    expect(a.dist).toBeCloseTo(90, 6);
+    expect(v.target.y).toBeCloseTo(18.5, 6);
+  });
+
+  it("Aerea mira desde mas arriba que Fachada y todas las vistas quedan sobre el suelo", () => {
+    const facade = presetView("facade", BUILDING, ATRIUM, opts);
+    const aerial = presetView("aerial", BUILDING, ATRIUM, opts);
+    expect(angles(aerial).el).toBeGreaterThan(angles(facade).el + 20);
+    for (const p of TWIN_PRESETS) {
+      const v = presetView(p.id, BUILDING, ATRIUM, opts);
+      expect(v.position.y).toBeGreaterThan(0);
+      expect(v.target.y).toBeGreaterThanOrEqual(0);
+      expect(Number.isFinite(v.distance)).toBe(true);
+    }
+  });
+
+  it("Atrio apunta al vacio del atrio", () => {
+    const v = presetView("atrium", BUILDING, ATRIUM, opts);
+    expect(v.target.x).toBeGreaterThan(ATRIUM.min.x);
+    expect(v.target.x).toBeLessThan(ATRIUM.max.x);
+  });
+
+  it("el enfoque de piso mira desde arriba al piso aislado", () => {
+    const floor: BoxLike = { min: { x: -19, y: 33.6, z: -15 }, max: { x: 19, y: 37.2, z: 15 } };
+    const v = floorFocusView(floor, opts);
+    expect(v.position.y).toBeGreaterThan(floor.max.y);
+    expect(angles(v).el).toBeCloseTo(38, 5);
+  });
+
+  it("los limites de orbita impiden pasar bajo el suelo", () => {
+    expect(CAMERA_LIMITS.maxPolarAngle).toBeLessThan(Math.PI / 2);
+    expect(CAMERA_LIMITS.minDistance).toBeGreaterThan(0);
+    expect(minCameraHeight(0, CAMERA_LIMITS.maxDistance, CAMERA_LIMITS.maxPolarAngle)).toBeGreaterThanOrEqual(0);
+    expect(minCameraHeight(-5, 50, Math.PI)).toBeGreaterThanOrEqual(0);
   });
 });

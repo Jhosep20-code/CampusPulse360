@@ -1,11 +1,9 @@
 /**
  * Constantes del gemelo 3D.
  *
- * IMPORTANTE: todas las dimensiones de este archivo son ESTIMACIONES del
- * prototipo (no hay fotos ni planos de la UTP Huancayo todavia). No son
- * mediciones reales del edificio. Cuando exista el GLB de Blender, las
- * dimensiones saldran del modelo y este bloque solo servira para la
- * geometria procedural de respaldo.
+ * IMPORTANTE: todas las dimensiones de este archivo son ESTIMACIONES tomadas de
+ * docs/referencias/especificacion-3d.md (a partir de una fotografia; no hay
+ * planos ni levantamiento de la UTP Huancayo). No son mediciones reales.
  */
 
 /**
@@ -24,58 +22,108 @@ export const SPACE_MESH_PREFIX = "SPC_";
 /** Nodos opcionales de fachada por piso (FLR_<piso>_*) que acompanan la vista explotada. */
 export const FLOOR_NODE_PREFIX = "FLR_";
 
+/** Niveles representados en el gemelo (P1-P10). El dato de 10 pisos lo aporta el equipo. */
+export const TWIN_LEVELS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+/** Aviso obligatorio del modelo (gemelo y AR). */
+export const APPROX_NOTICE = "Modelo aproximado basado en fotografía · dimensiones estimadas · sin planos verificados";
+/** Rotulo de los pisos sin sensores. */
+export const NO_SPACES_LABEL = "sin espacios instrumentados";
+
 export interface BuildingDims {
   /** Huella en X (m). ESTIMACION. */
   footprintW: number;
   /** Huella en Z (m). ESTIMACION. */
   footprintD: number;
-  /** Altura de piso a piso (m). ESTIMACION. */
+  /** Altura de la planta baja (m). ESTIMACION. */
+  groundFloorHeight: number;
+  /** Altura de piso tipo, P2 en adelante (m). ESTIMACION. */
   floorHeight: number;
+  /** Altura de la coronacion sobre el ultimo piso (m). ESTIMACION. */
+  crownH: number;
   /** Espesor de losa (m). ESTIMACION. */
   slab: number;
   /** Separacion extra por piso en vista explotada (m). Parametro visual. */
   explodeGap: number;
   /** Retiro de los espacios respecto a la fachada (m). ESTIMACION. */
   wallInset: number;
-  /** Ancho del pasillo central (m). ESTIMACION. */
+  /** Retiro del frente de los espacios (la planta baja tiene vidrio retranqueado) (m). ESTIMACION. */
+  frontSetback: number;
+  /** Espesor de muros macizos (m). ESTIMACION. */
+  wallT: number;
+  /** Ancho del pasillo perimetral al atrio (m). ESTIMACION. */
   corridorW: number;
-  /** Ancho (X) del nucleo de circulacion (m). ESTIMACION. */
+  /** Ancho (X) y profundidad (Z) del atrio, y su desplazamiento en X (m). ESTIMACION. */
+  atriumW: number;
+  atriumD: number;
+  atriumX: number;
+  /** Ancho (X) y profundidad (Z) del nucleo de ascensores (m). ESTIMACION. */
   coreW: number;
-  /** Profundidad (Z) del nucleo de circulacion (m). ESTIMACION. */
   coreD: number;
   /** Separacion entre volumenes contiguos (m). */
   spaceGap: number;
   /** Altura libre que se resta al volumen del espacio bajo el cielo raso (m). ESTIMACION. */
   headroom: number;
-  /** Modulo de montantes del muro cortina (m). ESTIMACION. */
-  mullionPitch: number;
-  /** Altura del zocalo (m). ESTIMACION. */
-  plinthH: number;
-  /** Margen del zocalo respecto a la huella (m). ESTIMACION. */
-  plinthMargin: number;
-  /** Altura del parapeto de cubierta (m). ESTIMACION. */
-  parapetH: number;
-  /** Altura del antepecho opaco bajo el vidrio (m). ESTIMACION. */
-  spandrelH: number;
+  /** Muro cortina: franjas verticales y panos por franja (solo fachada +Z). ESTIMACION. */
+  glassBays: number;
+  panesPerBay: number;
+  /** Pilastra izquierda y borde derecho del marco (m). ESTIMACION. */
+  frontPierW: number;
+  rightEdgeW: number;
+  /** Planta baja: pilastras, retranqueo del vidrio, banda de rotulo (m). ESTIMACION. */
+  groundPiers: number;
+  pierSize: number;
+  groundSetback: number;
+  signBandH: number;
+  /** Marquesina del ingreso: ancho, fondo, espesor y altura (m). ESTIMACION. */
+  marqueeW: number;
+  marqueeD: number;
+  marqueeT: number;
+  marqueeY: number;
+  /** Caja tecnica de cubierta (m); centro en X/Z. ESTIMACION. */
+  roofBoxW: number;
+  roofBoxD: number;
+  roofBoxH: number;
+  roofBoxX: number;
+  roofBoxZ: number;
 }
 
 export const DEFAULT_DIMS: BuildingDims = {
-  footprintW: 48,
-  footprintD: 22,
+  footprintW: 38,
+  footprintD: 30,
+  groundFloorHeight: 4.8,
   floorHeight: 3.6,
+  crownH: 2.4,
   slab: 0.3,
   explodeGap: 4,
   wallInset: 0.8,
+  frontSetback: 1.8,
+  wallT: 0.6,
   corridorW: 2.4,
-  coreW: 5.2,
-  coreD: 8.4,
+  atriumW: 14,
+  atriumD: 9,
+  atriumX: 2,
+  coreW: 7,
+  coreD: 9,
   spaceGap: 0.3,
   headroom: 0.4,
-  mullionPitch: 1.5,
-  plinthH: 0.6,
-  plinthMargin: 1.5,
-  parapetH: 0.9,
-  spandrelH: 0.85,
+  glassBays: 6,
+  panesPerBay: 4,
+  frontPierW: 4,
+  rightEdgeW: 0.6,
+  groundPiers: 7,
+  pierSize: 0.6,
+  groundSetback: 1.5,
+  signBandH: 1.0,
+  marqueeW: 10,
+  marqueeD: 4,
+  marqueeT: 0.25,
+  marqueeY: 3.5,
+  roofBoxW: 14,
+  roofBoxD: 8,
+  roofBoxH: 3,
+  roofBoxX: -6,
+  roofBoxZ: -6,
 };
 
 /** Identidad visual (CLAUDE.md) + rojo critico del gemelo. */
