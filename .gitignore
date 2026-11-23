@@ -34,3 +34,7 @@ docs/referencias/utp-huancayo/guias-generadas/
 
 # Secretos del modo local con Docker Compose
 infra/local.env
+
+# Despliegue: worktree temporal y secretos de produccion (nunca versionar)
+.deploy-wt/
+infra/*.secrets.local*
