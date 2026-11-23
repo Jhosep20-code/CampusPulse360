@@ -3,7 +3,7 @@
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "campuspulse",
   // Cuenta Cloudflare EXCLUSIVA de CampusPulse 360 (no es secreto). Evita operar
-  // por error en otra cuenta del mismo usuario (p. ej. la de ReclamoClaro).
+  // por error en otra cuenta del mismo usuario (otro proyecto).
   "account_id": "5ca2972899cf96e5009864b8549b2a89",
   "main": "src/index.ts",
   "compatibility_date": "2026-11-01",

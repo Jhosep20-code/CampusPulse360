@@ -1,23 +1,51 @@
-## Hito 2: despliegue público, gemelo de 10 pisos, AR, modo offline y correcciones
+## Hito 2–5: despliegue público, IA real, gemelo de 10 pisos con modelo Blender, AR y correcciones
 
-**Producción:** https://campuspulse.campuspulse-api.workers.dev (Cloudflare Workers Free, commit `4bac699`)
+**Producción:** https://campuspulse.campuspulse-api.workers.dev (Cloudflare Workers Free)
+- Versión desplegada `4852654b` (commit `9c453f6`).
+- Respaldo `b23b261c` (commit `4bac699`). Para volver: `wrangler rollback b23b261c-abe9-4756-8429-d1987e28952a`.
 
-### Cambios principales
-- Despliegue en Cloudflare Free (cuenta propia de CampusPulse, `account_id` fijado), D1 `campuspulse-db`, Cron, secretos y simulador en la nube rotulado como telemetría simulada.
-- IA real con Workers AI (`gpt-oss-20b`): diagnóstico de incidencias y asistente verificados en producción.
-- Gemelo digital de 10 pisos: fachada, vista Referencia con comparación de foto local, atrio en corte, balizas de estado y modo día/noche.
-- AR: WebXR, Scene Viewer y vista 3D; GLB sincronizado con el gemelo.
-- Corrección crítica del error móvil "l is not a function" (limpieza de efecto inválida en la AR), con pruebas de regresión.
-- Cierre automático de incidencias normalizadas.
-- Vista de reloj circular `/reloj` (Galaxy Watch6 Classic, vista previa).
-- Docker Compose (modo offline) y e2e con Playwright en CI.
-- CI: gitleaks sin falsos positivos y nombre de imagen GHCR en minúsculas.
+> Esta PR no activa un despliegue nuevo por sí misma: el job `deploy` de CI solo se ejecuta en `main` y si la variable de repositorio `DEPLOY_ENABLED` vale `true`, que hoy está desactivada.
 
-### Pruebas
-- 231 pruebas unitarias y de integración, 15 e2e y gitleaks limpio.
-- Evidencias en `docs/evidencias/`.
+### Plataforma y nube (S/ 0.00)
+- Cuenta Cloudflare propia del proyecto (`account_id` fijado y perfil `campuspulse` de wrangler aislado de otras cuentas).
+- D1 `campuspulse-db` con migraciones 0001–0004, dos Cron Triggers y secretos cargados con `wrangler secret`.
+- Simulador IoT en la nube, rotulado como telemetría simulada. Se detiene cuando llega un gateway real.
+- IA real con Workers AI (`@cf/openai/gpt-oss-20b`): diagnóstico de incidencias y asistente verificados en producción. Límite de 250 llamadas al día; se midieron unas 20 neuronas por llamada.
+- Cierre automático de incidencias que llevan 10 minutos normalizadas.
 
-### Pendiente de pruebas físicas
-- AR en Galaxy S25 Ultra y `/reloj` en Galaxy Watch6 Classic.
+### Gemelo digital
+- **Modelo real de Blender 5.3:** script reproducible `assets/3d/blender/build_utp_huancayo.py` y fuente `.blend`.
+  - Exporta GLB de escritorio (1,85 MB, 37k triángulos), móvil (0,98 MB, 19k triángulos) y entorno (87 KB).
+  - Jerarquía `BUILDING / FACADE / ROOF / ATRIUM / STAIRS / ELEVATORS / FLOOR_P01–P10 / SPC_* / SENSOR_ANCHORS`.
+- **Visor Three.js/R3F con el GLB:** aislar un piso oculta su grupo (`visible=false`, sin escalar matrices); la explosión desplaza cada grupo en Y. Si el GLB falla, el visor vuelve a la geometría procedural.
+- **Corrección de las "losas negras":** las matrices degeneradas (escala 0 en un solo eje) producían normales NaN en el shader de instancing de three. Pruebas visuales WebGL: P6 bajó de 55,2 % a 0,7 % de píxeles negros y P9 de 39,0 % a 0,7 %.
+- **Máquina de estados de la vista:** Fachada, Aérea, Atrio y Referencia, aislamiento, explosión, modo datos, noche y "Restablecer vista".
+- **Vista Referencia:** comparación con una foto local que no sale del dispositivo.
+- **Atrio:** corte de sección.
+- **Encuadre:** el piso aislado tiene prioridad sobre el preset de cámara.
+- Diez pisos y los 10 espacios instrumentados se conservan. P6–P10 se rotulan "sin espacios instrumentados".
+- Aviso visible: "Modelo aproximado basado en fotografía · dimensiones estimadas · sin planos verificados".
+
+### Otras funciones
+- **AR:** WebXR, Scene Viewer y vista 3D. Se corrigió el error móvil "l is not a function": una limpieza de efecto inválida.
+- Vista de reloj circular en `/reloj`.
+- Mensajes de error aptos para producción y recarga automática ante fragmentos obsoletos tras un despliegue.
+- Docker Compose para el modo sin conexión, y e2e con Playwright en CI.
+- CI:
+  - gitleaks sin falsos positivos;
+  - nombre de la imagen GHCR en minúsculas;
+  - pruebas visuales WebGL excluidas del CI por defecto (se ejecutan con `VISUAL=1`).
+
+### Pruebas (local, 23-nov-2026)
+- **Unitarias e integración:** 257 (contratos 9, simulador 10, web 161, API 77).
+- **e2e:** 15 aprobadas y 3 omitidas a propósito, contra el stack Docker con el GLB.
+- **gitleaks:** sin hallazgos en todo el historial.
+- **Validación con GPU e interacción real:** secuencias críticas de aislamiento, vistas y Restablecer superadas en local y en producción. Evidencias en `docs/evidencias/hito-5-losas-negras-y-blender.md` y `docs/entregables/FINAL/capturas/`.
+
+### Pendiente (no se declara completado)
+- Bloques visuales automáticos B3 y B4 (10 pisos × 5 vistas): bloqueados en WebGL por software; hay que ejecutarlos con GPU.
+- Pruebas físicas: AR en Galaxy S25 Ultra, `/reloj` en Galaxy Watch6 Classic y fps en dispositivo.
+- Fidelidad arquitectónica interior (atrio, ascensores y escaleras): esquemática, pendiente de contrastar con referencias reales.
+- Unity/VR de la TA5: en la rama `feature/ta5-unity`, sin ejecutar.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)

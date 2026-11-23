@@ -8,12 +8,12 @@
 ## 1. Cuenta de Cloudflare (incidencia resuelta)
 | Comprobación | Resultado |
 |---|---|
-| Sesión `default` de wrangler en este equipo | Cuenta antigua `8961e8…c3bfd1` (ReclamoClaro). Credenciales en `AppData\Roaming\xdg.config\.wrangler\config\default.toml`, sin cambios desde las 20:29 |
+| Sesión `default` de wrangler en este equipo | Cuenta antigua de OTRO proyecto (id omitido). Credenciales en `AppData\Roaming\xdg.config\.wrangler\config\default.toml`, sin cambios desde las 20:29 |
 | Variables `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` / `XDG_CONFIG_HOME` | No definidas |
 | Causa | El login con la cuenta nueva no quedó en el archivo que usa este entorno |
 | Corrección 1 | `account_id: 5ca2972899cf96e5009864b8549b2a89` fijado en `apps/api/wrangler.jsonc`. Con la sesión antigua, wrangler falla con "Authentication error" y no toca la otra cuenta |
 | Corrección 2 | Perfil `campuspulse` (`wrangler auth create`) asociado solo a `C:\Proyectos\CampusPulse360` |
-| Verificación | Dentro del repo: `5ca297…9b2a89`. Fuera del repo: se mantiene `8961e8…c3bfd1`. `reclamoclaro-db` no se tocó |
+| Verificación | Dentro del repo: `5ca297…9b2a89`. Fuera del repo: se mantiene (cuenta de otro proyecto, id omitido). la base de datos del otro proyecto no se tocó |
 
 ## 2. Recursos creados (solo en la cuenta nueva)
 | Recurso | Detalle |
