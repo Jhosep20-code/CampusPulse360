@@ -149,5 +149,6 @@ jobs:
           pnpm exec wrangler deploy
           --var GIT_COMMIT:${{ github.sha }}
           --var ENVIRONMENT:production
+          --var CLOUD_SIM:on
           --var WEBAUTHN_RP_ID:${{ vars.PUBLIC_HOST }}
           --var WEBAUTHN_ORIGIN:https://${{ vars.PUBLIC_HOST }}
