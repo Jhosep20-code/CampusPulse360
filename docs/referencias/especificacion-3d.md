@@ -1,6 +1,7 @@
 # Especificación 3D del gemelo digital — sede UTP Huancayo
 
 > **Autoría:** agente director-3d, a partir de las fotografías de referencia del equipo, que son privadas y no se versionan (22-nov-2026).
+> **Corrección del 22-nov-2026 (dato del equipo):** la sede tiene **10 pisos**. Este dato lo proporciona el equipo y prevalece sobre el conteo de franjas de la foto, que daba 8 niveles con baja confianza. Todas las secciones se ajustaron a 10 niveles.
 > **Alcance:** no hay planos ni levantamiento. **Todos los valores numéricos son estimados**, salvo los marcados "px", que se midieron sobre la única foto exterior (600×600 px, ±5 px). El modelo es **representativo, no geométricamente preciso**.
 
 ## 0. Validez de las referencias
@@ -9,7 +10,14 @@
   - **Retocadas o generadas** (atrio, aula, laboratorio y "pasillos de cada piso"): muestran la interfaz de CampusPulse 360, superposiciones de sensores y códigos inventados.
   - **Render de arquitectura** (biblioteca).
   - Solo se usan como referencia de estilo.
-- **Documento .docx** de la carpeta: no se ha analizado.
+- **Documento `imagenes utp.docx`** (revisado el 22-nov-2026): contiene **3 láminas compuestas generadas por IA**. Se reconocen por el texto deformado en las pancartas y por el rótulo "Referencia para Gemelo Digital/Modelado 3D CampusPulse 360". **No son evidencia.** Solo sirven como guía de estilo en lo que coincide con la foto exterior real:
+  - muro cortina azul de 6 franjas y volúmenes laterales macizos;
+  - acento rojo arriba a la derecha y banda de rótulo sobre la planta baja con marquesina;
+  - valla con seto;
+  - de noche, ventanas encendidas y línea de luz en la coronación;
+  - atrio con barandas y 3 ascensores sobre muro negro.
+
+  La dirección que figura en ellas no está verificada.
 
 ## 1. Observado
 | Rasgo | Observación | Confianza |
@@ -17,7 +25,7 @@
 | Volumetría | Torre prismática. Fachada principal de muro cortina de vidrio dentro de un marco blanco macizo | Alta |
 | Fachada lateral izquierda | Blanca y ciega; posible junta vertical a mitad del fondo | Alta (ciega) / Baja (junta) |
 | Marco | Pilastra blanca ancha a la izquierda (~11 % del frente, en px), coronación blanca y borde derecho estrecho | Alta |
-| Pisos del muro cortina | 7 pisos de vidrio sobre la planta baja: 8 niveles (rango de 7 a 9) | Media-baja |
+| Número de pisos | **10 pisos (dato del equipo).** En la foto las líneas de losa se distinguen poco; el conteo inicial de 8 se descarta | Dato del equipo |
 | Módulos verticales | 6 franjas con montantes oscuros | Media |
 | Antepechos | Ninguno blanco: vidrio continuo con juntas finas por losa | Media |
 | Planta baja | Más alta que el piso tipo (1,35–1,6× en px). Pilastras blancas, vidrio oscuro retranqueado y marquesina blanca | Media |
@@ -30,17 +38,17 @@
 ## 2. Estimado
 | Magnitud | Valor (estimado) | Método |
 |---|---|---|
-| Altura de piso típica | 3,8 m (3,6–4,0) | Supuesto típico de edificio educativo con falso cielo |
-| Altura de planta baja | 5,0 m (4,5–6,0) | Proporción en px × altura de piso supuesta |
-| Niveles | 8 (7–9) | Conteo de franjas |
+| Altura de piso típica | 3,6 m (3,4–3,8) | Se ajusta para que 10 pisos conserven la proporción frente/altura medida (~0,89) |
+| Altura de planta baja | 4,8 m (4,5–5,5) | Planta baja más alta que el piso tipo (1,35–1,6× en px) |
+| Niveles | **10** | Dato del equipo (no se deduce de la foto) |
 | Coronación | 2,4 m | ~0,68 pisos en px |
-| Altura hasta la coronación | ~34 m | 5,0 + 7 × 3,8 + 2,4 |
-| Frente | 36 m (30–40) | Proporción frente/altura en px, corregida por un giro supuesto de 25–35° |
+| Altura hasta la coronación | ~39,6 m | 4,8 + 9 × 3,6 + 2,4 |
+| Frente | 38 m (34–42) | Proporción frente/altura medida (~0,89 en px) × altura de ~39,6 m, corregida por un giro supuesto de 25–35° |
 | Fondo | 30 m (22–38) | El valor menos fiable; se necesita un atrio con aulas a ambos lados |
-| Paño del muro cortina | ~1,3 m | 31,4 m / 6 franjas / 4 paños (supuesto) |
+| Paño del muro cortina | ~1,4 m | 33,4 m / 6 franjas / 4 paños (supuesto) |
 
 ## 3. Desconocido
-- Planos, orientación al norte, sótanos y número real de pisos.
+- Planos, orientación al norte y sótanos. El número de pisos (10) lo aporta el equipo, sin plano que lo respalde.
 - Fachadas posterior y lateral derecha (se representan con una banda de ventanas genérica y se rotulan así).
 - Cubierta real, atrio y núcleo exactos.
 - Distribución interior y ubicación real de la biblioteca, el auditorio y las oficinas.
@@ -66,15 +74,15 @@
 ### 5.1 Constantes
 | Constante | Valor | Constante | Valor |
 |---|---|---|---|
-| `levels` | 8 | `glassBays` × `panesPerBay` | 6 × 4 |
-| `footprintW` × `footprintD` | 36 × 30 m | `frontPierW` / `rightEdgeW` | 4,0 / 0,6 m |
-| `groundFloorHeight` / `floorHeight` | 5,0 / 3,8 m | `crownH` | 2,4 m |
+| `levels` | **10** | `glassBays` × `panesPerBay` | 6 × 4 |
+| `footprintW` × `footprintD` | 38 × 30 m | `frontPierW` / `rightEdgeW` | 4,0 / 0,6 m |
+| `groundFloorHeight` / `floorHeight` | 4,8 / 3,6 m | `crownH` | 2,4 m |
 | `slab` | 0,3 m | `atriumW` × `atriumD` | 14 × 9 m (x +2 m) |
 | `corridorW` | 2,4 m | `coreW` × `coreD` | 7 × 9 m |
 | `roofBox` | 14 × 8 × 3 m (centro x −6, z −6) | `wallInset` | 0,8 m |
 
 ### 5.2 Muro cortina (solo en la fachada +Z)
-- **Retícula:** 24 columnas (6 franjas × 4 paños) por 7 filas (niveles 2 a 8).
+- **Retícula:** 24 columnas (6 franjas × 4 paños) por 9 filas (niveles P2 a P10).
 - **Montantes:** los principales de 0,25 × 0,35 m y los secundarios de 0,08 × 0,15 m.
 - **Juntas de losa:** de 0,10 m.
 
@@ -115,7 +123,7 @@
 - **Exportación:** GLB con meshopt; LOD0 ≤3 MB y LOD1 ≤1,5 MB.
 
 ## 6. Asignación de espacios (esquemática)
-Los ids contienen el piso, así que se mantienen los niveles 1 a 5. Los niveles 6 a 8 son torre sin espacios instrumentados.
+Los ids contienen el piso, así que los 10 espacios instrumentados se mantienen en P1–P5. Los pisos P6–P10 se representan y se pueden seleccionar individualmente, pero no tienen sensores (se rotulan "sin espacios instrumentados").
 
 | Nivel | Frente (+Z, vidrio) | Fondo (−Z) |
 |---|---|---|
@@ -131,7 +139,7 @@ Los ids contienen el piso, así que se mantienen los niveles 1 a 5. Los niveles 
 **Rasgos a comprobar:**
 1. Silueta: frente/altura entre 0,8 y 1,0 (en la foto, ~0,89).
 2. Marco: pilastra izquierda entre el 8 % y el 14 % del frente, coronación y borde derecho estrecho.
-3. Retícula: 6 franjas oscuras, 7 filas de vidrio, sin antepechos.
+3. Retícula: 6 franjas oscuras y vidrio continuo en P2–P10, sin antepechos.
 4. Lateral izquierdo: blanco ciego, entre el 35 % y el 55 % del frente en pantalla.
 5. Planta baja: entre 1,3 y 1,6 veces un piso, con pilastras, vidrio oscuro y banda blanca.
 6. Cubierta: caja blanca retrasada, de entre 0,5 y 0,9 pisos de altura.
@@ -145,7 +153,7 @@ Hay que tocar `constants.ts`, `facade.ts`, `layout.ts`, `view.ts`, `CampusTwin.t
 - Constantes de la tabla 5.1.
 - Muro cortina solo en +Z.
 - Volúmenes macizos, planta baja y acento.
-- Alturas de piso no uniformes y 8 niveles (6 a 8 vacíos).
+- Alturas de piso no uniformes y **10 niveles** (P6–P10 sin espacios instrumentados, pero seleccionables).
 - Filas frente/fondo según el mapa de la tabla 6.
 - Instancing por material, modo realista y modo datos, Lightformers de cielo y cerro, contexto y cerros.
 - Rótulo: "Modelo aproximado basado en fotografía · dimensiones estimadas".

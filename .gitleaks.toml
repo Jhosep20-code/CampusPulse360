@@ -1,0 +1,10 @@
+# Configuracion de gitleaks para CampusPulse 360.
+# Se extiende la configuracion por defecto y solo se excluye documentacion de
+# terceros (skills instaladas en .claude/skills) que contiene EJEMPLOS ficticios
+# de antipatrones (p. ej. "sk-live-abc123..."). El codigo del proyecto se escanea completo.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Documentacion de skills de terceros con ejemplos ficticios"
+paths = ['''^\.claude/skills/''']

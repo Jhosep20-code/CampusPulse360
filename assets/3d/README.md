@@ -7,8 +7,10 @@ Se sustituye por un GLB de Blender poniendo su ruta en `MODEL_URL`
 
 ## Estado actual
 
-- No hay fotos ni planos de la UTP Huancayo. Todas las dimensiones de la geometria procedural
-  (huella 48 x 22 m, 5 pisos, 3,6 m por piso, losa de 0,3 m, etc.) son **ESTIMACIONES de prototipo**.
+- Hay una foto exterior real y fotos interiores del equipo (privadas, no versionadas). No hay planos.
+- La sede tiene **10 pisos (P1-P10)**, dato del equipo. Huella (~38 x 30 m), alturas (P1 ~4,8 m;
+  P2-P10 ~3,6 m) y reticula del muro cortina son **ESTIMACIONES** a partir de la fotografia.
+  Ver `docs/referencias/especificacion-3d.md`.
 - El visor muestra el rotulo "Modelo representativo · geometria provisional" mientras
   `building.geometry_provisional` sea `true` o no exista GLB.
 
