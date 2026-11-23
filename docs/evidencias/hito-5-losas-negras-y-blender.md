@@ -94,3 +94,8 @@ Las capturas están en `docs/entregables/FINAL/capturas/glb/`.
 - Medir fps con GPU real en el Galaxy S25 Ultra y en el portátil.
 - Probar la AR (Scene Viewer con el GLB móvil, y WebXR) en el S25.
 - Pulir el brillo nocturno de P1–P5.
+
+## 7. Despliegue (23-nov-2026)
+- Version anterior de reserva: `b23b261c-abe9-4756-8429-d1987e28952a` (commit 4bac699). Para volver: `npx wrangler rollback b23b261c-abe9-4756-8429-d1987e28952a` desde apps/api.
+- Version desplegada: `4852654b-796a-4af4-827d-febc1813084a` (commit 9c453f6).
+- Verificado en produccion con GPU: source glb, 61 draw calls, 0 degeneradas; P6 aislado con 16 mallas y 0 de otros pisos (`capturas/glb/produccion-glb-*.jpg`).
