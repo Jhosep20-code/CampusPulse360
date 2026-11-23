@@ -4,7 +4,19 @@ import {
   hash01,
   type ContextDensity,
 } from "./environment";
+import {
+  DETAIL_FLOORS,
+  addAtriumRailings,
+  addCore,
+  addDetailedFloor,
+  addStairs,
+  isDetailed,
+  stairSpecs,
+  type BoxExtra,
+} from "./interior";
 import { atriumRect, coreRect, corridorOuterZ, levelBaseY, levelHeight, type TwinLayout } from "./layout";
+
+export { DETAIL_FLOORS };
 
 /**
  * Geometria PROCEDURAL del edificio, agrupada POR MATERIAL para dibujarla con una
@@ -31,6 +43,10 @@ export interface BBox extends Box {
   level: number;
   /** Giro en Y (rad). */
   ry?: number;
+  /** Giro en X (rad), solo tubos inclinados de las escaleras. */
+  rx?: number;
+  /** Color por instancia (hex), multiplicado por el color del material. */
+  color?: string;
 }
 
 export type BatchKey =
@@ -38,6 +54,7 @@ export type BatchKey =
   | "white"
   | "frame"
   | "glassGround"
+  | "glassClear"
   | "roof"
   | "red"
   | "slab"
@@ -45,6 +62,12 @@ export type BatchKey =
   | "coreBlack"
   | "steel"
   | "tile"
+  | "ceiling"
+  | "fixture"
+  | "wood"
+  | "furnDark"
+  | "screen"
+  | "books"
   | "hedge"
   | "sidewalk"
   | "asphalt"
@@ -56,6 +79,7 @@ export const BATCH_KEYS: readonly BatchKey[] = [
   "white",
   "frame",
   "glassGround",
+  "glassClear",
   "roof",
   "red",
   "slab",
@@ -63,6 +87,12 @@ export const BATCH_KEYS: readonly BatchKey[] = [
   "coreBlack",
   "steel",
   "tile",
+  "ceiling",
+  "fixture",
+  "wood",
+  "furnDark",
+  "screen",
+  "books",
   "hedge",
   "sidewalk",
   "asphalt",
@@ -79,20 +109,33 @@ export interface BatchMeta {
   pick: boolean;
   /** Pertenece al entorno (no va a la AR/GLB). */
   env: boolean;
+  /** Va a la AR / GLB (el mobiliario y las luminarias del interior no). */
+  ar: boolean;
+  /** Lleva colores por instancia (instanceColor). */
+  tinted: boolean;
 }
 
-const M = (shadow: boolean, interior: boolean, pick: boolean, env: boolean): BatchMeta => ({
+const M = (
+  shadow: boolean,
+  interior: boolean,
+  pick: boolean,
+  env: boolean,
+  extra: { ar?: boolean; tinted?: boolean } = {},
+): BatchMeta => ({
   shadow,
   interior,
   pick,
   env,
+  ar: extra.ar ?? !env,
+  tinted: extra.tinted ?? false,
 });
 
 export const BATCH_META: Record<BatchKey, BatchMeta> = {
-  glass: M(false, false, true, false),
+  glass: M(false, false, true, false, { tinted: true }),
   white: M(true, false, false, false),
   frame: M(true, false, false, false),
   glassGround: M(false, false, false, false),
+  glassClear: M(false, false, false, false),
   roof: M(true, false, false, false),
   red: M(true, false, false, false),
   slab: M(true, false, true, false),
@@ -100,10 +143,16 @@ export const BATCH_META: Record<BatchKey, BatchMeta> = {
   coreBlack: M(false, true, false, false),
   steel: M(false, true, false, false),
   tile: M(false, true, false, false),
+  ceiling: M(false, true, false, false, { ar: false }),
+  fixture: M(false, true, false, false, { ar: false }),
+  wood: M(false, true, false, false, { ar: false }),
+  furnDark: M(false, true, false, false, { ar: false }),
+  screen: M(false, true, false, false, { ar: false }),
+  books: M(false, true, false, false, { ar: false, tinted: true }),
   hedge: M(false, false, false, true),
   sidewalk: M(false, false, false, true),
   asphalt: M(false, false, false, true),
-  context: M(true, false, false, true),
+  context: M(true, false, false, true, { tinted: true }),
   lampHead: M(false, false, false, true),
 };
 
@@ -154,8 +203,18 @@ export function buildBuilding(
 ): Building {
   const boxes = emptyBoxes();
   const windows: WindowPane[] = [];
-  const add = (key: BatchKey, level: number, x: number, y: number, z: number, sx: number, sy: number, sz: number) => {
-    boxes[key].push({ level, x, y, z, sx, sy, sz });
+  const add = (
+    key: BatchKey,
+    level: number,
+    x: number,
+    y: number,
+    z: number,
+    sx: number,
+    sy: number,
+    sz: number,
+    extra?: BoxExtra,
+  ) => {
+    boxes[key].push({ level, x, y, z, sx, sy, sz, ...(extra ?? {}) });
   };
 
   const n = Math.max(1, layout.floors.length);
@@ -193,7 +252,7 @@ export function buildBuilding(
     const H = heights[k] ?? dims.floorHeight;
     const yc = base + H / 2;
 
-    // ---- Losas (con vacio de atrio de P2 en adelante)
+    // ---- Losas (con vacio de atrio y de escaleras de P2 en adelante)
     const sw = W - 0.2;
     const sd = D - 0.2;
     const sy = base + slab / 2;
@@ -204,8 +263,9 @@ export function buildBuilding(
       const x1 = sw / 2;
       const z0 = -sd / 2;
       const z1 = sd / 2;
-      add("slab", k, (x0 + atr.minX) / 2, sy, 0, atr.minX - x0, slab, sd);
-      add("slab", k, (atr.maxX + x1) / 2, sy, 0, x1 - atr.maxX, slab, sd);
+      const holes = stairSpecs(dims).map((s) => ({ x0: s.cx - s.width / 2, x1: s.cx + s.width / 2, z0: s.z0, z1: s.z1 }));
+      slabWithHoles(add, k, sy, slab, { x0, x1: atr.minX, z0, z1 }, holes);
+      slabWithHoles(add, k, sy, slab, { x0: atr.maxX, x1, z0, z1 }, holes);
       add("slab", k, (atr.minX + atr.maxX) / 2, sy, (atr.maxZ + z1) / 2, atr.maxX - atr.minX, slab, z1 - atr.maxZ);
       add("slab", k, (atr.minX + atr.maxX) / 2, sy, (z0 + atr.minZ) / 2, atr.maxX - atr.minX, slab, atr.minZ - z0);
     }
@@ -251,19 +311,11 @@ export function buildBuilding(
       });
     }
 
-    // ---- Nucleo de 3 ascensores sobre muro negro brillante (cara hacia el atrio)
-    const coreH = H - slab;
-    add("coreBlack", k, (core.minX + core.maxX) / 2, base + slab + coreH / 2, 0, core.maxX - core.minX, coreH, core.maxZ - core.minZ);
-    for (const dz of [-2.4, 0, 2.4]) add("steel", k, core.minX - 0.03, base + slab + 1.2, dz, 0.06, 2.4, 1.6);
-
-    // ---- Dos escaleras (volumen de tramo + descanso)
-    for (const sx of [-14.2, (core.maxX + (W / 2 - dims.wallInset)) / 2]) {
-      const wide = sx < 0 ? 3.0 : 1.8;
-      add("steel", k, sx, base + slab + coreH * 0.25, -0.5, wide, coreH * 0.5, 5);
-      add("steel", k, sx, base + slab + coreH * 0.5 - 0.06, 3.0, wide, 0.12, 1.4);
-    }
-
-    // ---- Pasillo perimetral (porcelanato) y barandas de acero del atrio
+    // ---- Interior: nucleo de ascensores, escaleras, barandas del atrio y pasillos
+    const ictx = { dims, add, levelBase, heights, n, spaces: spacesOf(k) };
+    addCore(ictx, k);
+    if (k < n - 1) addStairs(ictx, k);
+    addAtriumRailings(ictx, k);
     const tileY = base + slab + 0.01;
     if (k === 0) {
       add("tile", k, (atr.minX - dims.corridorW + atr.maxX) / 2, tileY, 0, atr.maxX - atr.minX + dims.corridorW, 0.02, 2 * outerZ);
@@ -272,25 +324,12 @@ export function buildBuilding(
       add("tile", k, (tx0 + atr.maxX) / 2, tileY, (atr.maxZ + outerZ) / 2, atr.maxX - tx0, 0.02, outerZ - atr.maxZ);
       add("tile", k, (tx0 + atr.maxX) / 2, tileY, -(atr.maxZ + outerZ) / 2, atr.maxX - tx0, 0.02, outerZ - atr.maxZ);
       add("tile", k, (tx0 + atr.minX) / 2, tileY, 0, atr.minX - tx0, 0.02, atr.maxZ - atr.minZ);
-
-      const rw = atr.maxX - atr.minX;
-      const rd = atr.maxZ - atr.minZ;
-      const cx = (atr.minX + atr.maxX) / 2;
-      for (const dy of [1.05, 0.55]) {
-        add("steel", k, cx, base + slab + dy, atr.maxZ - 0.06, rw, 0.05, 0.05);
-        add("steel", k, cx, base + slab + dy, atr.minZ + 0.06, rw, 0.05, 0.05);
-        add("steel", k, atr.minX + 0.06, base + slab + dy, 0, 0.05, 0.05, rd);
-      }
-      const postsX = Math.round(rw / 2);
-      for (let i = 0; i <= postsX; i++) {
-        const px = atr.minX + 0.06 + (i * (rw - 0.12)) / postsX;
-        add("steel", k, px, base + slab + 0.525, atr.maxZ - 0.06, 0.05, 1.05, 0.05);
-        add("steel", k, px, base + slab + 0.525, atr.minZ + 0.06, 0.05, 1.05, 0.05);
-      }
-      for (let i = 1; i < 4; i++) {
-        add("steel", k, atr.minX + 0.06, base + slab + 0.525, atr.minZ + (i * rd) / 4, 0.05, 1.05, 0.05);
-      }
     }
+    // Pasillo que rodea el nucleo por delante y por detras.
+    for (const sgn of [1, -1]) {
+      add("tile", k, (atr.maxX + core.maxX) / 2, tileY, (sgn * (atr.maxZ + outerZ)) / 2, core.maxX - atr.maxX, 0.02, outerZ - atr.maxZ);
+    }
+    if (isDetailed(k)) addDetailedFloor(ictx, k);
 
     // ---- Fachada principal
     if (k === 0) {
@@ -306,10 +345,31 @@ export function buildBuilding(
         add("white", k, px, glassH / 2, D / 2 - ps / 2, ps, glassH, ps);
       }
       const mx = dims.atriumX;
-      add("white", k, mx, dims.marqueeY + dims.marqueeT / 2, D / 2 + dims.marqueeD / 2 - 0.3, dims.marqueeW, dims.marqueeT, dims.marqueeD);
-      for (const dx of [-dims.marqueeW / 2 + 0.3, dims.marqueeW / 2 - 0.3]) {
-        add("white", k, mx + dx, dims.marqueeY / 2, D / 2 + dims.marqueeD - 0.55, 0.25, dims.marqueeY, 0.25);
-      }
+      const mw = dims.marqueeW;
+      const mt = dims.marqueeT;
+      const my = dims.marqueeY;
+      const frontZ = D / 2 + dims.marqueeD - 0.3;
+      add("white", k, mx, my + mt / 2, D / 2 + dims.marqueeD / 2 - 0.3, mw, mt, dims.marqueeD);
+      // Canto de la marquesina: faja frontal y fajas laterales que sobresalen por encima y por debajo de la losa.
+      add("white", k, mx, my + mt / 2, frontZ - 0.1, mw, 0.55, 0.2);
+      for (const sgn of [-1, 1]) add("white", k, mx + (sgn * (mw - 0.2)) / 2, my + mt / 2, D / 2 + dims.marqueeD / 2 - 0.3, 0.2, 0.55, dims.marqueeD);
+      add("led", k, mx, my - 0.06, frontZ - 0.3, mw - 0.6, 0.04, 0.06);
+      // Portico: dos columnas y viga bajo la losa.
+      for (const sgn of [-1, 1]) add("white", k, mx + sgn * (mw / 2 - 0.45), my / 2, frontZ - 0.55, 0.5, my, 0.5);
+      add("white", k, mx, my - 0.25, frontZ - 0.55, mw - 0.9, 0.3, 0.35);
+      // Puertas de vidrio del ingreso: 6 hojas con montantes, dintel, umbral y tiradores.
+      const doorN = 6;
+      const leaf = 1.0;
+      const dz = D / 2 - dims.groundSetback + 0.07;
+      const dx0 = mx - (doorN * leaf) / 2;
+      for (let i = 0; i <= doorN; i++) add("frame", k, dx0 + i * leaf, 1.225, dz, 0.07, 2.45, 0.08);
+      add("frame", k, mx, 2.45, dz, doorN * leaf + 0.07, 0.1, 0.1);
+      add("frame", k, mx, 0.04, dz, doorN * leaf + 0.07, 0.08, 0.1);
+      for (let i = 0; i < doorN; i++) add("glassClear", k, dx0 + (i + 0.5) * leaf, 1.23, dz - 0.01, leaf - 0.08, 2.36, 0.02);
+      for (const p of [1, 3, 5]) for (const sgn of [-1, 1]) add("steel", k, dx0 + p * leaf + sgn * 0.12, 1.05, dz + 0.06, 0.03, 0.3, 0.03);
+      // Escalon de ingreso (el piso interior esta 0,30 m sobre el lote).
+      add("slab", k, mx, 0.075, D / 2 + 0.7, mw - 1, 0.15, 1.6);
+      add("slab", k, mx, 0.04, D / 2 + 1.75, mw + 1, 0.08, 0.6);
       // Ventanas del vestibulo (modo noche).
       const lobby = spacesOf(k).find((s) => s.row === 0);
       for (let i = 0; i < 12; i++) {
@@ -327,7 +387,7 @@ export function buildBuilding(
       }
     } else {
       // Muro cortina: vidrio continuo, junta de losa, montantes principales y secundarios.
-      add("glass", k, cwCx, yc, glassZ, cwW, H - 0.1, 0.08);
+      add("glass", k, cwCx, yc, glassZ, cwW, H - 0.1, 0.08, { color: glassTint(k, n) });
       add("frame", k, cwCx, base + 0.05, glassZ + 0.03, cwW, 0.1, 0.25);
       for (let b = 0; b <= dims.glassBays; b++) {
         add("frame", k, cwX0 + (b * cwW) / dims.glassBays, yc, glassZ + 0.05, 0.25, H, 0.35);
@@ -396,4 +456,47 @@ export function buildBuilding(
     crownTop,
     topY: Math.max(crownTop, roofTop + dims.roofBoxH),
   };
+}
+
+interface Hole {
+  x0: number;
+  x1: number;
+  z0: number;
+  z1: number;
+}
+
+/** Losa rectangular con vacios (escaleras): se parte en franjas X y se resta cada vacio en Z. */
+function slabWithHoles(
+  add: (key: BatchKey, level: number, x: number, y: number, z: number, sx: number, sy: number, sz: number) => void,
+  level: number,
+  y: number,
+  thick: number,
+  r: Hole,
+  holes: Hole[],
+): void {
+  const inside = holes.filter((h) => h.x0 >= r.x0 - 1e-9 && h.x1 <= r.x1 + 1e-9);
+  const xs = [...new Set([r.x0, r.x1, ...inside.flatMap((h) => [h.x0, h.x1])])].sort((a, b) => a - b);
+  for (let i = 0; i < xs.length - 1; i++) {
+    const xa = xs[i] as number;
+    const xb = xs[i + 1] as number;
+    const cover = inside.filter((h) => h.x0 <= xa + 1e-9 && h.x1 >= xb - 1e-9).sort((a, b) => a.z0 - b.z0);
+    let z = r.z0;
+    const piece = (za: number, zb: number) => {
+      if (zb - za > 1e-6) add("slab", level, (xa + xb) / 2, y, (za + zb) / 2, xb - xa, thick, zb - za);
+    };
+    for (const h of cover) {
+      piece(z, h.z0);
+      z = h.z1;
+    }
+    piece(z, r.z1);
+  }
+}
+
+/** Multiplicador de color del vidrio por piso: mas claro arriba (refleja mas cielo), con variacion minima. */
+export function glassTint(level: number, count: number): string {
+  const t = count > 2 ? (level - 1) / (count - 2) : 0;
+  const j = (hash01(level * 71 + 3) - 0.5) * 0.06;
+  const ch = (a: number, b: number) => Math.max(0, Math.min(1, a + (b - a) * t + j));
+  const hex = (v: number) => Math.round(v * 255).toString(16).padStart(2, "0");
+  return `#${hex(ch(0.78, 1))}${hex(ch(0.84, 1))}${hex(ch(0.92, 1))}`;
 }

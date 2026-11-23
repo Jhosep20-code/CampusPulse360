@@ -41,7 +41,7 @@ export interface CampusModel {
   dispose: () => void;
 }
 
-function boxGeometry(b: Box, dy: number): BufferGeometry {
+function boxGeometry(b: Box & { rx?: number; ry?: number }, dy: number): BufferGeometry {
   const g = new BoxGeometry(b.sx, b.sy, b.sz);
   g.translate(b.x, b.y + dy, b.z);
   // Sin UV: no hay texturas, ahorra peso en el GLB.
@@ -49,7 +49,7 @@ function boxGeometry(b: Box, dy: number): BufferGeometry {
   return g;
 }
 
-function mergedMesh(name: string, boxes: Box[], dys: number[], material: Material): Mesh | null {
+function mergedMesh(name: string, boxes: Array<Box & { rx?: number; ry?: number }>, dys: number[], material: Material): Mesh | null {
   const geoms = boxes.map((b, i) => boxGeometry(b, dys[i] ?? 0));
   if (geoms.length === 0) return null;
   const merged = mergeGeometries(geoms, false);
@@ -66,7 +66,7 @@ export function buildCampusModel(campus: CampusResponse, dims: BuildingDims = DE
   group.name = "CampusPulse360_AR";
 
   for (const key of BATCH_KEYS) {
-    if (BATCH_META[key].env) continue;
+    if (!BATCH_META[key].ar) continue;
     const spec = MATERIAL_SPECS[key];
     const boxes = building.boxes[key];
     const opacity = spec.opacityAr;

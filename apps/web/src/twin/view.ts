@@ -105,7 +105,7 @@ export function initialViewFromBox(box: BoxLike, opts: InitialViewOptions): Init
 
 /* ------------------------------------------------------------------ presets */
 
-export type TwinPresetId = "facade" | "aerial" | "atrium" | "photo";
+export type TwinPresetId = "facade" | "aerial" | "atrium" | "reference";
 
 export interface TwinPreset {
   id: TwinPresetId;
@@ -115,7 +115,7 @@ export interface TwinPreset {
   azimuthDeg: number;
   elevationDeg: number;
   margin: number;
-  /** Distancia fija en metros (preset de comparacion con la foto). */
+  /** Distancia fija en metros (encuadre de referencia). */
   distance?: number;
   /** Cota Y del objetivo si la distancia es fija. */
   targetY?: number;
@@ -124,9 +124,10 @@ export interface TwinPreset {
 export const TWIN_PRESETS: readonly TwinPreset[] = [
   { id: "facade", label: "Fachada", description: "Vista de la fachada principal", azimuthDeg: -30, elevationDeg: 14, margin: INITIAL_MARGIN },
   { id: "aerial", label: "Aérea", description: "Vista aérea del edificio y su entorno", azimuthDeg: -38, elevationDeg: 42, margin: 1.45 },
-  { id: "atrium", label: "Atrio", description: "Vista del atrio y el núcleo de ascensores en modo datos", azimuthDeg: -18, elevationDeg: 9, margin: 1.05 },
-  // Preset de comparacion con la foto: azimut -30, elevacion 13, ~90 m (especificacion 5.7).
-  { id: "photo", label: "Foto", description: "Encuadre de comparación con la fotografía de referencia", azimuthDeg: -30, elevationDeg: 13, margin: 1, distance: 90, targetY: 18.5 },
+  // Atrio: corte de seccion visto de frente y algo elevado; encuadra atrio, ascensores y 4 niveles.
+  { id: "atrium", label: "Atrio", description: "Corte de seccion: atrio, nucleo de ascensores e interior esquematico", azimuthDeg: -12, elevationDeg: 11, margin: 1.06 },
+  // Encuadre de referencia (especificacion 5.7): azimut -30, elevacion 13, ~90 m, lienzo 1:1.
+  { id: "reference", label: "Referencia", description: "Encuadre de referencia 1:1 para comparar con una fotografia propia", azimuthDeg: -30, elevationDeg: 13, margin: 1, distance: 90, targetY: 18.5 },
 ];
 
 export function presetById(id: TwinPresetId): TwinPreset {

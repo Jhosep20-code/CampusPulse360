@@ -99,13 +99,13 @@ describe("camara por defecto y presets", () => {
     expect(a.el).toBeCloseTo(14, 5);
   });
 
-  it("define los 4 presets: Fachada, Aerea, Atrio y Foto", () => {
-    expect(TWIN_PRESETS.map((p) => p.label)).toEqual(["Fachada", "Aérea", "Atrio", "Foto"]);
+  it("define los 4 presets: Fachada, Aerea, Atrio y Referencia", () => {
+    expect(TWIN_PRESETS.map((p) => p.label)).toEqual(["Fachada", "Aérea", "Atrio", "Referencia"]);
     for (const p of TWIN_PRESETS) expect(p.description.length).toBeGreaterThan(5);
   });
 
-  it("Foto: azimut -30, elevacion 13 y 90 m de distancia fija", () => {
-    const v = presetView("photo", BUILDING, ATRIUM, opts);
+  it("Referencia: azimut -30, elevacion 13 y 90 m de distancia fija", () => {
+    const v = presetView("reference", BUILDING, ATRIUM, opts);
     const a = angles(v);
     expect(a.az).toBeCloseTo(-30, 4);
     expect(a.el).toBeCloseTo(13, 4);

@@ -90,11 +90,39 @@ describe("geometria del edificio (especificacion 5.1-5.6)", () => {
     expect(roofBox).toMatchObject({ x: -6, z: -6 });
   });
 
+  it("el interior esquematico tiene detalle en P1-P5 y no en P6-P10", () => {
+    const upper = (k: "ceiling" | "fixture" | "wood" | "furnDark" | "screen" | "books") =>
+      building.boxes[k].filter((b) => b.level >= 5);
+    for (const k of ["ceiling", "fixture", "wood", "furnDark", "screen", "books"] as const) {
+      expect(building.boxes[k].length).toBeGreaterThan(0);
+      expect(upper(k)).toHaveLength(0);
+    }
+    // 3 ascensores por piso con puertas de acero (2 hojas cada una) y luminarias emisivas cuadradas.
+    expect(building.boxes.steel.filter((s) => s.level === 2 && Math.abs(s.sy - 2.2) < 1e-9)).toHaveLength(6);
+    expect(building.boxes.fixture.every((f) => f.sx === 0.6 || f.sx === 0.32)).toBe(true);
+    // Tubos inclinados de las escaleras.
+    expect(building.boxes.steel.some((s) => s.rx !== undefined)).toBe(true);
+    // Losas con vacio de escaleras: P2 tiene mas piezas que las 4 del atrio.
+    expect(building.boxes.slab.filter((s) => s.level === 1).length).toBeGreaterThan(10);
+  });
+
+  it("el GLB / AR excluye mobiliario y luminarias del interior pero no la estructura", async () => {
+    const { BATCH_META } = await import("./facade");
+    for (const k of ["ceiling", "fixture", "wood", "furnDark", "screen", "books", "context"] as const) {
+      expect(BATCH_META[k].ar).toBe(false);
+    }
+    for (const k of ["glass", "white", "slab", "coreBlack", "steel", "tile", "glassClear"] as const) {
+      expect(BATCH_META[k].ar).toBe(true);
+    }
+  });
+
   it("incluye nucleo de ascensores, barandas del atrio y entorno (excluido en AR)", () => {
     expect(building.boxes.coreBlack).toHaveLength(10);
     expect(building.boxes.steel.length).toBeGreaterThan(200);
     expect(building.boxes.hedge.length).toBeGreaterThan(0);
     expect(building.boxes.context.length).toBeGreaterThan(50);
+    expect(building.boxes.context.length).toBeLessThan(201);
+    expect(building.boxes.context.some((c) => c.color !== undefined)).toBe(true);
     const bare = buildBuilding(D, layout, "none", false);
     expect(bare.boxes.hedge).toHaveLength(0);
     expect(bare.boxes.context).toHaveLength(0);

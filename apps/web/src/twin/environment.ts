@@ -50,28 +50,47 @@ const S = (x: number, y: number, z: number, sx: number, sy: number, sz: number):
   sz,
 });
 
-/** Cajas del contexto urbano: 2 a 4 pisos (6 a 12,5 m), fuera del lote y de la calle. */
+const BRICK = ["#A9614B", "#B87358", "#9A5A47", "#C27A5E", "#8F5442"];
+const STUCCO = ["#D9CBB4", "#CFC0A8", "#E4DAC7", "#BDAE97", "#D3C3A4", "#C9B79B", "#B9C3B0", "#C9B4A2"];
+const ROOFS = ["#C9CDD2", "#B9BEC4", "#D8D3C8", "#A9715A", "#DDDFE2"];
+
+/** Elige un color de una lista de forma determinista. */
+const pick = (list: readonly string[], r: number): string => list[Math.min(list.length - 1, Math.floor(r * list.length))] ?? "#CCCCCC";
+
+/**
+ * Cajas del contexto urbano: 2 a 4 pisos (6,5 a 12,5 m), lejos del lote, la calle y la vereda.
+ * Alturas variadas, giros leves, color por instancia (ladrillo, tarrajeo) y techos claros con
+ * tanques ocasionales. Son MENOS cajas y mas lejanas que antes, para no competir con la sede.
+ */
 export function buildContextBoxes(density: ContextDensity): BBox[] {
   if (density === "none") return [];
   const rnd = mulberry32(20261122);
   const out: BBox[] = [];
   let i = 0;
-  for (let cx = -168; cx <= 168; cx += 24) {
-    for (let cz = -168; cz <= 216; cz += 24) {
-      const jx = (rnd() - 0.5) * 6;
-      const jz = (rnd() - 0.5) * 6;
-      const sx = 12 + rnd() * 8;
-      const sz = 12 + rnd() * 8;
-      const h = 6 + rnd() * 6.5;
+  for (let cx = -216; cx <= 216; cx += 36) {
+    for (let cz = -216; cz <= 252; cz += 36) {
+      const jx = (rnd() - 0.5) * 14;
+      const jz = (rnd() - 0.5) * 14;
+      const sx = 10 + rnd() * 12;
+      const sz = 10 + rnd() * 10;
+      const floors = 2 + Math.floor(rnd() * 3);
+      const h = floors * 3 + 0.5 + rnd() * 1.2;
       const keep = rnd();
+      const material = rnd();
+      const roofPick = rnd();
+      const tank = rnd();
+      const turn = rnd() < 0.35 ? (rnd() - 0.5) * 0.3 : 0;
       i++;
       const x = cx + jx;
       const z = cz + jz;
-      // Lote, vereda y calle quedan libres.
-      if (Math.abs(x) < 46 && z > -36 && z < 40) continue;
-      if (keep > 0.86) continue;
-      if (density === "sparse" && (i % 3 !== 0 || Math.hypot(x, z) > 120)) continue;
-      out.push(S(x, h / 2, z, sx, h, sz));
+      // Lote, vereda, calle y una franja amplia alrededor quedan libres.
+      if (Math.abs(x) < 64 && z > -58 && z < 78) continue;
+      if (keep > 0.42) continue;
+      if (density === "sparse" && (i % 3 !== 0 || Math.hypot(x, z) > 140)) continue;
+      const body = material < 0.42 ? pick(BRICK, rnd()) : pick(STUCCO, rnd());
+      out.push({ ...S(x, h / 2, z, sx, h, sz), color: body, ry: turn });
+      out.push({ ...S(x, h + 0.15, z, sx + 0.5, 0.3, sz + 0.5), color: pick(ROOFS, roofPick), ry: turn });
+      if (tank < 0.3) out.push({ ...S(x + sx * 0.2, h + 0.9, z - sz * 0.15, 1.6, 1.2, 1.6), color: "#D4D6D9", ry: turn });
     }
   }
   return out;

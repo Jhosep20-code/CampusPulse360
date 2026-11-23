@@ -120,6 +120,34 @@ export function spaceXRange(dims: BuildingDims): { min: number; max: number } {
   return { min: -dims.footprintW / 2 + dims.wallInset, max: dims.footprintW / 2 - dims.wallInset };
 }
 
+/**
+ * Cota Z del corte de seccion de la vista Atrio: quita la fachada frontal y la mitad
+ * delantera, pero deja una franja del pasillo frontal (con su baranda) para que el borde
+ * del atrio siga cerrado. ESTIMACION: depende de atriumD.
+ */
+export function sectionCutZ(dims: BuildingDims): number {
+  return dims.atriumD / 2 + 1.1;
+}
+
+interface P3 {
+  x: number;
+  y: number;
+  z: number;
+}
+
+/**
+ * Caja que encuadra la vista Atrio: el atrio, el pasillo oeste y el nucleo de ascensores,
+ * de la planta baja a P4 (4 niveles en cuadro). Cotas ESTIMADAS.
+ */
+export function sectionFrameBox(dims: BuildingDims): { min: P3; max: P3 } {
+  const a = atriumRect(dims);
+  const k = coreRect(dims);
+  return {
+    min: { x: a.minX - dims.corridorW - 0.6, y: 0.4, z: -dims.atriumD / 2 },
+    max: { x: k.maxX + 0.6, y: levelBaseY(4, dims) + 0.6, z: sectionCutZ(dims) },
+  };
+}
+
 /** Altura total hasta la coronacion (sin caja tecnica). */
 export function crownTopY(floorCount: number, dims: BuildingDims): number {
   const n = Math.max(1, floorCount);

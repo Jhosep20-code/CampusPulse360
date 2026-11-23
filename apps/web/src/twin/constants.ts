@@ -27,6 +27,11 @@ export const TWIN_LEVELS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 /** Aviso obligatorio del modelo (gemelo y AR). */
 export const APPROX_NOTICE = "Modelo aproximado basado en fotografía · dimensiones estimadas · sin planos verificados";
+/** Rotulo obligatorio de la vista Atrio (corte de seccion). */
+export const INTERIOR_NOTICE = "Interior esquemático basado en fotografías; distribución no verificada";
+/** Aviso del comparador de referencia (texto exacto pedido por el equipo). */
+export const REFERENCE_PRIVACY =
+  "La imagen no sale de tu dispositivo. Comparación visual aproximada, sin precisión arquitectónica";
 /** Rotulo de los pisos sin sensores. */
 export const NO_SPACES_LABEL = "sin espacios instrumentados";
 

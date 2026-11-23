@@ -9,6 +9,7 @@ import {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useReducer,
   useRef,
   useState,
   useSyncExternalStore,
@@ -33,8 +34,10 @@ import {
   MeshBasicMaterial,
   MeshPhysicalMaterial,
   MeshStandardMaterial,
+  Mesh as ThreeMesh,
   Object3D,
   PerspectiveCamera,
+  Plane,
   PlaneGeometry,
   ShaderMaterial,
   SphereGeometry,
@@ -42,15 +45,27 @@ import {
   type DirectionalLight,
   type HemisphereLight,
   type InstancedMesh,
+  type Intersection,
   type Material,
   type Mesh,
+  type Raycaster,
   type Group,
 } from "three";
 import { describeEmptyLevels, describeSpaces, describeTwin, liveBySpaceId } from "./a11y";
 import { STATUS_LABEL, colorForSpace, emissiveForNight, primaryValueLabel } from "./colors";
 import {
+  createPhotoSlot,
+  initialCompareState,
+  isImageFile,
+  letterboxRect,
+  reduceCompare,
+  referenceSilhouette,
+  type PhotoSlot,
+} from "./compare";
+import {
   APPROX_NOTICE,
   DEFAULT_DIMS,
+  INTERIOR_NOTICE,
   MODEL_URL,
   NO_SPACES_LABEL,
   PALETTE,
@@ -58,10 +73,12 @@ import {
 } from "./constants";
 import { buildHillRing } from "./environment";
 import { BATCH_KEYS, BATCH_META, buildBuilding, type BatchKey, type Building } from "./facade";
-import { atriumRect, computeLayout, coreRect, crownTopY, floorLevels } from "./layout";
+import { computeLayout, crownTopY, floorLevels, sectionCutZ, sectionFrameBox } from "./layout";
+import { ReferenceOverlay, ReferencePanel } from "./ReferencePanel";
 import {
   DAY_COLORS,
   ENV_COLORS,
+  INTERIOR_FILL,
   MATERIAL_SPECS,
   NIGHT_COLORS,
   SKY,
@@ -121,6 +138,8 @@ interface Anim {
   night: number;
   /** 0 = realista, 1 = modo datos. */
   data: number;
+  /** 0 = edificio completo, 1 = corte de seccion de la vista Atrio. */
+  section: number;
 }
 
 interface Mats {
@@ -161,6 +180,11 @@ interface SceneCtx {
   exploded: boolean;
   isolatedLevel: number | null;
   shadows: boolean;
+  /** Vista Atrio activa (corte de seccion). */
+  section: boolean;
+  /** Plano de corte compartido (conserva z <= constant). */
+  clip: Plane;
+  sectionZ: number;
   setHovered: (id: string | null) => void;
   setPickHover: (v: boolean) => void;
   select: (id: string | null) => void;
@@ -275,31 +299,53 @@ void main() {
   #include <colorspace_fragment>
 }`;
 
-function createMats(): Mats {
+/** Materiales que recorta el plano de seccion (el entorno lejano no). */
+const UNCLIPPED: ReadonlySet<BatchKey> = new Set<BatchKey>(["sidewalk", "asphalt", "context"]);
+/** Materiales de cuerpos cerrados: se dibujan por ambas caras para que el corte se vea macizo. */
+const DOUBLE_SIDED: ReadonlySet<BatchKey> = new Set<BatchKey>(["white", "slab", "roof"]);
+const BASIC_KEYS: ReadonlySet<BatchKey> = new Set<BatchKey>(["led", "lampHead", "fixture", "screen"]);
+
+function createMats(clip: Plane): Mats {
   const batch = {} as Record<BatchKey, Material>;
   for (const k of BATCH_KEYS) {
     const s = MATERIAL_SPECS[k];
-    if (k === "led" || k === "lampHead") {
-      batch[k] = new MeshBasicMaterial({ color: s.color, toneMapped: false });
+    let mat: Material;
+    if (BASIC_KEYS.has(k)) {
+      mat = new MeshBasicMaterial({ color: s.color, toneMapped: false });
     } else if (k === "glass") {
-      batch[k] = new MeshPhysicalMaterial({
+      mat = new MeshPhysicalMaterial({
         color: s.color,
         roughness: s.roughness,
         metalness: s.metalness,
         clearcoat: s.clearcoat ?? 0.6,
-        clearcoatRoughness: 0.05,
-        envMapIntensity: 1.8,
+        clearcoatRoughness: 0.03,
+        envMapIntensity: s.envMapIntensity ?? 1.8,
         transparent: true,
         opacity: s.opacity,
         depthWrite: false,
       });
     } else {
-      batch[k] = new MeshStandardMaterial({ color: s.color, roughness: s.roughness, metalness: s.metalness });
+      const translucent = s.opacity < 0.999;
+      mat = new MeshStandardMaterial({
+        color: s.color,
+        roughness: s.roughness,
+        metalness: s.metalness,
+        envMapIntensity: s.envMapIntensity ?? 1,
+        ...(translucent ? { transparent: true, opacity: s.opacity, depthWrite: false } : {}),
+      });
     }
+    if (!UNCLIPPED.has(k)) {
+      mat.clippingPlanes = [clip];
+      mat.clipShadows = true;
+    }
+    if (DOUBLE_SIDED.has(k)) mat.side = DoubleSide;
+    batch[k] = mat;
   }
+  const windows = new MeshBasicMaterial({ color: "#FFFFFF", transparent: true, opacity: 0, toneMapped: false, depthWrite: false });
+  windows.clippingPlanes = [clip];
   return {
     batch,
-    windows: new MeshBasicMaterial({ color: "#FFFFFF", transparent: true, opacity: 0, toneMapped: false, depthWrite: false }),
+    windows,
     ground: new MeshStandardMaterial({ color: DAY_COLORS.ground, roughness: 0.95, metalness: 0 }),
     hills: new MeshStandardMaterial({ color: DAY_COLORS.hills, roughness: 1, metalness: 0, side: DoubleSide }),
     sky: new ShaderMaterial({
@@ -323,7 +369,7 @@ function disposeMats(m: Mats): void {
 
 const C = {
   ctxDay: new Color(DAY_COLORS.context),
-  ctxNight: new Color(MATERIAL_SPECS.context.color),
+  ctxNight: new Color(NIGHT_COLORS.context),
   walkDay: new Color(DAY_COLORS.sidewalk),
   walkNight: new Color(MATERIAL_SPECS.sidewalk.color),
   asphDay: new Color(DAY_COLORS.asphalt),
@@ -342,14 +388,15 @@ const C = {
   lampNight: new Color(MATERIAL_SPECS.lampHead.color),
 };
 
-const OPACITY_KEYS = ["glass", "white", "frame", "glassGround"] as const;
+const OPACITY_KEYS = ["glass", "white", "frame", "glassGround", "glassClear"] as const;
 
 /** Actualiza los materiales segun la transicion dia/noche y realista/datos. */
 function updateMats(m: Mats, a: Anim): void {
   for (const k of OPACITY_KEYS) {
     const mat = m.batch[k] as MeshStandardMaterial;
     const s = MATERIAL_SPECS[k];
-    const op = MathUtils.lerp(s.opacity, s.opacityData, a.data);
+    // En el corte de seccion los muros y la carpinteria se vuelven macizos (no translucidos).
+    const op = MathUtils.lerp(s.opacity, s.opacityData, a.data * (1 - a.section));
     const transparent = op < 0.999;
     mat.opacity = op;
     if (mat.transparent !== transparent) {
@@ -407,6 +454,7 @@ function Batches() {
       sy: number,
       sz: number,
       ry: number,
+      rx = 0,
     ) => {
       let yy = y;
       let ss = sy;
@@ -417,7 +465,7 @@ function Batches() {
         ss = v < 0.003 ? 0 : sy * v;
       }
       DUMMY.position.set(x, yy, z);
-      DUMMY.rotation.set(0, ry, 0);
+      DUMMY.rotation.set(rx, ry, 0);
       DUMMY.scale.set(sx, ss, sz);
       DUMMY.updateMatrix();
       im.setMatrixAt(i, DUMMY.matrix);
@@ -427,7 +475,7 @@ function Batches() {
       const list = building.boxes[key];
       if (!im || list.length === 0) continue;
       if (!force && staticOnly.has(key)) continue;
-      list.forEach((b, i) => place(im, i, b.level, b.x, b.y, b.z, b.sx, b.sy, b.sz, b.ry ?? 0));
+      list.forEach((b, i) => place(im, i, b.level, b.x, b.y, b.z, b.sx, b.sy, b.sz, b.ry ?? 0, b.rx ?? 0));
       im.instanceMatrix.needsUpdate = true;
     }
     const wm = winRef.current;
@@ -444,6 +492,20 @@ function Batches() {
     dirty.current = false;
     // Solo cuando cambia la estructura; los cambios de estado se animan en useFrame.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [building, floors]);
+
+  // Color por instancia (vidrio por piso, lomos de libros, contexto urbano).
+  useLayoutEffect(() => {
+    const c = new Color();
+    for (const key of BATCH_KEYS) {
+      if (!BATCH_META[key].tinted) continue;
+      const im = refs.current[key];
+      if (!im) continue;
+      building.boxes[key].forEach((b, i) => {
+        im.setColorAt(i, c.set(b.color ?? "#FFFFFF"));
+      });
+      if (im.instanceColor) im.instanceColor.needsUpdate = true;
+    }
   }, [building, floors]);
 
   // Color de cada ventana: ocupacion en los pisos con datos, patron estable en el resto.
@@ -489,7 +551,7 @@ function Batches() {
       apply(false);
       dirty.current = false;
     }
-    const showInterior = anim.current.data > 0.02;
+    const showInterior = anim.current.data > 0.02 || anim.current.section > 0.02;
     for (const key of BATCH_KEYS) {
       const im = refs.current[key];
       if (im) im.visible = !BATCH_META[key].interior || showInterior;
@@ -525,7 +587,7 @@ function Batches() {
         const list = building.boxes[key];
         if (list.length === 0) return null;
         const meta = BATCH_META[key];
-        const receive = key === "white" || key === "slab" || key === "roof" || key === "sidewalk" || key === "asphalt";
+        const receive = key === "white" || key === "slab" || key === "roof" || key === "sidewalk" || key === "asphalt" || key === "tile";
         return (
           <instancedMesh
             key={`${key}-${list.length}`}
@@ -570,6 +632,7 @@ function SpaceVolume({ geom }: { geom: SpaceGeom }) {
   const hovered = ctx.hoveredId === space.id;
   const ratio = live?.metrics && space.capacity > 0 ? live.metrics.occupancy / space.capacity : 0;
   const nightGlow = ctx.night && status !== "offline" ? emissiveForNight(ratio) : 0;
+  const tintRef = useRef<Mesh>(null);
 
   const material = useMemo(
     () =>
@@ -582,12 +645,31 @@ function SpaceVolume({ geom }: { geom: SpaceGeom }) {
         depthWrite: false,
         roughness: 0.4,
         metalness: 0.05,
+        clippingPlanes: [ctx.clip],
       }),
     // El color inicial se fija una sola vez; los cambios posteriores se interpolan en useFrame.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
-  useEffect(() => () => material.dispose(), [material]);
+  // Suelo tenue del ambiente en la vista Atrio: conserva la lectura por estado sin tapar el interior.
+  const tint = useMemo(
+    () =>
+      new MeshBasicMaterial({
+        color: targetColor.clone(),
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        clippingPlanes: [ctx.clip],
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+  useEffect(() => {
+    return () => {
+      material.dispose();
+      tint.dispose();
+    };
+  }, [material, tint]);
 
   useFrame((state, dt) => {
     const k = ctx.reduced ? 1 : 1 - Math.exp(-dt * 5);
@@ -601,10 +683,19 @@ function SpaceVolume({ geom }: { geom: SpaceGeom }) {
     glow += nightGlow * 0.3 + (hovered ? 0.25 : 0) + (selected ? 0.3 : 0);
     material.emissiveIntensity = MathUtils.lerp(material.emissiveIntensity, glow, ctx.reduced ? 1 : k);
 
-    // En modo realista el volumen es un tinte tenue tras el vidrio; en modo datos se ve completo.
-    const baseOpacity = MathUtils.lerp(0.16, 0.5, ctx.anim.current.data);
-    const targetOpacity = faded ? 0.04 : selected ? 0.82 : hovered ? 0.72 : baseOpacity;
+    // Realista: tinte tenue tras el vidrio. Datos: volumen completo. Atrio (corte): casi invisible, solo al
+    // seleccionar o pasar el cursor; el estado se lee en el suelo del ambiente.
+    const sec = ctx.anim.current.section;
+    const baseOpacity = MathUtils.lerp(0.16, 0.5, ctx.anim.current.data) * (1 - sec);
+    const selOpacity = MathUtils.lerp(0.82, 0.34, sec);
+    const hovOpacity = MathUtils.lerp(0.72, 0.2, sec);
+    const targetOpacity = faded ? 0.04 : selected ? selOpacity : hovered ? hovOpacity : baseOpacity;
     material.opacity = MathUtils.lerp(material.opacity, targetOpacity, ctx.reduced ? 1 : k);
+    material.visible = material.opacity > 0.015;
+
+    tint.color.copy(material.color);
+    tint.opacity = MathUtils.lerp(tint.opacity, faded ? 0.03 : 0.34 * sec, ctx.reduced ? 1 : k);
+    if (tintRef.current) tintRef.current.visible = tint.opacity > 0.01;
   });
 
   const interactive = !faded;
@@ -616,10 +707,22 @@ function SpaceVolume({ geom }: { geom: SpaceGeom }) {
     onPointerOut: () => ctx.setHovered(null),
     onClick: (e: ThreeEvent<MouseEvent>) => {
       e.stopPropagation();
-      if (e.delta > 4) return; // fue un arrastre de camara, no un clic
+      if (e.delta > 8) return; // fue un arrastre de camara (tolerancia mayor en tactil), no un clic
       ctx.select(space.id);
     },
   };
+
+  // En el corte, la parte recortada del volumen no se puede seleccionar.
+  const clippedRaycast = useMemo(
+    () =>
+      function (this: Mesh, raycaster: Raycaster, intersects: Intersection[]) {
+        const found: Intersection[] = [];
+        ThreeMesh.prototype.raycast.call(this, raycaster, found);
+        const cut = ctx.anim.current.section > 0.5;
+        for (const h of found) if (!cut || h.point.z <= ctx.sectionZ + 0.01) intersects.push(h);
+      },
+    [ctx.anim, ctx.sectionZ],
+  );
 
   if (geom.mesh) {
     return (
@@ -634,17 +737,30 @@ function SpaceVolume({ geom }: { geom: SpaceGeom }) {
     );
   }
   return (
-    <mesh
-      name={space.mesh_id}
-      geometry={ctx.res.box}
-      material={material}
-      position={geom.pos}
-      scale={geom.size}
-      renderOrder={2}
-      userData={{ spaceId: space.id }}
-      raycast={interactive ? undefined : noRaycast}
-      {...handlers}
-    />
+    <>
+      <mesh
+        name={space.mesh_id}
+        geometry={ctx.res.box}
+        material={material}
+        position={geom.pos}
+        scale={geom.size}
+        renderOrder={2}
+        userData={{ spaceId: space.id }}
+        raycast={interactive ? clippedRaycast : noRaycast}
+        {...handlers}
+      />
+      <mesh
+        ref={tintRef}
+        geometry={ctx.res.plane}
+        material={tint}
+        position={[geom.pos[0], geom.pos[1] - geom.size[1] / 2 + 0.045, geom.pos[2]]}
+        rotation-x={-Math.PI / 2}
+        scale={[Math.max(0.1, geom.size[0] - 0.3), Math.max(0.1, geom.size[2] - 0.3), 1]}
+        renderOrder={1}
+        visible={false}
+        raycast={noRaycast}
+      />
+    </>
   );
 }
 
@@ -694,6 +810,70 @@ function SpaceLabel({
   );
 }
 
+/**
+ * Baliza de estado para espacios en advertencia o critico. Es una etiqueta DOM sin oclusion:
+ * se ve tambien desde la vista Fachada (el vidrio es casi opaco) y desde cualquier angulo.
+ */
+function SpaceBeacon({ geom, anchor }: { geom: SpaceGeom; anchor: Vec3 }) {
+  const ctx = useCtx();
+  const overlay = useContext(OverlayCtx);
+  const status = ctx.liveMap.get(geom.space.id)?.status;
+  const critical = status === "critical";
+  const color = critical ? PALETTE.critical : PALETTE.gold;
+  const text = critical ? "crítico" : "advertencia";
+  return (
+    <Html position={anchor} center zIndexRange={[24, 0]} style={{ pointerEvents: "none" }} {...(overlay ? { portal: overlay as RefObject<HTMLElement> } : {})}>
+      <style>{"@keyframes cpBeacon{0%{transform:scale(.8);opacity:.85}100%{transform:scale(2.1);opacity:0}}"}</style>
+      <button
+        type="button"
+        aria-label={`Seleccionar ${geom.space.name}, ${text}`}
+        title={`${geom.space.name}: ${text}`}
+        onClick={() => ctx.select(geom.space.id)}
+        style={{
+          pointerEvents: "auto",
+          position: "relative",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 3,
+          padding: 6,
+          margin: 0,
+          border: 0,
+          background: "transparent",
+          cursor: "pointer",
+          font: '700 10px/1 "IBM Plex Sans", system-ui, sans-serif',
+        }}
+      >
+        <span style={{ position: "relative", width: 24, height: 24, display: "grid", placeItems: "center" }}>
+          {ctx.reduced ? null : (
+            <span style={{ position: "absolute", inset: 0, borderRadius: "50%", border: `2px solid ${color}`, animation: "cpBeacon 1.8s ease-out infinite" }} />
+          )}
+          <span
+            aria-hidden="true"
+            style={{
+              width: 22,
+              height: 22,
+              borderRadius: "50%",
+              background: color,
+              border: `2px solid ${PALETTE.bg}`,
+              color: PALETTE.bg,
+              display: "grid",
+              placeItems: "center",
+              fontSize: 13,
+              boxShadow: `0 0 0 1px ${color}, 0 2px 8px rgba(0,0,0,.55)`,
+            }}
+          >
+            !
+          </span>
+        </span>
+        <span style={{ background: PALETTE.panel, color: PALETTE.text, borderRadius: 4, padding: "2px 5px", border: `1px solid ${color}` }}>
+          {geom.space.code}
+        </span>
+      </button>
+    </Html>
+  );
+}
+
 /* --------------------------------------------------------------- pisos */
 
 /** Volumenes de espacio, contornos y etiquetas de un piso (la estructura va en Batches). */
@@ -711,9 +891,18 @@ function FloorGroup({ floor }: { floor: FloorInfo }) {
     g.position.y = floor.y0 + (floor.y1 - floor.y0) * tRef.current;
   });
 
-  const labelGeoms = floor.geoms.filter((g) => {
+  const shown = (g: SpaceGeom) => {
     if (ctx.isolatedLevel !== null && ctx.isolatedLevel !== floor.level) return false;
+    // En el corte de la vista Atrio, los espacios recortados no tienen donde apoyar la etiqueta.
+    return !(ctx.section && ctx.procedural && g.pos[2] > ctx.sectionZ);
+  };
+  const labelGeoms = floor.geoms.filter((g) => {
+    if (!shown(g)) return false;
     return g.space.id === ctx.selectedId || ctx.liveMap.get(g.space.id)?.status === "critical";
+  });
+  const beaconGeoms = floor.geoms.filter((g) => {
+    const st = ctx.liveMap.get(g.space.id)?.status;
+    return shown(g) && (st === "warning" || st === "critical");
   });
   const outlines = floor.geoms.filter((g) => g.space.id === ctx.selectedId || g.space.id === ctx.hoveredId);
 
@@ -741,6 +930,10 @@ function FloorGroup({ floor }: { floor: FloorInfo }) {
         );
       })}
 
+      {beaconGeoms.map((g) => (
+        <SpaceBeacon key={g.space.id} geom={g} anchor={[g.pos[0], g.pos[1] + g.size[1] / 2 + 0.2, g.pos[2]]} />
+      ))}
+
       {labelGeoms.map((g) => (
         <SpaceLabel
           key={g.space.id}
@@ -761,6 +954,7 @@ function Atmosphere({ shadows, shadowMapSize }: { shadows: boolean; shadowMapSiz
   const scene = useThree((s) => s.scene);
   const hemi = useRef<HemisphereLight>(null);
   const sun = useRef<DirectionalLight>(null);
+  const fill = useRef<DirectionalLight>(null);
 
   useFrame((_, dt) => {
     const a = ctx.anim.current;
@@ -772,13 +966,22 @@ function Atmosphere({ shadows, shadowMapSize }: { shadows: boolean; shadowMapSiz
     a.data += (dTarget - a.data) * kD;
     if (Math.abs(a.night - nTarget) < 0.002) a.night = nTarget;
     if (Math.abs(a.data - dTarget) < 0.002) a.data = dTarget;
+    const sTarget = ctx.section ? 1 : 0;
+    a.section += (sTarget - a.section) * (ctx.reduced ? 1 : 1 - Math.exp(-dt * 3.5));
+    if (Math.abs(a.section - sTarget) < 0.002) a.section = sTarget;
+    // El plano barre desde fuera del edificio hasta la cota del corte.
+    ctx.clip.constant = a.section < 0.002 ? 1000 : MathUtils.lerp(70, ctx.sectionZ, a.section);
 
     updateMats(ctx.mats, a);
-    if (hemi.current) hemi.current.intensity = MathUtils.lerp(0.62, 0.16, a.night);
+    if (hemi.current) hemi.current.intensity = MathUtils.lerp(0.72, 0.3, a.night);
     if (sun.current) {
-      sun.current.intensity = MathUtils.lerp(2.4, 0.25, a.night);
+      // Sol algo mas suave dentro del corte para equilibrarlo con la luz calida interior.
+      sun.current.intensity = MathUtils.lerp(2.2, 0.34, a.night) * MathUtils.lerp(1, 0.72, a.section);
       sun.current.color.lerpColors(DAY_SUN, NIGHT_MOON, a.night);
+      // Sombras menos duras de noche (la luz lunar es difusa).
+      sun.current.shadow.intensity = MathUtils.lerp(0.85, 0.5, a.night);
     }
+    if (fill.current) fill.current.intensity = a.section * MathUtils.lerp(1.1, 1.45, a.night);
     scene.environmentIntensity = MathUtils.lerp(1, 0.2, a.night);
     if (scene.fog) scene.fog.color.lerpColors(C.skyHorDay, C.skyHorNight, a.night);
   });
@@ -802,6 +1005,8 @@ function Atmosphere({ shadows, shadowMapSize }: { shadows: boolean; shadowMapSiz
         shadow-bias={-0.0004}
         shadow-normalBias={0.05}
       />
+      {/* Relleno interior calido-neutro, solo en el corte de la vista Atrio; sin sombras. */}
+      <directionalLight ref={fill} position={INTERIOR_FILL.position} intensity={0} color={INTERIOR_FILL.color} />
     </>
   );
 }
@@ -824,7 +1029,9 @@ function CameraRig({
   exploded,
   isolatedLevel,
   reduced,
+  coarse,
 }: {
+  coarse: boolean;
   floors: FloorInfo[];
   bounds: Box3;
   atriumBox: Box3;
@@ -951,8 +1158,11 @@ function CameraRig({
       maxDistance={CAMERA_LIMITS.maxDistance}
       minPolarAngle={CAMERA_LIMITS.minPolarAngle}
       maxPolarAngle={CAMERA_LIMITS.maxPolarAngle}
-      smoothTime={reduced ? 0.001 : 0.28}
-      draggingSmoothTime={reduced ? 0.001 : 0.12}
+      smoothTime={reduced ? 0.001 : coarse ? 0.22 : 0.28}
+      draggingSmoothTime={reduced ? 0.001 : coarse ? 0.08 : 0.12}
+      // Tactil: un dedo orbita, dos dedos hacen zoom (pellizco) y panoramica; giro algo mas fino.
+      azimuthRotateSpeed={coarse ? 0.8 : 1}
+      polarRotateSpeed={coarse ? 0.8 : 1}
       dollyToCursor
     />
   );
@@ -972,6 +1182,8 @@ function CursorSync({ pointer }: { pointer: boolean }) {
 /* --------------------------------------------------------------- escena */
 
 type SceneProps = Omit<TwinProps, "quality" | "className" | "cameraPreset" | "dataMode"> & {
+  /** Vista Atrio: corte de seccion. */
+  section: boolean;
   profile: "high" | "low";
   reduced: boolean;
   /** Modo datos efectivo (prop, preset Atrio o piso aislado). */
@@ -991,6 +1203,7 @@ function Scene({
   exploded = false,
   isolatedLevel = null,
   night = false,
+  section,
   profile,
   reduced,
   dataMode,
@@ -998,6 +1211,15 @@ function Scene({
   initialPreset,
 }: SceneProps) {
   const model = useTwinModel();
+  const gl = useThree((st) => st.gl);
+  useLayoutEffect(() => {
+    gl.localClippingEnabled = true;
+    return () => {
+      gl.localClippingEnabled = false;
+    };
+  }, [gl]);
+  const clip = useMemo(() => new Plane(new Vector3(0, 0, -1), 1000), []);
+  const sectionZ = sectionCutZ(DIMS);
   const procedural = model === null;
   const settings = profileSettings(profile);
   const shadows = settings.shadows;
@@ -1020,14 +1242,11 @@ function Scene({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [structureKey, settings.context, procedural],
   );
+  // Encuadre de la vista Atrio: atrio, nucleo y 4 niveles.
   const atriumBox = useMemo(() => {
-    const a = atriumRect(DIMS);
-    const k = coreRect(DIMS);
-    return new Box3(
-      new Vector3(a.minX, 0, a.minZ),
-      new Vector3(k.maxX, crownTopY(floors.length, DIMS), a.maxZ),
-    );
-  }, [floors.length]);
+    const f = sectionFrameBox(DIMS);
+    return new Box3(new Vector3(f.min.x, f.min.y, f.min.z), new Vector3(f.max.x, f.max.y, f.max.z));
+  }, []);
 
   const liveMap = useMemo(() => liveBySpaceId(live), [live]);
   const spaceCap = useMemo(() => new Map(campus.spaces.map((s) => [s.id, s.capacity])), [campus]);
@@ -1048,11 +1267,11 @@ function Scene({
       hills,
       sky: new SphereGeometry(600, 24, 16),
       edges: new EdgesGeometry(box),
-      lineSelected: new LineBasicMaterial({ color: PALETTE.gold, toneMapped: false }),
-      lineHover: new LineBasicMaterial({ color: PALETTE.cyan, toneMapped: false }),
+      lineSelected: new LineBasicMaterial({ color: PALETTE.gold, toneMapped: false, clippingPlanes: [clip] }),
+      lineHover: new LineBasicMaterial({ color: PALETTE.cyan, toneMapped: false, clippingPlanes: [clip] }),
     };
-  }, []);
-  const mats = useMemo(() => createMats(), []);
+  }, [clip]);
+  const mats = useMemo(() => createMats(clip), [clip]);
   useEffect(
     () => () => {
       res.box.dispose();
@@ -1068,7 +1287,7 @@ function Scene({
   );
   useEffect(() => () => disposeMats(mats), [mats]);
 
-  const anim = useRef<Anim>({ night: night ? 1 : 0, data: dataMode ? 1 : 0 });
+  const anim = useRef<Anim>({ night: night ? 1 : 0, data: dataMode ? 1 : 0, section: section ? 1 : 0 });
 
   const pickLevel = useMemo(() => {
     if (!onSelectLevel) return null;
@@ -1099,6 +1318,9 @@ function Scene({
       exploded,
       isolatedLevel,
       shadows,
+      section,
+      clip,
+      sectionZ,
       setHovered,
       setPickHover,
       select: onSelectSpace,
@@ -1106,7 +1328,7 @@ function Scene({
     }),
     [
       res, mats, procedural, model, building, floors, spaceCap, layer, liveMap, selectedSpaceId, hoveredId,
-      night, dataMode, reduced, exploded, isolatedLevel, shadows, onSelectSpace, pickLevel,
+      night, dataMode, reduced, exploded, isolatedLevel, shadows, section, clip, sectionZ, onSelectSpace, pickLevel,
     ],
   );
 
@@ -1146,6 +1368,7 @@ function Scene({
         exploded={exploded}
         isolatedLevel={isolatedLevel}
         reduced={reduced}
+        coarse={profile === "low"}
       />
       <CursorSync pointer={hoveredId !== null || pickHover} />
     </Ctx.Provider>
@@ -1221,9 +1444,74 @@ export default function CampusTwin({
   const [preset, setPreset] = useState<TwinPresetId>(cameraPreset ?? "facade");
   const [presetReq, setPresetReq] = useState<PresetRequest | null>(null);
   const initialPreset = useRef<TwinPresetId>(cameraPreset ?? "facade").current;
+
+  // Modo Referencia: comparacion VOLUNTARIA con una foto local (object URL; nunca se sube).
+  const [cmp, dispatchCmp] = useReducer(reduceCompare, initialCompareState);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const slotRef = useRef<PhotoSlot | null>(null);
+  const getSlot = (): PhotoSlot => {
+    if (!slotRef.current) {
+      slotRef.current = createPhotoSlot({
+        createObjectURL: (b) => URL.createObjectURL(b),
+        revokeObjectURL: (u) => URL.revokeObjectURL(u),
+      });
+    }
+    return slotRef.current;
+  };
+  const leaveReference = () => {
+    slotRef.current?.release();
+    dispatchCmp({ type: "reset" });
+    setPhotoError(null);
+  };
+  useEffect(() => {
+    return () => {
+      slotRef.current?.release();
+    };
+  }, []);
+
   const choose = (id: TwinPresetId) => {
+    if (preset === "reference" && id !== "reference") leaveReference();
     setPreset(id);
     setPresetReq((r) => ({ id, n: (r?.n ?? 0) + 1 }));
+  };
+  const referenceActive = preset === "reference";
+  const sectionActive = preset === "atrium";
+
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return undefined;
+    const measure = () =>
+      setBox((p) => (p.w === el.clientWidth && p.h === el.clientHeight ? p : { w: el.clientWidth, h: el.clientHeight }));
+    measure();
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    ro?.observe(el);
+    return () => {
+      ro?.disconnect();
+    };
+  }, []);
+  const frame = referenceActive && box.w > 0 && box.h > 0 ? letterboxRect(box.w, box.h) : null;
+  const silhouette = useMemo(
+    () =>
+      referenceSilhouette({
+        min: { x: -DIMS.footprintW / 2, y: 0, z: -DIMS.footprintD / 2 },
+        max: { x: DIMS.footprintW / 2, y: crownTopY(floorLevels(campus).length, DIMS), z: DIMS.footprintD / 2 },
+      }),
+    [campus],
+  );
+  const onFile = (file: File) => {
+    if (!isImageFile(file)) {
+      setPhotoError("El archivo elegido no es una imagen.");
+      return;
+    }
+    setPhotoError(null);
+    dispatchCmp({ type: "load", url: getSlot().set(file) });
+  };
+  const onPhotoError = () => {
+    slotRef.current?.release();
+    dispatchCmp({ type: "clear" });
+    setPhotoError("No se pudo leer esa imagen. Prueba con otra.");
   };
   const lastPropPreset = useRef(cameraPreset);
   useEffect(() => {
@@ -1246,8 +1534,12 @@ export default function CampusTwin({
     isolatedLevel !== null && isolatedLevel !== undefined && !campus.spaces.some((s) => s.level === isolatedLevel);
 
   return (
-    <div className={className} style={{ position: "relative", width: "100%", height: "100%", minHeight: 280, background: PALETTE.bg, overflow: "hidden" }}>
-      <div role="img" aria-label={label} style={fill}>
+    <div ref={rootRef} className={className} style={{ position: "relative", width: "100%", height: "100%", minHeight: 280, background: PALETTE.bg, overflow: "hidden" }}>
+      <div
+        role="img"
+        aria-label={label}
+        style={frame ? { position: "absolute", left: frame.x, top: frame.y, width: frame.size, height: frame.size } : fill}
+      >
         <OverlayCtx.Provider value={overlayRef}>
         <TwinErrorBoundary>
           <Canvas
@@ -1280,6 +1572,7 @@ export default function CampusTwin({
                 {...(exploded !== undefined ? { exploded } : {})}
                 {...(isolatedLevel !== undefined ? { isolatedLevel } : {})}
                 {...(night !== undefined ? { night } : {})}
+                section={sectionActive}
                 profile={profile}
                 reduced={reduced}
                 dataMode={effectiveData}
@@ -1324,10 +1617,41 @@ export default function CampusTwin({
         ))}
       </div>
 
+      {referenceActive ? (
+        <>
+          <ReferenceOverlay
+            state={cmp}
+            rect={frame ?? { x: 0, y: 0, size: Math.min(box.w, box.h) }}
+            silhouette={silhouette}
+            onPhotoError={onPhotoError}
+          />
+          <ReferencePanel
+            state={cmp}
+            error={photoError}
+            narrow={box.w < 560}
+            onFile={onFile}
+            onMode={(mode) => dispatchCmp({ type: "mode", mode })}
+            onOpacity={(value) => dispatchCmp({ type: "opacity", value })}
+            onGuides={(guides) => dispatchCmp({ type: "guides", guides })}
+            onClear={() => {
+              slotRef.current?.release();
+              dispatchCmp({ type: "clear" });
+            }}
+            onExit={() => choose("facade")}
+          />
+        </>
+      ) : null}
+
       {isolatedLevel !== null && isolatedLevel !== undefined ? (
         <p role="status" style={{ ...chip, position: "absolute", top: 48, left: 8, margin: 0, padding: "3px 9px", color: PALETTE.text }}>
           Piso {isolatedLevel}
           {isolatedHasNoSpaces ? ` · ${NO_SPACES_LABEL}` : ""}
+        </p>
+      ) : null}
+
+      {sectionActive ? (
+        <p role="note" style={{ ...chip, position: "absolute", left: 10, bottom: 30, margin: 0, padding: "2px 8px", maxWidth: "calc(100% - 20px)", pointerEvents: "none", color: PALETTE.gold }}>
+          {INTERIOR_NOTICE}
         </p>
       ) : null}
 

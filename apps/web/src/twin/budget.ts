@@ -18,7 +18,7 @@ export interface RenderBudget {
   windowPanes: number;
   /** InstancedMesh del edificio y el entorno (una por material usado). */
   batchDrawCalls: number;
-  /** Draw calls fijos: cielo, suelo, cerros, ventanas nocturnas, volumenes de espacio, contornos. */
+  /** Draw calls fijos: cielo, suelo, cerros, ventanas nocturnas, volumenes de espacio (o su suelo tenue en la vista Atrio), contornos. */
   fixedDrawCalls: number;
   /** Peor caso del pase principal: modo datos (interior) + noche + 2 contornos. */
   drawCallsMain: number;
@@ -62,7 +62,10 @@ export function estimateBudget(
   }
   const spaces = layout.spaces.length;
   const windows = building.windows.length;
-  // cielo + suelo + cerros + ventanas + volumenes SPC + 2 contornos (seleccion y hover)
+  // cielo + suelo + cerros + ventanas + 1 dibujo por espacio + 2 contornos (seleccion y hover).
+  // Cada espacio dibuja su volumen (modo datos) o su suelo tenue (vista Atrio); en el corte el volumen
+  // solo se ve al seleccionar o pasar el cursor (como mucho 2), asi que el peor caso es spaces + 2.
+  // Las balizas de estado son etiquetas DOM (sin draw calls).
   const fixed = 1 + 1 + 1 + (windows > 0 ? 1 : 0) + spaces + 2;
   const drawCallsMain = batchDrawCalls + fixed;
   const shadowPass = settings.shadows ? shadowCalls : 0;
