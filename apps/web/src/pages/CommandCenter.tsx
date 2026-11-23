@@ -6,12 +6,14 @@ import {
   Flame,
   Layers,
   Moon,
+  RotateCcw,
   Thermometer,
   Users,
   Wind,
   Zap,
 } from "lucide-react";
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useReducer, useState } from "react";
+import { INITIAL_VIEW, reduceView } from "../twin/view-state";
 import { Link, useLocation } from "react-router";
 import { TWIN_LEVELS } from "../twin/constants";
 import type { TwinLayer } from "../twin/types";
@@ -56,10 +58,15 @@ export default function CommandCenter() {
   const focusSpaceIds = (location.state as FocusState | null)?.focusSpaceIds;
 
   const [layer, setLayer] = useState<TwinLayer>("status");
-  const [exploded, setExploded] = useState(false);
-  const [night, setNight] = useState(false);
-  const [dataMode, setDataMode] = useState(false);
-  const [isolated, setIsolated] = useState<number | null>(null);
+  // Estado de la vista del gemelo: unica fuente de verdad con reglas de compatibilidad (view-state.ts).
+  const [view, dispatchView] = useReducer(reduceView, INITIAL_VIEW);
+  const [resetToken, setResetToken] = useState(0);
+  const { exploded, night, dataMode, isolatedLevel: isolated } = view;
+  const setIsolated = (level: number | null) => dispatchView({ type: "isolate", level });
+  const resetView = () => {
+    dispatchView({ type: "reset" });
+    setResetToken((n) => n + 1);
+  };
   const [selected, setSelected] = useState<string | null>(null);
 
   const k = live.data?.kpis;
@@ -125,7 +132,7 @@ export default function CommandCenter() {
               ))}
             </div>
             <div className="ml-auto flex flex-wrap items-center gap-1.5">
-              <button type="button" className="btn btn-sm" aria-pressed={exploded} onClick={() => setExploded((v) => !v)}>
+              <button type="button" className="btn btn-sm" aria-pressed={exploded} onClick={() => dispatchView({ type: "explode", on: !exploded })}>
                 <Layers size={14} aria-hidden="true" /> Pisos explotados
               </button>
               <label className="sr-only" htmlFor="aislar-piso">
@@ -144,11 +151,14 @@ export default function CommandCenter() {
                   </option>
                 ))}
               </select>
-              <button type="button" className="btn btn-sm" aria-pressed={dataMode} onClick={() => setDataMode((v) => !v)}>
+              <button type="button" className="btn btn-sm" aria-pressed={dataMode} onClick={() => dispatchView({ type: "data", on: !dataMode })}>
                 <Eye size={14} aria-hidden="true" /> Modo datos
               </button>
-              <button type="button" className="btn btn-sm" aria-pressed={night} onClick={() => setNight((v) => !v)}>
+              <button type="button" className="btn btn-sm" aria-pressed={night} onClick={() => dispatchView({ type: "night", on: !night })}>
                 <Moon size={14} aria-hidden="true" /> Modo noche
+              </button>
+              <button type="button" className="btn btn-sm" onClick={resetView} title="Quita aislamiento, explosión, corte y modo datos, y vuelve a la cámara inicial">
+                <RotateCcw size={14} aria-hidden="true" /> Restablecer vista
               </button>
             </div>
           </div>
@@ -175,6 +185,9 @@ export default function CommandCenter() {
                     onSelectLevel={setIsolated}
                     dataMode={dataMode}
                     night={night}
+                    cameraPreset={view.preset}
+                    onPresetChange={(id) => dispatchView({ type: "preset", id })}
+                    viewResetToken={resetToken}
                     {...(focusSpaceIds ? { focusSpaceIds } : {})}
                   />
                 </Suspense>

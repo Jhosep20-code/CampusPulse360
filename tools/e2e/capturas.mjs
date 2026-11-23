@@ -11,9 +11,16 @@ async function waitRender(page) {
   await page.waitForTimeout(20000);
 }
 async function twinShot(page, file) {
-  const twin = page.locator('[role="img"][aria-label^="Gemelo"]').locator("..");
-  await twin.scrollIntoViewIfNeeded();
-  await twin.screenshot({ path: `${out}/${file}` });
+  // Recorte directo: la comprobacion de "estabilidad" de Playwright depende de rAF y no
+  // termina con el renderizado WebGL por software (muy lento) del navegador de pruebas.
+  const box = await page.evaluate(() => {
+    const el = document.querySelector('[role="img"][aria-label^="Gemelo"]').parentElement;
+    el.scrollIntoView({ block: "center" });
+    const b = el.getBoundingClientRect();
+    return { x: b.x, y: b.y, width: b.width, height: b.height };
+  });
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: `${out}/${file}`, clip: box, timeout: 180000 });
   console.log("captura:", file);
 }
 async function view(page, name) {
@@ -41,7 +48,9 @@ await desk.locator("select").filter({ has: desk.locator('option[value="all"]') }
 await desk.waitForTimeout(3500);
 await twinShot(desk, "gemelo-piso-P8-escritorio.png");
 
-const mob = await browser.newPage({ ...devices["Pixel 7"] });
+await desk.close(); // libera la GPU por software antes del movil
+// Densidad 1: con renderizado por software, la densidad 2,6x del Pixel 7 agota el tiempo de captura.
+const mob = await browser.newPage({ ...devices["Pixel 7"], deviceScaleFactor: 1 });
 mob.on("pageerror", (e) => errors.push(e.message));
 await mob.goto(base + "/");
 await waitRender(mob);
@@ -49,6 +58,6 @@ await mob.screenshot({ path: `${out}/movil-mando.png`, fullPage: false });
 await twinShot(mob, "gemelo-fachada-movil.png");
 await mob.goto(base + "/ar");
 await mob.waitForTimeout(2000);
-await mob.screenshot({ path: `${out}/movil-ar.png` });
+await mob.screenshot({ path: `${out}/movil-ar.png`, timeout: 180000 });
 await browser.close();
 console.log("errores de pagina:", errors.length ? errors : "ninguno");

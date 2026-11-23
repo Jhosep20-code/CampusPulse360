@@ -29,6 +29,14 @@ export interface TwinProps {
   dataMode?: boolean;
   /** Preset de camara inicial o solicitado desde fuera (Fachada, Aerea, Atrio, Foto). */
   cameraPreset?: TwinPresetId;
+  /**
+   * Vista controlada: el padre aplica la maquina de estados (view-state.ts). Al pulsar un
+   * preset, el gemelo lo notifica y el padre resuelve incompatibilidades (p. ej. Referencia
+   * limpia el aislamiento y la explosion).
+   */
+  onPresetChange?: (id: TwinPresetId) => void;
+  /** Cambia cada vez que el padre pide "Restablecer vista" (camara inicial y sin estados residuales). */
+  viewResetToken?: number;
   /** Modo noche: ventanas emisivas segun ocupacion. */
   night?: boolean;
   /** Perfil de calidad; "auto" decide por PerformanceMonitor. */

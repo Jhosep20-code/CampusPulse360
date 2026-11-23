@@ -86,3 +86,60 @@ El gemelo procedural actual cuesta menos de 60 draw calls (estimacion analitica;
 - [ ] Peso <= 5 MB y <= 120 k triangulos (anotar el valor real medido).
 - [ ] Fuentes de cada dimension verificada anotadas; el resto rotulado como estimado.
 - [ ] Se probo en un movil real (rendimiento y color) antes de poner `geometry_provisional = false`.
+
+## Modelo de Blender (fuente reproducible)
+
+Primer modelo arquitectonico editable de la sede, **estimado a partir de fotografia** (sin planos).
+Es una representacion aproximada, **no una replica exacta**. Todas las dimensiones salen de
+`docs/referencias/especificacion-3d.md` y de `apps/web/src/twin/constants.ts`; ninguna es una medicion.
+
+- Fuente: `assets/3d/blender/utp-huancayo.blend` (LOD0). Script: `assets/3d/blender/build_utp_huancayo.py`
+  (bpy + bmesh, idempotente, sin descargas ni IA). Validador de GLB: `assets/3d/blender/validate_glb.py`.
+- Regenerar todo (.blend, 3 GLB, 4 renders y `build-report.json`):
+  `"C:/Program Files/Blender Foundation/Blender 5.3/blender.exe" --background --factory-startup --python assets/3d/blender/build_utp_huancayo.py --`
+  Opciones tras `--`: `--skip-render` (solo .blend y GLB), `--only-render` (solo renders desde el .blend), `--meshopt`
+  (activa `EXT_meshopt_compression`; por defecto va SIN compresion, Draco nunca).
+- Validar: `python -I assets/3d/blender/validate_glb.py`.
+- Salidas: `apps/web/public/models/utp-huancayo.glb` (LOD0, solo `BUILDING`),
+  `utp-huancayo-mobile.glb` (LOD1: sin mobiliario, sin luminarias individuales, montantes secundarios reducidos, escaleras
+  y barandas simplificadas) y `utp-context.glb` (nodo `CONTEXT`, omisible). Renders en `docs/entregables/FINAL/capturas/blender/`.
+- Ejes: metros, +Y arriba, origen en el centro de la huella a nivel de la planta baja, fachada principal hacia +Z.
+  Todos los nodos tienen transformacion identidad (los vertices estan horneados en coordenadas del edificio), salvo los
+  volumenes `SPC_*` y las anclas, que tienen su centro como origen.
+
+### Jerarquia (nodos vacios padre, mismos nombres que las colecciones de Blender)
+
+`BUILDING` > `FACADE`, `ROOF`, `ATRIUM`, `STAIRS`, `ELEVATORS`, `FLOOR_P01` ... `FLOOR_P10`, `SENSOR_ANCHORS`.
+`CONTEXT` es una raiz aparte (no cuelga de `BUILDING`). Los objetos se fusionan por material dentro de cada grupo
+(`<GRUPO>_<MATERIAL>`; las ventanas llevan ademas el codigo del espacio, p. ej. `FLOOR_P02_WINDOW_NIGHT_A201`).
+
+| Grupo | Contenido |
+| --- | --- |
+| `FLOOR_Pxx` | **Todo lo especifico del piso**, para ocultarlo con `visible=false` sin escalar matrices: losa con vacios de atrio y escaleras, frentes de losa del atrio, vidrio del muro cortina y sus montantes (P2-P10), planta baja con pilastras, vidrio oscuro, banda de rotulo, marquesina y puertas (P1), bandas genericas posterior/derecha, ventanas `WINDOW_NIGHT`, pasillo de porcelanato, falso cielo con luminarias, tabiques con puertas de madera, barandas del atrio, tramos de escalera que unen el piso con el siguiente, puertas de acero de los 3 ascensores, mobiliario (solo P1 biblioteca, P2 aula, P3 y P4 laboratorios, P5 auditorio), el volumen `SPC_*` de cada espacio de ese piso. |
+| `FACADE` | Volumenes macizos blancos continuos de todo el alto: lateral izquierdo ciego, muro posterior, lateral derecho (borde de 0,6 m) y pilastra izquierda de 4 m. |
+| `ROOF` | Losa de cubierta (con hueco bajo la claraboya), coronacion de 2,4 m, acento rojo (sin logotipo), linea LED `LED_CROWN`, caja tecnica y equipos genericos. |
+| `ATRIUM` | Compartido: 4 pilares continuos en las esquinas del atrio y claraboya. (Las barandas y frentes de losa van en cada `FLOOR_Pxx`.) |
+| `STAIRS` | Compartido: tabique central de cada escalera en U. (Los tramos, descansos y barandas van en cada `FLOOR_Pxx`.) |
+| `ELEVATORS` | Compartido: nucleo de 7 x 9 m en `CORE_BLACK`. (Las puertas de acero van en cada `FLOOR_Pxx`.) |
+| `SPC_<piso>_<codigo>` | Los 10 volumenes del seed, hijos de su `FLOOR_Pxx`, material `SPC_VOLUME` (el visor lo sustituye). |
+| `SENSOR_ANCHORS` | 10 empties `ANCHOR_SPC_*` en el centro superior de cada volumen. No se mueven con el piso: en vista explotada el visor debe sumarles el desplazamiento de su piso (`level` en los extras). |
+
+Los objetos de piso llevan `extras.level` (1-10); los volumenes y anclas llevan `extras.space_id`.
+
+### Materiales (nombres estables; el visor puede sustituirlos)
+
+Los de la especificacion: `GLASS_CURTAIN`, `WHITE_PANEL`, `FRAME_DARK`, `GLASS_GROUND`, `ROOF`, `BRAND_RED`, `SLAB`,
+`CORE_BLACK`, `STEEL`, `TILE`, `WOOD`, `CEILING`, `LIGHT_PANEL` (emisivo), `WINDOW_NIGHT` (emisivo #FFF1E2), `HEDGE`,
+`ASPHALT`, `CONTEXT`. Adicionales: `GLASS_CLEAR`, `LED_CROWN` (emisivo), `FURN_DARK`, `SCREEN`, `BOOKS_A/B/C`, `SPC_VOLUME`,
+`GROUND`, `SIDEWALK`, `CONTEXT_BRICK`, `CONTEXT_ROOF`, `LAMP_HEAD` (emisivo).
+Los emisivos se exportan con intensidad 1: el visor debe bajarla (`emissiveIntensity`) de dia y modularla de noche.
+`GLASS_CURTAIN` y `GLASS_GROUND` se exportan con `alphaMode=BLEND`. Sin texturas, sin camaras ni luces.
+
+### Estimado vs. verificado
+
+Nada del modelo esta verificado con planos o mediciones. Son **estimaciones**: huella 38 x 30 m, alturas (P1 4,8 m, resto 3,6 m,
+coronacion 2,4 m), retícula 6 x 4, atrio 14 x 9 m, nucleo 7 x 9 m, pasillos de 2,4 m, posicion de escaleras, distribucion de
+espacios (cada fila es un unico espacio de ancho completo), mobiliario, fachadas posterior y derecha (bandas genericas), caja
+tecnica, equipos de cubierta y el contexto urbano (manzanas pseudoaleatorias). Lo unico "observado" es cualitativo: 6 franjas de
+muro cortina, pilastra blanca a la izquierda, lateral ciego, planta baja con vidrio oscuro y marquesina, acento rojo y atrio con
+3 ascensores sobre muro negro (fotografias privadas, no incluidas).

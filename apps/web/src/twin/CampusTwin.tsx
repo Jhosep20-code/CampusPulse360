@@ -20,6 +20,7 @@ import {
 } from "react";
 import {
   ACESFilmicToneMapping,
+  Matrix4,
   BackSide,
   Box3,
   BoxGeometry,
@@ -88,6 +89,7 @@ import {
 import { profileSettings, resolveProfile } from "./profile";
 import type { TwinLayer, TwinProps } from "./types";
 import { useTwinModel, type TwinModel } from "./useTwinModel";
+import { instanceTransform } from "./instancing";
 import {
   CAMERA_LIMITS,
   TWIN_PRESETS,
@@ -435,6 +437,14 @@ function Batches() {
   const targetVis = (index: number) =>
     isolatedLevel === null || floors[index]?.level === isolatedLevel ? 1 : 0;
 
+  useEffect(() => {
+    if (!VISUAL_TEST) return undefined;
+    DEBUG_REG.batches = { refs: refs.current, building, win: winRef.current };
+    return () => {
+      DEBUG_REG.batches = null;
+    };
+  }, [building]);
+
   const staticOnly = useMemo(() => {
     const set = new Set<BatchKey>();
     for (const k of BATCH_KEYS) if (building.boxes[k].every((b) => b.level < 0)) set.add(k);
@@ -456,17 +466,18 @@ function Batches() {
       ry: number,
       rx = 0,
     ) => {
-      let yy = y;
-      let ss = sy;
-      if (level >= 0) {
-        const v = vis.current[level] ?? 1;
-        const base = building.levelBase[level] ?? 0;
-        yy = base + (y - base) * v + level * gap * expl.current;
-        ss = v < 0.003 ? 0 : sy * v;
-      }
-      DUMMY.position.set(x, yy, z);
+      // Ver instancing.ts: un piso oculto debe tener matriz NULA (antes quedaba un plano
+      // de tamano completo con normal NaN -> "losas negras").
+      const t = instanceTransform(
+        { level, x, y, z, sx, sy, sz },
+        level >= 0 ? (vis.current[level] ?? 1) : 1,
+        expl.current,
+        level >= 0 ? (building.levelBase[level] ?? 0) : 0,
+        gap,
+      );
+      DUMMY.position.set(t.x, t.y, t.z);
       DUMMY.rotation.set(rx, ry, 0);
-      DUMMY.scale.set(sx, ss, sz);
+      DUMMY.scale.set(t.sx, t.sy, t.sz);
       DUMMY.updateMatrix();
       im.setMatrixAt(i, DUMMY.matrix);
     };
@@ -477,6 +488,9 @@ function Batches() {
       if (!force && staticOnly.has(key)) continue;
       list.forEach((b, i) => place(im, i, b.level, b.x, b.y, b.z, b.sx, b.sy, b.sz, b.ry ?? 0, b.rx ?? 0));
       im.instanceMatrix.needsUpdate = true;
+      // Las cajas de un piso oculto ya no ocupan espacio: recalcular la esfera envolvente
+      // evita un frustum culling o raycast basados en la geometria anterior.
+      im.computeBoundingSphere();
     }
     const wm = winRef.current;
     if (wm) {
@@ -724,6 +738,15 @@ function SpaceVolume({ geom }: { geom: SpaceGeom }) {
     [ctx.anim, ctx.sectionZ],
   );
 
+  useEffect(() => {
+    if (!VISUAL_TEST || faded) return undefined;
+    DEBUG_REG.spaces.add(space.id);
+    return () => {
+      DEBUG_REG.spaces.delete(space.id);
+    };
+  }, [faded, space.id]);
+  // Piso no aislado: el volumen no se dibuja (ni bloquea la vista ni recibe el raycast).
+  if (faded) return null;
   if (geom.mesh) {
     return (
       <primitive
@@ -1416,6 +1439,18 @@ const chip: CSSProperties = {
   font: '500 11px/1.4 "IBM Plex Sans", system-ui, sans-serif',
 };
 
+/**
+ * Solo pruebas visuales automatizadas (?visualtest en la URL): conserva el buffer de
+ * dibujo para leer los pixeles reales del fotograma WebGL. No se activa en uso normal.
+ */
+const VISUAL_TEST = typeof location !== "undefined" && new URLSearchParams(location.search).has("visualtest");
+
+/** Registro para el inspector de pruebas visuales (solo se usa con ?visualtest). */
+const DEBUG_REG: {
+  batches: { refs: Partial<Record<BatchKey, InstancedMesh | null>>; building: Building; win: InstancedMesh | null } | null;
+  spaces: Set<string>;
+} = { batches: null, spaces: new Set() };
+
 export default function CampusTwin({
   campus,
   live,
@@ -1429,6 +1464,8 @@ export default function CampusTwin({
   night,
   dataMode,
   cameraPreset,
+  onPresetChange,
+  viewResetToken,
   quality = "auto",
   className,
 }: TwinProps) {
@@ -1469,10 +1506,15 @@ export default function CampusTwin({
     };
   }, []);
 
-  const choose = (id: TwinPresetId) => {
+  /** Aplica un preset localmente (camara + estado de Referencia), sin notificar al padre. */
+  const applyLocal = (id: TwinPresetId) => {
     if (preset === "reference" && id !== "reference") leaveReference();
     setPreset(id);
     setPresetReq((r) => ({ id, n: (r?.n ?? 0) + 1 }));
+  };
+  const choose = (id: TwinPresetId) => {
+    applyLocal(id);
+    onPresetChange?.(id);
   };
   const referenceActive = preset === "reference";
   const sectionActive = preset === "atrium";
@@ -1515,12 +1557,66 @@ export default function CampusTwin({
   };
   const lastPropPreset = useRef(cameraPreset);
   useEffect(() => {
-    if (cameraPreset && cameraPreset !== lastPropPreset.current) choose(cameraPreset);
+    // El padre (maquina de estados) cambio el preset, p. ej. al aislar un piso estando en
+    // Atrio/Referencia: se aplica localmente sin volver a notificar (sin bucles).
+    if (cameraPreset && cameraPreset !== lastPropPreset.current && cameraPreset !== preset) applyLocal(cameraPreset);
     lastPropPreset.current = cameraPreset;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cameraPreset]);
+  const lastReset = useRef(viewResetToken);
+  useEffect(() => {
+    // "Restablecer vista": camara inicial (Fachada) aunque ya estuviera en Fachada.
+    if (viewResetToken !== undefined && viewResetToken !== lastReset.current) applyLocal("facade");
+    lastReset.current = viewResetToken;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewResetToken]);
 
   const effectiveData = Boolean(dataMode) || preset === "atrium" || (isolatedLevel ?? null) !== null;
+
+  // Inspector de geometria real para pruebas visuales (?visualtest): clasifica cada instancia
+  // por la escala de su matriz: oculta (3 ejes ~0), degenerada (algun eje 0 pero no todos ->
+  // plano con normal NaN, la causa de las "losas negras") o visible (solo si la malla se dibuja).
+  useEffect(() => {
+    if (!VISUAL_TEST) return undefined;
+    const w = window as unknown as { __twinDebug?: () => unknown };
+    w.__twinDebug = () => {
+      const m = new Matrix4();
+      const visibleByLevel: Record<string, number> = {};
+      const hiddenByLevel: Record<string, number> = {};
+      let degenerate = 0;
+      const reg = DEBUG_REG.batches;
+      if (reg) {
+        for (const key of BATCH_KEYS) {
+          const im = reg.refs[key];
+          const list = reg.building.boxes[key];
+          if (!im || !list) continue;
+          list.forEach((b, i) => {
+            if (b.level < 0) return;
+            im.getMatrixAt(i, m);
+            const e = m.elements;
+            const sc = [Math.hypot(e[0]!, e[1]!, e[2]!), Math.hypot(e[4]!, e[5]!, e[6]!), Math.hypot(e[8]!, e[9]!, e[10]!)];
+            const zeros = sc.filter((v) => v < 1e-6).length;
+            const lv = String(b.level + 1);
+            if (zeros === 3) hiddenByLevel[lv] = (hiddenByLevel[lv] ?? 0) + 1;
+            else if (zeros > 0) degenerate++;
+            else if (im.visible) visibleByLevel[lv] = (visibleByLevel[lv] ?? 0) + 1;
+          });
+        }
+      }
+      return {
+        isolatedLevel: isolatedLevel ?? null,
+        preset,
+        exploded: Boolean(exploded),
+        degenerate,
+        visibleByLevel,
+        hiddenByLevel,
+        spacesDrawn: [...DEBUG_REG.spaces],
+      };
+    };
+    return () => {
+      delete w.__twinDebug;
+    };
+  }, [isolatedLevel, preset, exploded]);
 
   const provisional = campus.building.geometry_provisional || MODEL_URL === null;
   const label = useMemo(
@@ -1546,7 +1642,7 @@ export default function CampusTwin({
             shadows={settings.shadows ? "percentage" : false}
             dpr={effectiveDpr}
             camera={{ fov: 35, near: 0.5, far: 800, position: [-38, 37, 66] }}
-            gl={{ antialias: true, toneMapping: ACESFilmicToneMapping, powerPreference: "high-performance" }}
+            gl={{ antialias: true, toneMapping: ACESFilmicToneMapping, powerPreference: "high-performance", preserveDrawingBuffer: VISUAL_TEST }}
             onPointerMissed={() => onSelectSpace(null)}
             style={{ touchAction: "none" }}
           >

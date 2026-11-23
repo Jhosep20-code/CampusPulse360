@@ -1,0 +1,80 @@
+{
+  "blender": "5.3.0",
+  "meshopt": false,
+  "draco": false,
+  "blend_bytes": 227290,
+  "LOD0": {
+    "objects": 186,
+    "meshes": 159,
+    "triangles": 37080,
+    "vertices": 24720,
+    "materials": [
+      "BOOKS_A",
+      "BOOKS_B",
+      "BOOKS_C",
+      "BRAND_RED",
+      "CEILING",
+      "CORE_BLACK",
+      "FRAME_DARK",
+      "FURN_DARK",
+      "GLASS_CLEAR",
+      "GLASS_CURTAIN",
+      "GLASS_GROUND",
+      "LED_CROWN",
+      "LIGHT_PANEL",
+      "ROOF",
+      "SCREEN",
+      "SLAB",
+      "SPC_VOLUME",
+      "STEEL",
+      "TILE",
+      "WHITE_PANEL",
+      "WINDOW_NIGHT",
+      "WOOD"
+    ],
+    "glb_bytes": 1944512
+  },
+  "CONTEXT": {
+    "objects": 10,
+    "meshes": 9,
+    "triangles": 1524,
+    "vertices": 1016,
+    "materials": [
+      "ASPHALT",
+      "CONTEXT",
+      "CONTEXT_BRICK",
+      "CONTEXT_ROOF",
+      "FRAME_DARK",
+      "GROUND",
+      "HEDGE",
+      "LAMP_HEAD",
+      "SIDEWALK"
+    ],
+    "glb_bytes": 89388
+  },
+  "LOD1": {
+    "objects": 157,
+    "meshes": 130,
+    "triangles": 19320,
+    "vertices": 12880,
+    "materials": [
+      "BRAND_RED",
+      "CEILING",
+      "CORE_BLACK",
+      "FRAME_DARK",
+      "GLASS_CLEAR",
+      "GLASS_CURTAIN",
+      "GLASS_GROUND",
+      "LED_CROWN",
+      "ROOF",
+      "SLAB",
+      "SPC_VOLUME",
+      "STEEL",
+      "TILE",
+      "WHITE_PANEL",
+      "WINDOW_NIGHT",
+      "WOOD"
+    ],
+    "glb_bytes": 1029720
+  }
+}
