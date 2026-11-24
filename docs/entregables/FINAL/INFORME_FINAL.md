@@ -1,3 +1,7 @@
+**UNIVERSIDAD TECNOLÓGICA DEL PERÚ**
+
+Sede Huancayo · [COMPLETAR: facultad o carrera]
+
 # CampusPulse 360
 
 ## Gemelo digital inteligente de la UTP Huancayo con IoT simulado, automatización RPA, IA generativa, DevOps y experiencia inmersiva web
@@ -6,32 +10,27 @@
 
 | Dato | Valor |
 |---|---|
-| Universidad | Universidad Tecnológica del Perú — sede Huancayo |
-| Curso | **[COMPLETAR: nombre del curso y sección]** |
-| Docente | **[COMPLETAR: nombre del docente]** |
-| Grupo | **[COMPLETAR: número de grupo]** |
-| Integrante 1 | **[COMPLETAR: apellidos, nombres y código]** — rol: backend, IoT, RPA, IA y DevOps |
-| Integrante 2 | **[COMPLETAR: apellidos, nombres y código]** — rol: gemelo 3D, interfaz, inmersión (AR / primera persona) y documentación |
-| Fecha | 27 de noviembre de 2026 |
+| Curso y sección | **[COMPLETAR]** |
+| Docente | **[COMPLETAR]** |
+| Número de grupo | **[COMPLETAR]** |
+| Integrante 1 | **[COMPLETAR: apellidos, nombres y código]** — backend, IoT, RPA, IA y DevOps |
+| Integrante 2 | **[COMPLETAR: apellidos, nombres y código]** — gemelo 3D, interfaz, inmersión y documentación |
+| Conformación | 2 integrantes. La consigna pide de 3 a 5: **excepción pendiente de confirmación del docente** |
 | Demo pública | https://campuspulse.campuspulse-api.workers.dev |
 | Repositorio | https://github.com/Jhosep20-code/CampusPulse360 (rama `feature/hito-2`, PR #1) |
 
-> **Alcance y honestidad del documento:**
-> - **Sensores:** telemetría **simulada**, no hay sensores físicos.
-> - **Modelo 3D:** **aproximado**; las medidas se estimaron con fotografías, sin planos oficiales.
-> - **IA:** se usa **Cloudflare Workers AI con `@cf/openai/gpt-oss-20b`**, un modelo de pesos abiertos de OpenAI. **No es la API oficial de OpenAI**.
-> - **TA5:** se resuelve con una alternativa inmersiva **web**. **No hay proyecto Unity.**
-> - **Evidencias:** toda cifra procede de ejecuciones registradas en `docs/evidencias/`. Lo pendiente se declara como tal.
-> - **Versiones:** se separa lo publicado en producción de lo que solo está en la rama (§11).
+**Huancayo, Perú · 27 de noviembre de 2026**
 
 ---
 
 ## Resumen ejecutivo
+> **Alcance de este documento:** los sensores son **simulados** (no hay hardware); el modelo 3D es **aproximado**, estimado con fotografías y sin planos; la IA es el modelo **`@cf/openai/gpt-oss-20b` de OpenAI ejecutado mediante Cloudflare Workers AI, no mediante la API oficial de OpenAI**; la TA5 se resuelve con una alternativa **web** (no hay proyecto Unity). Las cifras proceden de ejecuciones registradas en `docs/evidencias/` y lo pendiente se declara como tal.
+
 CampusPulse 360 es un gemelo digital de la sede UTP Huancayo, desplegado públicamente en Cloudflare con **costo adicional S/ 0,00**.
 
 Cadena de funcionamiento:
-1. Diez sensores **simulados** envían CO₂, temperatura, humedad, ocupación y consumo eléctrico.
-2. Una API firmada (HMAC) guarda las lecturas en D1.
+1. Diez dispositivos **simulados** generan CO₂, temperatura, humedad, ocupación y consumo eléctrico.
+2. Las lecturas llegan a D1 por dos caminos: el **simulador en Docker** las envía a la API con firma **HMAC**; en producción, el **simulador en la nube** (parte del propio Worker) **escribe directamente en D1**, sin pasar por la API ni usar HMAC.
 3. Un **bot RPA** se ejecuta cada minuto, evalúa **7 reglas sostenidas**, abre una única incidencia por condición y solicita un **diagnóstico con IA** (gpt-oss-20b en Workers AI). Si la IA falla, usa un respaldo por reglas rotulado «sin IA».
 4. El **gemelo 3D de 10 pisos** (modelo de Blender 5.3 visualizado con Three.js) colorea el espacio afectado, muestra una baliza con el valor, ilumina su ventana en la fachada y enfoca la cámara.
 
@@ -49,17 +48,13 @@ Para la TA5 se añadió un **recorrido en primera persona** con colisiones sobre
 
 | Ámbito | Resultado |
 |---|---|
-| Escenarios en producción | 4 escenarios controlados abrieron la incidencia **crítica** esperada (CO₂ en A401; temperatura en el Hall con la nueva regla crítica; sobreaforo en el Auditorio; consumo en LAB1) |
-| Diagnósticos | **3 en vivo** con gpt-oss-20b (1,7–4,0 s) y **1 por respaldo de reglas**, rotulado «sin IA» |
-| Pruebas automáticas | **350 pruebas** unitarias y de integración en verde y **15 e2e** en Docker (3 omitidas a propósito) |
-| CI | En verde en GitHub |
-| Primera persona | **109 FPS** en el navegador visible |
+| Versión publicada | Worker `9fca1ec7`, commit `004eaa4`; vistas, recorrido, primera persona y asistente verificados tras desplegar |
+| Escenarios en producción | 4 escenarios controlados abrieron la incidencia **crítica** esperada (CO₂ en A401; temperatura en el Hall; sobreaforo en el Auditorio; consumo en LAB1) |
+| Diagnósticos | **3 inferencias reales** de gpt-oss-20b (1,7–4,0 s) y **1 respaldo determinista por reglas**, rotulado «sin IA» |
+| Pruebas automáticas | **350** unitarias y de integración y **15** e2e en Docker (3 omitidas a propósito); CI en verde en `004eaa4` |
+| Primera persona | **120 FPS** en producción (navegador visible, laptop con GPU) |
 
-**Pendiente:**
-- validar la AR en el Galaxy S25 Ultra con la versión final;
-- grabar el video;
-- completar los datos académicos;
-- autorizar el despliegue de la primera persona.
+**Pendiente:** validar y capturar la AR en el Galaxy S25 Ultra con la versión final; grabar el video; completar los datos académicos; y confirmar con el docente el grupo de 2, el proveedor de IA y la TA5 en web.
 
 ---
 
@@ -76,16 +71,18 @@ La gestión de las condiciones de un campus universitario suele ser **reactiva y
 
 > **[COMPLETAR, opcional]:** dato institucional con su fuente (número de aulas o aforo de la sede). No se incluyen estadísticas sin fuente verificable.
 
+![Respuesta propuesta: Centro de mando en producción, con telemetría simulada y el gemelo digital (004eaa4)](capturas/produccion-final/01-centro-de-mando.jpg)
+
 ## 2. Objetivos
 **Objetivo general:** diseñar, implementar y desplegar un gemelo digital de la UTP Huancayo que monitoree el estado de los espacios, automatice la detección y el diagnóstico de incidencias y permita explorar el edificio en 3D, en AR y en primera persona.
 
 | Objetivo específico | Indicador | Resultado real (evidencia) |
 |---|---|---|
-| **OE1 IoT:** recibir y visualizar telemetría | 10 dispositivos × 5 variables, cada minuto | **Logrado:**<br>• 10 × 5 en producción;<br>• ingesta HMAC con 910/910 lecturas aceptadas;<br>• simulador en la nube cada minuto<br>(hito-3; Fig. «Telemetría») |
+| **OE1 IoT:** recibir y visualizar telemetría | 10 dispositivos × 5 variables, cada minuto | **Logrado:**<br>• 10 × 5 en producción;<br>• ingesta HMAC desde el simulador Docker: 910/910 aceptadas (22-nov);<br>• en producción, el simulador en la nube escribe en D1 cada minuto<br>(hito-3) |
 | **OE2 RPA:** gestionar incidencias sin intervención | Una incidencia por condición sostenida; cierre automático | **Logrado:**<br>• bot cada minuto en `success`;<br>• 7 reglas;<br>• deduplicación;<br>• cierre tras 10 min normalizados;<br>• incidencias en A301, A401, BIB, LOBBY, LAB1 y AUD<br>(hito-3, hito-10; §10) |
-| **OE3 IA:** diagnóstico y respuestas útiles con datos reales | JSON válido con causa, acciones y evidencia; rankings correctos | **Logrado:**<br>• 4 diagnósticos en vivo verificados (A401, LOBBY y AUD el 24-nov, A301 el 22-nov);<br>• asistente contrastado con `/live` en 20 preguntas<br>(hito-9, hito-10) |
+| **OE3 IA:** diagnóstico y respuestas útiles con datos reales | JSON válido con causa, acciones y evidencia; rankings correctos | **Logrado:**<br>• 4 inferencias reales verificadas (A401, LOBBY y AUD el 24-nov; A301 el 22-nov);<br>• asistente contrastado con `/live` en 22 preguntas (alcance en §6.4)<br>(hito-9, hito-10) |
 | **OE4 DevOps:** probar y construir automáticamente | Pipeline con pruebas, e2e en Docker y secretos | **Logrado:** GitHub Actions en verde (gitleaks, tipos, pruebas, build, e2e con Docker Compose + Playwright, imagen del simulador) |
-| **OE5 Experiencia:** 3D fluido, multidispositivo e inmersivo | ≥ 30 FPS en escritorio; móvil; AR | **Parcial:**<br>• 113 FPS en el recorrido y 109 FPS en primera persona (escritorio con GPU);<br>• vista móvil verificada en navegador;<br>• **la AR física solo tiene una prueba anterior sin captura** (§7.6) |
+| **OE5 Experiencia:** 3D fluido, multidispositivo e inmersivo | ≥ 30 FPS en escritorio; móvil; AR | **Parcial:**<br>• 119–120 FPS en producción (escritorio con GPU);<br>• vista móvil verificada con emulación;<br>• **AR: pruebas físicas anteriores reportadas, sin captura archivada; falta validar la versión final** (§7.5) |
 | **OE6 Predicción:** pronóstico a 30 min | Error medido | **Logrado en pruebas:** Holt con backtest MAE sobre datos simulados |
 
 ## 3. Alcance y metodología
@@ -102,7 +99,7 @@ La gestión de las condiciones de un campus universitario suele ser **reactiva y
 
 **Excluido:** sensores físicos, planos oficiales, VR con visor, Unity y la API oficial de OpenAI.
 
-**Metodología:** iterativa por hitos (hito-1 a hito-10), con verificación antes de cerrar cada módulo:
+**Metodología:** iterativa por hitos (hito-1 a hito-11), con verificación antes de cerrar cada módulo:
 1. Análisis de las rúbricas (`docs/requisitos/`).
 2. Decisiones registradas (`docs/decisiones/ADR-001…005`).
 3. Implementación con pruebas automáticas.
@@ -111,7 +108,7 @@ La gestión de las condiciones de un campus universitario suele ser **reactiva y
 
 **Prácticas de trabajo:**
 - control de versiones con PR #1, sin fusión automática a `main`;
-- CI en cada push;
+- CI en cada actualización del PR;
 - Docker Compose para el entorno local y de contingencia.
 
 ## 4. Arquitectura y flujo de datos
@@ -140,10 +137,10 @@ La gestión de las condiciones de un campus universitario suele ser **reactiva y
 ## 5. Tecnologías utilizadas y justificación
 | Eje del curso | Tecnología | Justificación |
 |---|---|---|
-| IoT | Simulador TypeScript con perfiles por tipo de espacio y hora de Lima; HTTPS con HMAC-SHA256 y anti-replay de ±60 s | El mismo protocolo admitiría un ESP32 real sin cambiar la API |
+| IoT | Simulador TypeScript por tipo de espacio y hora de Lima. Desde Docker: HTTPS con HMAC-SHA256 y anti-replay ±60 s. En la nube: cron del Worker con escritura directa en D1 | El mismo protocolo admitiría un ESP32 real sin cambiar la API |
 | RPA / bots | Cron Triggers: bot de incidencias por minuto y bot de reportes diario | Automatización sin servidores propios, auditada en `bot_runs` |
 | IA generativa | Workers AI `@cf/openai/gpt-oss-20b`; prompts versionados; salidas JSON validadas con zod | Gratuito (10.000 neuronas al día), con function calling |
-| CI/CD y contenedores | GitHub Actions; Docker (simulador, stack local, e2e con Compose, imagen en GHCR) | Pruebas automáticas en cada push; entorno reproducible sin conexión |
+| CI/CD y contenedores | GitHub Actions; Docker (simulador, stack local, e2e con Compose, imagen del simulador) | Pruebas automáticas en cada actualización del PR; entorno reproducible sin conexión |
 | Inmersión | Blender 5.3 → GLB; Three.js / React Three Fiber; WebXR; Scene Viewer; primera persona | Multiplataforma y sin instalación; un mismo modelo para todo |
 | Interfaz | React 19, TypeScript, Tailwind; identidad visual #080F1D / #17243A / #2962FF / #22D3D6 / #F0B95B | Responsive de 360 a 1920 px, accesible, con vista de reloj circular |
 | Datos | Cloudflare D1 (SQLite) | 100.000 escrituras al día gratis; uso medido de ~21 % |
@@ -152,13 +149,14 @@ La gestión de las condiciones de un campus universitario suele ser **reactiva y
 ## 6. Implementación y funcionamiento
 ### 6.1 IoT simulado
 - **Dispositivos:** 10 (`DEV_<piso>_<código>`), uno por espacio, con 5 variables: CO₂, temperatura, humedad, ocupación y potencia.
-- **Simulador:**
-  - curvas de ocupación por tipo de espacio y hora;
-  - CO₂ por balance de masa sencillo;
-  - temperatura dependiente de la ocupación y del día;
-  - ruido aleatorio.
-  - Funciona en Docker (local) y en la nube (cada minuto).
-- **Ingesta:** `POST /api/v1/ingest` con lotes firmados por gateway y ventana de ±60 s. Las firmas inválidas reciben **401**, verificado en producción el 24-nov.
+- **Modelo del simulador:** curvas de ocupación por tipo de espacio y hora, CO₂ por balance de masa sencillo, temperatura dependiente de la ocupación y del día, y ruido.
+
+| Origen de la lectura | Cómo llega a D1 | Autenticación | Uso |
+|---|---|---|---|
+| Simulador en Docker (`tools/simulator`) | `POST /api/v1/ingest` por lotes | **HMAC-SHA256** por gateway, ventana ±60 s; firma inválida → 401 | Stack local; ingesta probada en producción el 22-nov |
+| Simulador en la nube (`engine/cloud-sim.ts`) | **Escritura directa en D1** desde el cron del Worker | No usa la API ni HMAC (código interno del Worker) | Producción; se detiene si un gateway reportó en los últimos 2 min |
+| Escenarios de demostración | La API de administración inserta lecturas `sim-scenario` en D1 | Sesión de administrador con passkey | Demostración |
+
 - **Escenarios de demostración** (solo administrador):
   - CO₂, temperatura, sobreaforo, consumo o **sin conexión**, en advertencia o crítica, en cualquiera de los 10 espacios;
   - generan una rampa de lecturas `sim-scenario`;
@@ -184,11 +182,21 @@ La gestión de las condiciones de un campus universitario suele ser **reactiva y
 4. Cierra las que llevan 10 min normalizadas.
 5. Registra la ejecución en `bot_runs` (por ejemplo, «reglas=7; nuevas=0»).
 
-**Coherencia gemelo–incidencia:**
-- El 24-nov se detectó que una temperatura de 31,2 °C se veía «crítica» en el gemelo pero abría una incidencia de advertencia.
-- **Corrección:** `RULE_TEMP_CRIT`.
-- **Verificación en producción:** la incidencia del Hall fue **crítica**.
-- **Prueba de coherencia:** recorre 4 tipos × 2 intensidades en 3 espacios.
+**Aforo completo y sobreaforo (comportamiento implementado):**
+- **Regla `RULE_OVERCAP`:** se cumple con ocupación **≥ 100 %** durante 60 s; también el **aforo completo exacto** abre una incidencia titulada «Sobreaforo».
+- **Asistente:** solo cuenta como sobreaforo **más del 100 %**; el 100 % exacto se informa aparte como «al límite».
+- **Color del gemelo:** advertencia desde el 90 % y crítico desde el **110 %**.
+
+| Métrica | Color del gemelo: advertencia / crítico | Reglas: advertencia / crítica |
+|---|---|---|
+| CO₂ | ≥ 1.000 / ≥ 1.500 ppm | ≥ 1.200 (120 s) / ≥ 1.500 (60 s) |
+| Temperatura | ≥ 27 / ≥ 30 °C | ≥ 28 (180 s) / ≥ 30 (60 s) |
+| Ocupación | ≥ 90 % / ≥ 110 % | — / ≥ 100 % (60 s) |
+| Consumo | ≥ 4.500 / ≥ 6.000 W | ≥ 4.500 (120 s) / ≥ 6.000 (60 s) |
+
+- **Advertencias sin incidencia (por diseño):** el gemelo puede mostrar amarillo antes de que una regla se cumpla (p. ej., CO₂ de 1.008 ppm en A201, producción, 24-nov).
+- **Incoherencia conocida:** entre el 100 % y el 109 % de aforo el bot abre una incidencia **crítica** mientras el gemelo muestra **advertencia**. Corrección propuesta y **no aplicada**: llevar el umbral crítico visual de ocupación al 100 % (`packages/contracts/src/thresholds.ts`) con sus pruebas.
+- **Temperatura (corregido el 24-nov):** 31,2 °C se veía «crítico» pero abría una incidencia de advertencia; se añadió `RULE_TEMP_CRIT` y se verificó en producción. La prueba de coherencia recorre los perfiles de los escenarios (4 tipos × 2 intensidades en 3 espacios) y **no cubre** la franja 100–109 %.
 
 ### 6.4 IA generativa y prompt engineering
 **Tarea clave: diagnóstico de incidencias** (prompt `diagnose@1.0.0`):
@@ -201,8 +209,15 @@ La gestión de las condiciones de un campus universitario suele ser **reactiva y
 **Asistente** (prompt `assistant@1.1.0`):
 - **Herramientas** de solo lectura (nunca SQL libre).
 - **Cálculos en el backend:** en 18 familias de preguntas, el backend elige la herramienta y calcula rankings y porcentajes; la IA redacta.
-- **Validación de fidelidad:** una respuesta que omite el espacio o la cifra calculada se descarta y se usa el resultado verificado, rotulado `fallback`.
+- **Validación de fidelidad** (rankings, espacios por condición e incidencias): si la redacción no incluye el espacio principal o su cifra, se descarta y se muestra el resultado verificado, rotulado `fallback`. **Alcance limitado:** no comprueba el resto del texto ni las respuestas de estado general, actividad del bot o diagnósticos; la IA puede equivocarse.
 - **Defecto corregido:** «el espacio más ocupado respecto a su aforo» respondía «no hay» (hito-9).
+
+**Inferencia real frente a respaldo:**
+
+| Modo | Qué es | Cómo se identifica |
+|---|---|---|
+| En vivo (`live`) | Texto generado por gpt-oss-20b en Workers AI | «En vivo» / «Inferencia de IA · modelo» |
+| Respaldo (`fallback`) | Texto determinista armado por reglas del servidor, **sin IA** | «Diagnóstico por reglas — sin IA» / `rules-fallback` |
 
 **Diagnósticos verificados en producción:**
 
@@ -214,22 +229,22 @@ La gestión de las condiciones de un campus universitario suele ser **reactiva y
 | Consumo crítico en LAB1, 6.400 W (24-nov) | rules-fallback · rules-v1 | **respaldo (sin IA)** | — |
 
 - **Fallo en LAB1:** la llamada a Workers AI devolvió una respuesta vacía. El sistema la registró (`valid_json = 0`) y aplicó el respaldo por reglas, **rotulado «sin IA» en la interfaz**. No se presenta como respuesta de IA.
-- **Mejora en la rama:** el respaldo para consumo eléctrico ahora da una causa y 3 acciones concretas (antes: «sin pauta específica»). Aún no está en producción (§11).
+- **Corrección publicada (`004eaa4`):** el respaldo para consumo eléctrico ahora da una causa y 3 acciones concretas (antes: «sin pauta específica»). Se verificó con una prueba automática, no con un nuevo fallo en producción.
 
 **Cuota y proveedor:**
 - límite propio de 250 llamadas al día;
-- consumo del 24-nov: 48 llamadas y unas 874 neuronas de 10.000;
-- `gpt-oss-20b` es de OpenAI, pero **servido por Cloudflare: no es la API oficial de OpenAI**. Existe un adaptador oficial (probado con mocks) que no está activado.
+- consumo del 24-nov a las 18:07: 54 llamadas y unas 1.027 neuronas estimadas de 10.000;
+- `@cf/openai/gpt-oss-20b` es un modelo de pesos abiertos de **OpenAI** que se ejecuta mediante **Cloudflare Workers AI**; **no se usa la API oficial de OpenAI**. Existe un adaptador oficial (probado con mocks) que no está activado.
 
 ### 6.5 CI/CD y contenedores
 - **Pipeline:** `.github/workflows/ci.yml`:
   1. gitleaks;
   2. tipos, pruebas y build;
   3. e2e con Docker Compose + Playwright;
-  4. imagen del simulador en GHCR;
+  4. construcción de la imagen del simulador (su publicación en GHCR está configurada solo para `main`; **no se ha publicado**);
   5. deploy a Cloudflare, condicionado a `main` y a `DEPLOY_ENABLED`, **desactivado por diseño**.
 - **Despliegue a producción:** manual y controlado. Se respalda D1, se audita la migración, se despliega con `wrangler deploy` desde el commit aprobado y se deja anotado el rollback.
-- **Docker Compose local:** API (Worker + D1 local), cron y simulador. Es el entorno de contingencia sin internet; sin acceso a Workers AI, la IA cae al respaldo rotulado.
+- **Docker Compose local:** API (Worker + D1 local), cron y simulador. **Verificado sin internet** el 24-nov (red sin salida, imágenes ya construidas): web operativa, 10/10 espacios con datos, ingesta HMAC 610/610, bot correcto y asistente en respaldo rotulado.
 
 ![Docker Compose: salida real del stack local (24-nov)](capturas/produccion/15-docker-compose-local.png)
 
@@ -283,25 +298,18 @@ La gestión de las condiciones de un campus universitario suele ser **reactiva y
 | Salida | Esc o «Salir»: vuelven las cámaras orbitales y el Centro de mando; se cancela el recorrido guiado |
 | Limitaciones | El mobiliario no colisiona; interior esquemático |
 
-**Verificación (24-nov, build de producción en Docker, navegador visible):**
-- **Rendimiento:** **109 FPS**.
-- **Movimiento y colisiones:**
-  - caminando con W se cruza la puerta central del hall hacia el pasillo;
-  - el núcleo de ascensores detiene el desplazamiento lateral;
-  - a 3,6 m de una puerta, el tabique detiene el avance.
-- **Pisos:** el cambio se detiene en P10.
-- **Salida:** Esc devuelve la vista orbital.
-- **Errores:** ninguno en la consola.
-- **Pruebas:** 7 pruebas unitarias de colisiones.
-- **Móvil:** los controles quedaron dentro del lienzo y accesibles.
+**Verificación en producción (24-nov, `004eaa4`, navegador visible):**
+- **Rendimiento:** **120 FPS**.
+- **Movimiento y colisiones:** se cruza la puerta central del hall hacia el pasillo y el núcleo de ascensores detiene el paso lateral.
+- **Pisos y salida:** cambio de piso hasta P10; Esc devuelve las cámaras orbitales; sin errores en consola.
 
-**Estado:** en la rama y en el stack local. **No está desplegado en producción** (§11).
+**Verificado en local con el mismo código:** tabique macizo a 3,6 m de la puerta, controles táctiles en vista móvil emulada y 7 pruebas unitarias de colisiones. **No se ha probado en un teléfono físico.**
 
-![Primera persona: pasillo de P1 tras cruzar la puerta del hall](capturas/primera-persona/04-p1-pasillo-tras-cruzar-puerta.png)
+**Estado:** publicado en producción el 24-nov. En pantallas de poca altura, los botones de piso quedan bajo el borde visible: hay que desplazar la página o usar pantalla completa (el teclado funciona igual).
 
-![Primera persona: el núcleo de ascensores bloquea el paso](capturas/primera-persona/05-p1-colision-nucleo-ascensores.png)
+![Primera persona en producción (004eaa4): pasillo de P1 y núcleo de ascensores que bloquea el paso](capturas/produccion-final/06-primera-persona.png)
 
-![Primera persona: aula A201 (P2) con mobiliario y muro cortina](capturas/primera-persona/03-p2-aula-a201.png)
+![Primera persona (entorno local): aula A201 (P2) con mobiliario y muro cortina](capturas/primera-persona/03-p2-aula-a201.png)
 
 ### 7.5 Realidad aumentada
 **Niveles de `/ar`:**
@@ -312,13 +320,13 @@ La gestión de las condiciones de un campus universitario suele ser **reactiva y
 **Evidencia:**
 - en producción la página ofrece los tres niveles y, en escritorio, indica correctamente que no hay WebXR;
 - el código de AR **no ha cambiado** desde la versión desplegada el 23-nov (`207d3808`);
-- el equipo reportó una prueba física en el S25 Ultra, **pero no hay capturas de esa prueba en los archivos del proyecto**.
+- **Pruebas físicas anteriores:** el equipo reporta pruebas de AR en el Galaxy S25 Ultra previas a la versión final; **no hay captura archivada en el proyecto**.
 
-**Pendiente:** validar y capturar la AR con la versión final.
+**Pendiente:** validar y capturar la AR (nivel A o B) en el S25 con la versión final. No se declara ninguna prueba física de `004eaa4`.
 
 ### 7.6 Vista de reloj
 - **`/reloj`:** esfera circular con la alerta más grave, CO₂ medio, ocupación y la etiqueta SIMULADO.
-- **Evidencia física:** fotografías del **Galaxy Watch6 Classic** del 23-nov a las 19:52 (versión `207d3808`), con «Campus normal» y «CO₂ medio 790 ppm». El código del reloj no ha cambiado desde entonces.
+- **Evidencia física:** fotografías del **Galaxy Watch6 Classic** del 23-nov a las 19:52 (versión `207d3808`), con «Campus normal» y «CO₂ medio 790 ppm». El código del reloj no ha cambiado desde entonces; **falta repetir la foto con la versión final**.
 - **Telegram:** **no está configurado**. No hay notificaciones al reloj; es integración futura.
 
 ![Galaxy Watch6 Classic: vista /reloj (foto del 23-nov)](capturas/dispositivos/watch6-reloj-co2-medio-2026-11-23.png)
@@ -344,7 +352,7 @@ La gestión de las condiciones de un campus universitario suele ser **reactiva y
 | Compatibilidad | Ejecutable por plataforma; instalación previa | Navegador con WebGL 2, sin instalación. Probado en Chrome de escritorio y en vista móvil; **iOS no probado** |
 | IoT e IA | Clientes HTTP a programar | Nativo: `/live`, incidencias, diagnósticos y asistente en el mismo gemelo |
 | Realidad aumentada | AR Foundation, en otro proyecto | WebXR (A), Scene Viewer (B) y respaldo 3D (C) |
-| Hardware | PC con GPU; visor para VR real | Navegador con WebGL 2; 109–117 FPS medidos en la laptop con GPU |
+| Hardware | PC con GPU; visor para VR real | Navegador con WebGL 2; 117–120 FPS medidos en la laptop con GPU |
 | Escalabilidad | Distribución por build | Despliegue global en el borde, actualización inmediata y CI/CD |
 | Limitaciones | Curva de aprendizaje, licencias, integración manual de datos | **Sin VR con visor ni simulador VR**; colisiones simplificadas; interior esquemático |
 
@@ -384,7 +392,7 @@ La gestión de las condiciones de un campus universitario suele ser **reactiva y
   - vinculación de dispositivos con un código de 10 min;
   - sesión en cookie httpOnly/Secure/SameSite=Strict de 8 h.
   - En producción: 1 administrador con 2 passkeys (escritorio y Android).
-- **Autorización verificada en producción (24-nov):**
+- **Autorización verificada en producción (24-nov, repetida tras desplegar `004eaa4`):**
   - sin sesión, escenarios, restauración y reglas devuelven **401**;
   - una ingesta con firma inválida devuelve **401**;
   - un `Origin` ajeno recibe **403**;
@@ -403,13 +411,16 @@ La gestión de las condiciones de un campus universitario suele ser **reactiva y
 | Tipo | Resultado | Fecha |
 |---|---|---|
 | Unitarias e integración | **350 aprobadas, 0 fallidas**:<br>• contratos 9;<br>• API 140;<br>• web 191;<br>• simulador 10 | 24-nov (local) |
-| e2e Playwright + Docker Compose | **15 aprobadas, 0 fallidas, 3 omitidas a propósito** (5,5 min) | 24-nov (local) |
-| CI en GitHub | En verde en `513ce1e`, `72a68a2` y `e682243`; el HEAD final se verifica en la PR #1 | 24-nov |
+| e2e Playwright + Docker Compose | **15 aprobadas, 0 fallidas, 3 omitidas a propósito** (5,6 min) | 24-nov (local) |
+| CI en GitHub | En verde en `004eaa4` (run 45492073983), el commit desplegado | 24-nov |
 | gitleaks | Sin hallazgos en el historial de la rama | 24-nov |
-| Asistente con el modelo real | 20 preguntas (12 en local y 8 en producción) contrastadas con `/live`: rankings por aforo y absolutos, CO₂, temperatura, consumo, sobreaforo, desconexión, incidencias y estado general | 24-nov |
-| Escenarios en producción | 4 incidencias críticas coherentes con el estado del gemelo; 3 diagnósticos en vivo y 1 respaldo; las 3 de hoy restauradas (0 abiertas) | 24-nov |
-| Primera persona | 109 FPS; puerta, núcleo, tabique, P10, Esc y móvil verificados | 24-nov (local) |
-| Seguridad | 401 y 403 en operaciones sin autorización | 24-nov (producción) |
+| Asistente con el modelo real | 20 preguntas (12 en local y 8 en producción) contrastadas con `/live`, más 2 tras desplegar `004eaa4` (aforo y CO₂, ambas coincidentes) | 24-nov |
+| Escenarios en producción (`513ce1e`) | 4 incidencias críticas coherentes con el gemelo; 3 inferencias reales y 1 respaldo; restauradas (0 abiertas) | 24-nov |
+| Validación tras desplegar `004eaa4` | Fachada, Aérea, Atrio, Referencia, pisos explotados, noche, recorrido (avance y pausa), primera persona 120 FPS, telemetría avanzando, `/ar` y `/reloj` | 24-nov (producción) |
+| Primera persona (local) | Colisión con tabique, vista móvil emulada, 7 pruebas | 24-nov |
+| Docker sin internet | Red sin salida: web 200, 10/10 espacios, ingesta 610/610, bot correcto, asistente en respaldo | 24-nov (local) |
+| Alta de administrador en Docker local (autenticador **virtual** de Chromium) | Alta y reingreso correctos; escenario con incidencia y diagnóstico por reglas; segundo alta con el mismo token rechazada (403) | 24-nov (local) |
+| Seguridad | 401 sin sesión y con firma inválida; 403 con origen ajeno | 24-nov (producción) |
 
 ![Incidencias generadas por el bot en los escenarios del 24-nov](capturas/produccion/12-incidencias-escenarios-24nov.jpg)
 
@@ -417,24 +428,27 @@ La gestión de las condiciones de un campus universitario suele ser **reactiva y
 
 ![Respaldo por reglas rotulado «sin IA» (consumo en LAB1)](capturas/produccion/14-lab1-consumo-respaldo-sin-ia.jpg)
 
-![Asistente con respuestas verificadas contra el backend](capturas/produccion/07-asistente-ia.jpg)
+![Asistente tras desplegar 004eaa4: respuestas «En vivo» contrastadas con /live](capturas/produccion-final/03-asistente.jpg)
 
 ![Reglas activas y ejecuciones del bot](capturas/produccion/04-automatizaciones-reglas-bot.jpg)
 
 ![Telemetría simulada de los 10 espacios](capturas/produccion/06-iot-telemetria.jpg)
 
 ## 11. Estado de versiones: local, GitHub y producción
-| Componente | Producción (Worker `d9180962`, commit `513ce1e`) | Rama `feature/hito-2` (GitHub) |
+| Componente | Producción (Worker `9fca1ec7`, commit `004eaa4`) | Rama `feature/hito-2` |
 |---|---|---|
-| Asistente corregido, gemelo, recorrido guiado, escenarios, AR, reloj, passkeys | **Sí** | Sí |
-| Regla `RULE_TEMP_CRIT` (migración 0007 en D1) | **Sí** (D1 de producción) | Sí |
-| Recorrido en primera persona | **No** (pendiente de autorización de despliegue) | Sí |
-| Severidades en español en el panel Demostración | No | Sí |
-| Respaldo por reglas específico para consumo eléctrico | No | Sí |
+| Asistente, gemelo, recorrido guiado, escenarios, AR, reloj y passkeys | **Sí** | Sí |
+| Regla `RULE_TEMP_CRIT` (migración 0007) | **Sí** | Sí |
+| Primera persona | **Sí** (desde el 24-nov) | Sí |
+| Severidades en español y respaldo para consumo eléctrico | **Sí** | Sí |
+
+Los commits de la rama **posteriores** a `004eaa4` contienen documentación, la presentación y una utilidad local (`infra/generar-env-local.mjs`); **no se volvió a desplegar**.
 
 **Rollback disponible:**
-- Worker: `npx wrangler rollback 207d3808-9c4e-4cad-9c9d-2e07fcb0aa91`;
-- D1: marcador de Time Travel registrado en hito-10.
+- Worker: `npx wrangler rollback d9180962-e65a-4c90-b693-3dd8000693fc` (commit `513ce1e`).
+- D1: este despliegue no tuvo migraciones; antes se exportó la base y se anotó el marcador de Time Travel (hito-11).
+
+![Sistema en producción: commit 004eaa4, salud de servicios y consumo de IA](capturas/produccion-final/02-sistema-commit-004eaa4.jpg)
 
 ## 12. Matriz de cumplimiento
 **Estados:**
@@ -448,21 +462,23 @@ La gestión de las condiciones de un campus universitario suele ser **reactiva y
 | # | Requisito (máx.) | Implementación | Evidencia | Estado | Corrección necesaria |
 |---|---|---|---|---|---|
 | 1 | Problema relevante y objetivos medibles (2) | §1–2 con indicadores y resultados | Tabla de objetivos con fuentes | **CC** | Opcional: dato institucional con fuente |
-| 2 | Integración articulada de 3 o más tecnologías (3) | IoT → API → D1 → RPA → IA → gemelo/AR, con CI/CD y Docker | Escenarios en producción (§10); figuras 1–2 | **CC** | — |
+| 2 | Integración articulada de 3 o más tecnologías (3) | IoT → API → D1 → RPA → IA → gemelo/AR, con CI/CD y Docker | Escenarios en producción (§10); figuras 2–3 | **CC** | — |
 | 3 | Prototipo modular que resuelve el problema (3) | Monorepo, contratos, 7 migraciones, bots, escenarios, asistente | 350 pruebas, 15 e2e, producción operativa | **CC** | — |
-| 4 | CI/CD y contenedores con automatización (3) | Actions (secretos, pruebas, e2e Docker, GHCR); Docker Compose | Runs en verde; salida de Docker Compose | **CC** | Deploy automático desactivado a propósito (manual con respaldo) |
-| 5 | IA con prompts para una tarea clave (3) | Diagnóstico JSON + asistente con validación de fidelidad | 3 diagnósticos en vivo hoy; 20 preguntas verificadas | **CC**, con riesgo | **Riesgo:** «APIs de OpenAI» frente a Workers AI; confirmarlo con el docente |
-| 6 | Interfaz intuitiva, fluida, en tiempo real (1,5) | SPA responsive, gemelo en vivo, FPS, AR, reloj | Capturas; 109–117 FPS; fotos del Watch6 | **IE** | Capturar la AR en el S25 con la versión final |
+| 4 | CI/CD y contenedores con automatización (3) | Actions (secretos, pruebas, e2e e imagen Docker); Docker Compose | Run en verde de `004eaa4`; Docker verificado sin internet | **CC** | Deploy automático desactivado a propósito (manual con respaldo); imagen no publicada en GHCR |
+| 5 | IA con prompts para una tarea clave (3) | Diagnóstico JSON + asistente con validación de fidelidad acotada | 3 inferencias reales y 1 respaldo; 22 preguntas contrastadas | **CC**, con riesgo | **Riesgo:** «APIs de OpenAI» frente a Workers AI; confirmarlo con el docente |
+| 6 | Interfaz intuitiva, fluida, en tiempo real (1,5) | SPA responsive, gemelo en vivo, FPS, AR, reloj | Capturas de producción; 119–120 FPS; fotos del Watch6 (23-nov) | **IE** | Capturar la AR en el S25 con la versión final |
 | 7 | Informe con esquemas, capturas, resultados e impacto (1,5) | Este informe (Word/PDF) | — | **P** | Completar los datos académicos (Anexo B) |
-| 8 | Presentación con secuencia lógica y participación equitativa (1,5) | Guion de 5 min para 2 integrantes | `GUION_DEMO_5MIN.md` | **Pe** | Grabar el video y ensayar |
+| 8 | Presentación con secuencia lógica y participación equitativa (1,5) | Presentación de 10 diapositivas y guion de 5 min para 2 integrantes | `PRESENTACION_FINAL.pptx`, `GUION_DEMO_5MIN.md` | **Pe** | Grabar el video y ensayar |
 | 9 | Idea original que transforma la solución (1,5) | Gemelo conversacional (la IA mueve la cámara), alertas en la fachada, FPS sobre el gemelo vivo, escenarios configurables | Capturas y video del 23-nov | **CC** | — |
+
+**Requisito de grupo:** ambas consignas piden de 3 a 5 integrantes y el equipo tiene 2. La excepción está **pendiente de confirmación del docente**.
 
 ### 12.2 TA5 (20 puntos)
 | # | Criterio | Equivalente entregado | Evidencia | Estado |
 |---|---|---|---|---|
 | 1 | Escenario 3D en Unity | Edificio y entorno en Blender | Renders, GLB | **NL** (equivalente funcional) |
 | 2 | Materiales y objetos 3D | PBR y elementos instanciados | Renders | **CC** en Blender |
-| 3 | Recorrido tipo FPS | FPS web con colisiones | 5 capturas, 7 pruebas, 109 FPS | **CC** en web, local (no en Unity ni en producción) |
+| 3 | Recorrido tipo FPS | FPS web con colisiones | Capturas, 7 pruebas, 120 FPS en producción | **CC** en web (no en Unity) |
 | 4 | Entorno VR en Unity | — | — | **NL** |
 | 5 | Plugins de Unity | Equivalentes web | — | **NL** |
 | 6 | Ejecutar y navegar el recorrido VR | FPS en pantalla; AR en el móvil | Capturas FPS | **NL** |
@@ -471,26 +487,30 @@ La gestión de las condiciones de un campus universitario suele ser **reactiva y
 | 9 | Código limpio y organizado | Monorepo con módulos y pruebas | Repositorio | **CC** |
 | 10 | Redacción técnica | Este informe | — | **CC** (revisión final del equipo) |
 
+Los criterios 1, 4, 5 y 6 solo pueden considerarse cubiertos si el docente **acepta la alternativa web**; en sentido literal no se cumplen. Unity, OpenXR, Meta XR y VR con visor son ampliación futura (§8.4).
+
 ## 13. Limitaciones, riesgos y alternativas
 | Limitación o riesgo | Impacto | Alternativa o mitigación |
 |---|---|---|
 | Sensores simulados | No se miden condiciones reales | Mismo protocolo HMAC para un ESP32 con sensor NDIR de CO₂ |
 | Workers AI en lugar de la API oficial de OpenAI | Posible lectura estricta del criterio 5 | Adaptador oficial listo (requiere una clave propia; hoy no se activa por costo) |
-| Fallo o cuota de IA (ocurrió en LAB1) | Diagnóstico sin IA | Respaldo determinista rotulado; mejora de pautas en la rama |
+| Fallo o cuota de IA (ocurrió en LAB1) | Diagnóstico sin IA | Respaldo determinista rotulado, con pautas por métrica |
 | Geometría aproximada sin planos | El interior no es fiel | Croquis del equipo y modelo regenerable por script |
 | TA5 sin Unity ni VR con visor | Criterios 4–6 no literales | Procedimiento GLB → Unity/OpenXR (§8.4) |
-| Primera persona sin desplegar | No visible en la URL pública | Despliegue controlado con respaldo y rollback, previa autorización |
+| Ocupación 100–109 %: gemelo en advertencia, incidencia crítica | Incoherencia visible en la demo | Usar escenarios de 120 %; corrección propuesta del umbral visual (§6.3) |
+| Botones de primera persona bajo el borde en pantallas bajas | Hay que desplazar la página | Pantalla completa o teclado |
+| Grupo de 2 integrantes (consigna: 3–5) | Posible observación académica | Pedir confirmación al docente |
 | AR sin captura en la versión final | Evidencia débil del criterio 6 | Probarla y capturarla en el S25 antes de la sustentación |
-| Wi-Fi de la sustentación | Demo en vivo interrumpida | Hotspot del S25, `docker compose up` sin internet y video de respaldo rotulado |
+| Wi-Fi de la sustentación | Demo en vivo interrumpida | Hotspot del S25, Docker local sin internet (preparado antes) y video de respaldo rotulado, **aún por grabar** |
 | Telegram no configurado | Sin avisos al reloj | Integración futura (token del bot) |
 
 ## 14. Conclusiones y recomendaciones
 **Conclusiones (basadas en los resultados):**
 1. **Cadena completa en producción:** CampusPulse 360 integra los cinco ejes del curso. El 24-nov, cuatro escenarios en espacios distintos (A401, Hall, LAB1 y Auditorio) generaron la incidencia crítica esperada en uno o dos ciclos del bot, con diagnóstico y reflejo en el gemelo, y volvieron al estado normal al restaurar.
-2. **Cálculo determinista más IA:** combinar cálculo determinista en el backend con redacción por IA y validación de fidelidad eliminó las respuestas incorrectas del asistente. Ante un fallo real del modelo (LAB1), el sistema degradó de forma transparente a reglas rotuladas.
-3. **Coherencia de reglas:** la prueba de coherencia entre el estado visual y la severidad detectó y permitió corregir una regla faltante (temperatura crítica), verificada luego en producción.
-4. **TA5 en web:** la alternativa web cubre funcionalmente el escenario 3D y el recorrido en primera persona (109 FPS, colisiones con muros, tabiques, atrio y núcleo) dentro del mismo gemelo con datos en vivo. No sustituye literalmente a Unity ni a la VR con visor.
-5. **Costo y entrega controlada:** el proyecto opera con S/ 0,00. Cada despliegue tuvo respaldo de datos, ensayo de migración y opción de rollback.
+2. **Cálculo determinista más IA:** calcular en el backend rankings, porcentajes y estados corrigió el defecto detectado en las preguntas probadas. La validación de fidelidad **reduce, pero no elimina**, el riesgo de errores de la IA. Ante un fallo real del modelo (LAB1), el sistema pasó a reglas rotuladas.
+3. **Coherencia entre visor y reglas:** una incoherencia observada al probar la demo (temperatura crítica con incidencia de advertencia) se corrigió con una regla y una prueba automática, verificadas en producción. Queda documentada otra franja pendiente (ocupación 100–109 %).
+4. **TA5 en web:** la alternativa web cubre funcionalmente el escenario 3D y el recorrido en primera persona (120 FPS en producción; colisiones con muros, tabiques, atrio y núcleo) dentro del mismo gemelo con datos en vivo. No sustituye literalmente a Unity ni a la VR con visor.
+5. **Costo y entrega controlada:** el proyecto opera con S/ 0,00. Los despliegues del 24-nov se hicieron con respaldo previo de D1 y rollback disponible, y la migración 0006 se ensayó antes sobre una copia restaurada.
 
 **Recomendaciones:**
 1. Instalar un sensor físico de CO₂ por el mismo protocolo para validar el modelo con mediciones reales.
@@ -498,6 +518,7 @@ La gestión de las condiciones de un campus universitario suele ser **reactiva y
 3. Evaluar el adaptador de la API oficial de OpenAI si se dispone de una clave institucional.
 4. Ampliar a unos 20 espacios instrumentados (2 por piso) con migraciones aditivas, dentro del plan gratuito.
 5. Si la asignatura lo exige, llevar el GLB a Unity con OpenXR siguiendo el §8.4.
+6. Alinear el umbral visual de ocupación crítica con la regla de sobreaforo (100 %).
 
 ## 15. Referencias
 - Cloudflare. (2026). *Workers platform limits* y *Pricing*. https://developers.cloudflare.com/workers/platform/limits/ (consultado el 21-nov-2026).
@@ -517,18 +538,20 @@ La gestión de las condiciones de un campus universitario suele ser **reactiva y
 
 ## Anexo A. Evidencias
 - **Inventario clasificado:** `INVENTARIO_EVIDENCIAS.md` (qué demuestra cada captura y dónde se usa).
-- **Registros fechados:** `docs/evidencias/hito-1 … hito-10`.
+- **Registros fechados:** `docs/evidencias/hito-1 … hito-11`.
 - **Decisiones:** `docs/decisiones/ADR-001…005`.
+- **Capturas de la versión final (`004eaa4`):** `capturas/produccion-final/`.
 
 ## Anexo B. Datos que debe completar el equipo
 1. Curso, sección, docente y número de grupo (portada).
 2. Apellidos, nombres y código de los **2 integrantes** (portada).
 3. Si ya se entregó la propuesta inicial (entregable 1).
-4. Opcional: dato institucional con fuente (§1).
+4. Facultad o carrera (portada) y, de forma opcional, un dato institucional con fuente (§1).
+5. Confirmación del docente sobre: grupo de 2, uso de Workers AI en lugar de la API de OpenAI y TA5 en web.
 
 ## Anexo C. Ejecución
 - **Producción:** https://campuspulse.campuspulse-api.workers.dev
   - el visitante tiene solo lectura;
   - el administrador entra con passkey.
-- **Local sin internet:** con Docker Desktop, en la raíz del repositorio, `docker compose up -d` y abrir http://localhost:8787. La IA cae al respaldo rotulado.
+- **Local sin internet:** preparar antes, con conexión, las claves locales (`node infra/generar-env-local.mjs`) y las imágenes (`docker compose pull cron`, `docker compose build`). Sin internet: `docker compose up -d --no-build --pull never` y abrir http://localhost:8787. La IA cae al respaldo rotulado (pasos completos en `LEEME.txt` del paquete).
 - **Desarrollo:** `pnpm install` → `pnpm -r typecheck` → `pnpm -r test` → `pnpm --filter @campuspulse/web build`; e2e con el stack de Docker levantado: `cd tools/e2e && npx playwright test`.
