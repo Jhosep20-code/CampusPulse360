@@ -55,6 +55,18 @@
   - sin materiales nuevos.
 - **IA confirmada en producción:** Workers AI `@cf/openai/gpt-oss-20b` (no la API de OpenAI). Detalle en `docs/entregables/FINAL/EXPLICACION_DEMO.md`.
 
+### Demostración animada (23-nov, **solo local, sin desplegar**)
+- **Escenarios configurables (admin, datos simulados):**
+  - en cualquier espacio instrumentado;
+  - tipos: CO₂, temperatura, sobreaforo, consumo eléctrico o sin conexión;
+  - restauración por espacio;
+  - migración 0006 aditiva con reglas de consumo.
+- **Corrección:** los escenarios ya no escriben `last_seen`. Antes congelaban el simulador de todo el campus durante 2 min.
+- **Panel «Demostración»:** pasos Sensor → API → reglas → bot → incidencia → IA → gemelo, derivados solo de la API. Avisa si el diagnóstico vino del respaldo por reglas.
+- **Balizas:** muestran la causa y el valor; el estado sin conexión se ve en gris.
+- **Recorrido guiado:** con pausa, reiniciar, salir y media velocidad. Se cancela al interactuar y respeta reduced-motion.
+- Guion de 90 s en `docs/entregables/FINAL/DEMO_ANIMADA_90S.md`.
+
 ### Otras funciones
 - **AR:** WebXR, Scene Viewer y vista 3D. Se corrigió el error móvil "l is not a function": una limpieza de efecto inválida.
 - Vista de reloj circular en `/reloj`.
@@ -66,7 +78,7 @@
   - pruebas visuales WebGL excluidas del CI por defecto (se ejecutan con `VISUAL=1`).
 
 ### Pruebas (local, 23-nov-2026)
-- **Unitarias e integración:** 273 (contratos 9, simulador 10, web 172, API 82).
+- **Unitarias e integración:** 293 (contratos 9, simulador 10, web 183, API 91).
 - **CI:** el job `deploy` ahora pasa `CLOUD_SIM:on`, igual que la producción actual. Sin ese cambio, un deploy desde `main` habría apagado el simulador en la nube.
 - **e2e:** 15 aprobadas y 3 omitidas a propósito, contra el stack Docker con el GLB.
 - **gitleaks:** sin hallazgos en todo el historial.

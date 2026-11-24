@@ -88,7 +88,9 @@ export default function CommandCenter() {
   const [tourTargetId, setTourTargetId] = useState<string | null>(null);
   const applyTourStep = (step: TourStep) => {
     for (const a of step.actions) dispatchView(a);
-    if (step.actions.some((a) => a.type === "reset")) setResetToken((n) => n + 1);
+    // El token de reinicio re-aplica la camara inicial: solo si el paso TERMINA en reset (si despues pide otro
+    // preset, p. ej. Aerea, el token lo pisaria).
+    if (step.actions[step.actions.length - 1]?.type === "reset") setResetToken((n) => n + 1);
     if (step.clearSelection) setSelected(null);
     if (step.selectTarget && tourTargetId) setSelected(tourTargetId);
   };
@@ -262,7 +264,7 @@ export default function CommandCenter() {
 
             {tour.step ? (
               <div
-                className="absolute inset-x-2 top-14 z-20 mx-auto max-w-xl rounded-xl border border-line bg-panel/95 p-3 shadow-lg sm:inset-x-auto sm:left-1/2 sm:w-[min(36rem,calc(100%-1rem))] sm:-translate-x-1/2"
+                className="absolute inset-x-2 bottom-12 z-20 mx-auto max-w-xl rounded-xl border border-line bg-panel/95 p-3 shadow-lg sm:inset-x-auto sm:left-1/2 sm:w-[min(36rem,calc(100%-1rem))] sm:-translate-x-1/2"
                 role="region"
                 aria-label="Recorrido guiado"
               >
@@ -298,7 +300,7 @@ export default function CommandCenter() {
                   </div>
                 </div>
                 <p className="m-0 mt-1 text-sm font-semibold text-ink" aria-live="polite">{tour.step.title}</p>
-                <p className="m-0 text-xs text-ink-2">{tour.step.caption}</p>
+                <p className="m-0 hidden text-xs text-ink-2 sm:block">{tour.step.caption}</p>
                 <div className="mt-2 h-1 overflow-hidden rounded bg-line" aria-hidden="true">
                   <div className="h-full bg-ok" style={{ width: `${((tour.state.index + 1) / Math.max(1, tourSteps.length)) * 100}%`, transition: reducedMotion ? "none" : "width .3s" }} />
                 </div>
