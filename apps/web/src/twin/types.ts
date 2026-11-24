@@ -39,6 +39,12 @@ export interface TwinProps {
   viewResetToken?: number;
   /** El usuario empezo a mover la camara a mano (arrastre, pellizco o rueda): p. ej. cancela el recorrido guiado. */
   onUserInteract?: () => void;
+  /** Recorrido en primera persona activo en ese piso (null o ausente: camaras orbitales normales). */
+  firstPersonLevel?: number | null;
+  /** Pide cambiar de piso en primera persona (botones o teclas). */
+  onFirstPersonLevel?: (level: number) => void;
+  /** Pide salir de primera persona (boton o Esc). */
+  onExitFirstPerson?: () => void;
   /** Recorrido guiado activo: transiciones de camara lentas y orbita continua (sin efecto con movimiento reducido). */
   cinematic?: boolean;
   /** Estado de carga del modelo 3D (el padre bloquea el recorrido hasta que este listo). */

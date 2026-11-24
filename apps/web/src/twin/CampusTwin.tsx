@@ -77,6 +77,7 @@ import {
 import { buildHillRing } from "./environment";
 import { BATCH_KEYS, BATCH_META, buildBuilding, type BatchKey, type Building } from "./facade";
 import { computeLayout, crownTopY, floorLevels, sectionCutZ, sectionFrameBox } from "./layout";
+import { EYE_HEIGHT, MAX_PITCH, RUN_SPEED, WALK_SPEED, canStand, moveWithCollisions, planarAxes, spawnPoint, walkArea } from "./fps";
 import { ReferenceOverlay, ReferencePanel } from "./ReferencePanel";
 import {
   DAY_COLORS,
@@ -1524,7 +1525,236 @@ function CursorSync({ pointer }: { pointer: boolean }) {
 
 /* --------------------------------------------------------------- escena */
 
+/* ------------------------------------------------------- primera persona */
+
+/** Entrada compartida entre el teclado (FpsRig) y los botones tactiles (FpsOverlay). */
+export interface FpsInput {
+  keys: Set<string>;
+  /** Botones tactiles: -1, 0 o 1. */
+  padFwd: number;
+  padStrafe: number;
+}
+const FPS_KEYS = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "ShiftLeft", "ShiftRight"]);
+const isTyping = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+
+/**
+ * Camara en primera persona sobre el modelo existente (sin geometria nueva). Sustituye a CameraRig mientras esta
+ * activa: WASD/flechas para caminar, Shift para correr, arrastrar para mirar (raton o dedo), Esc para salir y
+ * RePag/AvPag para cambiar de piso. Altura de ojos fija sobre la losa y colisiones en planta (fps.ts).
+ */
+function FpsRig({
+  floors,
+  level,
+  input,
+  onExit,
+  onStep,
+}: {
+  floors: FloorInfo[];
+  level: number;
+  input: MutableRefObject<FpsInput>;
+  onExit: () => void;
+  onStep: (delta: 1 | -1) => void;
+}) {
+  const camera = useThree((s) => s.camera);
+  const gl = useThree((s) => s.gl);
+  const floor = floors.find((f) => f.level === level) ?? floors[0];
+  const index = floor?.index ?? 0;
+  const area = useMemo(() => walkArea(index), [index]);
+  const pose = useRef<{ x: number; z: number; yaw: number; pitch: number } | null>(null);
+  const exitRef = useRef(onExit);
+  exitRef.current = onExit;
+  const stepRef = useRef(onStep);
+  stepRef.current = onStep;
+
+  // Al entrar o cambiar de piso: misma posicion si es caminable en el piso nuevo; si no, punto de aparicion.
+  useEffect(() => {
+    const p = pose.current;
+    if (p && canStand(area, p.x, p.z)) return;
+    const s = spawnPoint(index);
+    pose.current = { x: s.x, z: s.z, yaw: s.yaw, pitch: -0.08 };
+    // Solo en desarrollo/pruebas: inspeccion de la pose (verificacion sin GPU dedicada).
+    if (import.meta.env.DEV || VISUAL_TEST) (window as unknown as { __cpFps?: unknown }).__cpFps = { pose: pose.current, keys: input.current.keys };
+  }, [area, index, input]);
+
+  // Plano cercano corto para no recortar los muros proximos; se restaura al salir.
+  useEffect(() => {
+    if (!(camera instanceof PerspectiveCamera)) return;
+    const prev = camera.near;
+    camera.near = 0.08;
+    camera.rotation.order = "YXZ";
+    camera.updateProjectionMatrix();
+    return () => {
+      camera.near = prev;
+      camera.rotation.order = "XYZ";
+      camera.updateProjectionMatrix();
+    };
+  }, [camera]);
+
+  useEffect(() => {
+    const keys = input.current.keys;
+    const down = (e: KeyboardEvent) => {
+      if (isTyping(e.target)) return;
+      if (FPS_KEYS.has(e.code)) {
+        keys.add(e.code);
+        if (e.code.startsWith("Arrow")) e.preventDefault();
+      } else if (e.code === "Escape") exitRef.current();
+      else if (e.code === "PageUp") stepRef.current(1);
+      else if (e.code === "PageDown") stepRef.current(-1);
+    };
+    const up = (e: KeyboardEvent) => keys.delete(e.code);
+    const clear = () => keys.clear();
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    window.addEventListener("blur", clear);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", clear);
+      keys.clear();
+    };
+  }, [input]);
+
+  // Mirar arrastrando (raton o dedo) sobre el lienzo.
+  useEffect(() => {
+    const el = gl.domElement;
+    let last: { x: number; y: number; id: number } | null = null;
+    const downH = (e: PointerEvent) => {
+      last = { x: e.clientX, y: e.clientY, id: e.pointerId };
+      el.setPointerCapture?.(e.pointerId);
+    };
+    const moveH = (e: PointerEvent) => {
+      const p = pose.current;
+      if (!last || !p || e.pointerId !== last.id) return;
+      const k = e.pointerType === "touch" ? 0.006 : 0.0035;
+      p.yaw -= (e.clientX - last.x) * k;
+      p.pitch = MathUtils.clamp(p.pitch - (e.clientY - last.y) * k, -MAX_PITCH, MAX_PITCH);
+      last = { x: e.clientX, y: e.clientY, id: e.pointerId };
+    };
+    const upH = (e: PointerEvent) => {
+      if (last && e.pointerId === last.id) last = null;
+    };
+    el.addEventListener("pointerdown", downH);
+    el.addEventListener("pointermove", moveH);
+    el.addEventListener("pointerup", upH);
+    el.addEventListener("pointercancel", upH);
+    return () => {
+      el.removeEventListener("pointerdown", downH);
+      el.removeEventListener("pointermove", moveH);
+      el.removeEventListener("pointerup", upH);
+      el.removeEventListener("pointercancel", upH);
+    };
+  }, [gl]);
+
+  useFrame((_, dt) => {
+    const p = pose.current;
+    if (!p || !floor) return;
+    // Tope por cuadro (la colision se subdivide en pasos de 0,2 m, asi que no atraviesa obstaculos).
+    const step = Math.min(dt, 0.1);
+    const k = input.current.keys;
+    const has = (...c: string[]) => c.some((x) => k.has(x));
+    let f = (has("KeyW", "ArrowUp") ? 1 : 0) - (has("KeyS", "ArrowDown") ? 1 : 0) + input.current.padFwd;
+    let s = (has("KeyD", "ArrowRight") ? 1 : 0) - (has("KeyA", "ArrowLeft") ? 1 : 0) + input.current.padStrafe;
+    const len = Math.hypot(f, s);
+    if (len > 1) {
+      f /= len;
+      s /= len;
+    }
+    if (len > 0) {
+      const speed = has("ShiftLeft", "ShiftRight") ? RUN_SPEED : WALK_SPEED;
+      const a = planarAxes(p.yaw);
+      const next = moveWithCollisions(area, p.x, p.z, (a.fx * f + a.rx * s) * speed * step, (a.fz * f + a.rz * s) * speed * step);
+      p.x = next.x;
+      p.z = next.z;
+    }
+    camera.position.set(p.x, floor.baseY + floor.y0 + DIMS.slab + EYE_HEIGHT, p.z);
+    camera.rotation.set(p.pitch, p.yaw, 0, "YXZ");
+  });
+  return null;
+}
+
+/** Controles en pantalla de primera persona: piso, salida, ayuda y cruceta tactil (mantener pulsado). */
+function FpsOverlay({
+  level,
+  levels,
+  input,
+  onLevel,
+  onExit,
+}: {
+  level: number;
+  levels: number[];
+  input: MutableRefObject<FpsInput>;
+  onLevel: (level: number) => void;
+  onExit: () => void;
+}) {
+  const i = levels.indexOf(level);
+  const pad = (fwd: number, strafe: number) => ({
+    onPointerDown: (e: React.PointerEvent) => {
+      e.preventDefault();
+      input.current.padFwd = fwd;
+      input.current.padStrafe = strafe;
+    },
+    onPointerUp: () => {
+      input.current.padFwd = 0;
+      input.current.padStrafe = 0;
+    },
+    onPointerLeave: () => {
+      input.current.padFwd = 0;
+      input.current.padStrafe = 0;
+    },
+    onPointerCancel: () => {
+      input.current.padFwd = 0;
+      input.current.padStrafe = 0;
+    },
+  });
+  const btn: CSSProperties = {
+    minWidth: 40,
+    minHeight: 40,
+    borderRadius: 10,
+    border: `1px solid ${PALETTE.border}`,
+    background: "rgba(23,36,58,0.92)",
+    color: PALETTE.text,
+    font: "600 13px system-ui, sans-serif",
+    touchAction: "none",
+    userSelect: "none",
+  };
+  return (
+    <div
+      role="region"
+      aria-label="Recorrido en primera persona"
+      style={{ position: "absolute", left: 8, right: 8, bottom: 8, display: "flex", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: 8, pointerEvents: "none" }}
+    >
+      <div style={{ pointerEvents: "auto", background: "rgba(8,15,29,0.86)", border: `1px solid ${PALETTE.border}`, borderRadius: 12, padding: "8px 10px", color: PALETTE.text, maxWidth: 360 }}>
+        <p style={{ margin: 0, font: "600 12px system-ui, sans-serif", color: PALETTE.cyan }}>Primera persona · Piso P{level}</p>
+        <p style={{ margin: "2px 0 6px", font: "11px system-ui, sans-serif", color: "#93A3BC" }}>
+          WASD o flechas para caminar · arrastra para mirar · Shift corre · RePag/AvPag cambia de piso · Esc sale. Interior esquemático, dimensiones estimadas.
+        </p>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button type="button" style={btn} disabled={i <= 0} onClick={() => onLevel(levels[i - 1]!)} aria-label="Bajar un piso">
+            ▼ Piso
+          </button>
+          <button type="button" style={btn} disabled={i < 0 || i >= levels.length - 1} onClick={() => onLevel(levels[i + 1]!)} aria-label="Subir un piso">
+            ▲ Piso
+          </button>
+          <button type="button" style={{ ...btn, padding: "0 10px" }} onClick={onExit}>
+            Salir
+          </button>
+        </div>
+      </div>
+      <div style={{ pointerEvents: "auto", display: "grid", gridTemplateColumns: "repeat(3, 44px)", gridTemplateRows: "repeat(2, 44px)", gap: 4 }} aria-label="Cruceta de movimiento">
+        <span />
+        <button type="button" style={btn} aria-label="Avanzar" {...pad(1, 0)}>▲</button>
+        <span />
+        <button type="button" style={btn} aria-label="Izquierda" {...pad(0, -1)}>◀</button>
+        <button type="button" style={btn} aria-label="Retroceder" {...pad(-1, 0)}>▼</button>
+        <button type="button" style={btn} aria-label="Derecha" {...pad(0, 1)}>▶</button>
+      </div>
+    </div>
+  );
+}
+
 type SceneProps = Omit<TwinProps, "quality" | "className" | "cameraPreset" | "dataMode"> & {
+  /** Entrada de primera persona compartida con los botones tactiles. */
+  fpsInput: MutableRefObject<FpsInput>;
   /** Vista Atrio: corte de seccion. */
   section: boolean;
   profile: "high" | "low";
@@ -1557,6 +1787,10 @@ function Scene({
   onSource,
   onUserInteract,
   cinematic,
+  firstPersonLevel = null,
+  onFirstPersonLevel,
+  onExitFirstPerson,
+  fpsInput,
   model,
   clip,
 }: SceneProps & { model: TwinModel | null; clip: Plane }) {
@@ -1726,6 +1960,19 @@ function Scene({
         <FloorGroup key={f.level} floor={f} />
       ))}
 
+      {firstPersonLevel !== null ? (
+        <FpsRig
+          floors={floors}
+          level={firstPersonLevel}
+          input={fpsInput}
+          onExit={() => onExitFirstPerson?.()}
+          onStep={(d) => {
+            const lv = floors.map((f) => f.level).sort((a, b) => a - b);
+            const next = lv[lv.indexOf(firstPersonLevel) + d];
+            if (next !== undefined) onFirstPersonLevel?.(next);
+          }}
+        />
+      ) : (
       <CameraRig
         floors={floors}
         bounds={bounds}
@@ -1741,6 +1988,7 @@ function Scene({
         onUserInteract={onUserInteract}
         cinematic={cinematic ?? false}
       />
+      )}
       <CursorSync pointer={hoveredId !== null || pickHover} />
     </Ctx.Provider>
   );
@@ -1857,10 +2105,14 @@ export default function CampusTwin({
   onUserInteract,
   cinematic,
   onModelState,
+  firstPersonLevel = null,
+  onFirstPersonLevel,
+  onExitFirstPerson,
   quality = "auto",
   className,
 }: TwinProps) {
   const reduced = usePrefersReducedMotion();
+  const fpsInput = useRef<FpsInput>({ keys: new Set(), padFwd: 0, padStrafe: 0 });
   const [source, setSource] = useState<"loading" | "glb" | "procedural">(MODEL_URL === null ? "procedural" : "loading");
   const modelStateRef = useRef(onModelState);
   modelStateRef.current = onModelState;
@@ -2058,6 +2310,10 @@ export default function CampusTwin({
     onSource: setSource,
     ...(onUserInteract ? { onUserInteract } : {}),
     ...(cinematic !== undefined ? { cinematic } : {}),
+    firstPersonLevel,
+    ...(onFirstPersonLevel ? { onFirstPersonLevel } : {}),
+    ...(onExitFirstPerson ? { onExitFirstPerson } : {}),
+    fpsInput,
   };
   const isolatedHasNoSpaces =
     isolatedLevel !== null && isolatedLevel !== undefined && !campus.spaces.some((s) => s.level === isolatedLevel);
@@ -2110,10 +2366,20 @@ export default function CampusTwin({
         <div ref={overlayRef} style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }} />
       </div>
 
+      {firstPersonLevel !== null ? (
+        <FpsOverlay
+          level={firstPersonLevel}
+          levels={floorLevels(campus)}
+          input={fpsInput}
+          onLevel={(lv) => onFirstPersonLevel?.(lv)}
+          onExit={() => onExitFirstPerson?.()}
+        />
+      ) : null}
+
       <div
         role="group"
         aria-label="Vistas de cámara"
-        style={{ position: "absolute", top: 8, left: 8, display: "flex", flexWrap: "wrap", gap: 6, maxWidth: "calc(100% - 16px)" }}
+        style={{ position: "absolute", top: 8, left: 8, display: firstPersonLevel !== null ? "none" : "flex", flexWrap: "wrap", gap: 6, maxWidth: "calc(100% - 16px)" }}
       >
         {TWIN_PRESETS.map((p) => (
           <button

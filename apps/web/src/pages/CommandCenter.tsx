@@ -4,6 +4,7 @@ import {
   Box,
   Eye,
   Flame,
+  Footprints,
   Layers,
   Moon,
   Pause,
@@ -74,7 +75,8 @@ export default function CommandCenter() {
   const [resetToken, setResetToken] = useState(0);
   const { exploded, night, dataMode, isolatedLevel: isolated } = view;
   // Manejadores manuales: cancelan el recorrido guiado si esta activo (manual() se define mas abajo).
-  const setIsolated = (level: number | null) => manual({ type: "isolate", level });
+  // En primera persona el selector de piso cambia el piso por el que se camina (no aisla).
+  const setIsolated = (level: number | null) => (fpsLevel !== null && level !== null ? setFpsLevel(level) : manual({ type: "isolate", level }));
   const resetView = () => {
     tour.stop();
     dispatchView({ type: "reset" });
@@ -101,7 +103,18 @@ export default function CommandCenter() {
   const modelReady = modelState !== "loading";
   const [flow, setFlow] = useState<PipelineStep[] | null>(null);
   const tourActive = tour.state.status !== "idle";
+  // Recorrido en primera persona (TA5): piso activo o null. Entra con la vista restablecida (sin corte, sin pisos
+  // explotados ni aislados) para caminar por el edificio completo; al salir vuelve la camara orbital.
+  const [fpsLevel, setFpsLevel] = useState<number | null>(null);
+  const enterFirstPerson = () => {
+    tour.stop();
+    const start = isolated ?? 1;
+    dispatchView({ type: "reset" });
+    setSelected(null);
+    setFpsLevel(start);
+  };
   const startTour = () => {
+    setFpsLevel(null);
     const t = pickTourTarget(campus.data?.spaces ?? [], statusById, selected);
     if (!t) return;
     setTourTargetId(t.spaceId);
@@ -125,6 +138,7 @@ export default function CommandCenter() {
   const onDemoFocus = useCallback(
     (space: Space) => {
       tour.stop();
+      setFpsLevel(null);
       dispatchView({ type: "isolate", level: space.level });
       setSelected(space.id);
       setFocusOrbitUntil(Date.now() + 14_000);
@@ -252,7 +266,7 @@ export default function CommandCenter() {
               <select
                 id="aislar-piso"
                 className="field !min-h-[34px] !w-auto !py-0 text-[13px]"
-                value={isolated === null ? "all" : String(isolated)}
+                value={fpsLevel !== null ? String(fpsLevel) : isolated === null ? "all" : String(isolated)}
                 onChange={(e) => setIsolated(e.target.value === "all" ? null : Number(e.target.value))}
               >
                 <option value="all">Todos los pisos</option>
@@ -279,7 +293,17 @@ export default function CommandCenter() {
                 {tourActive ? <X size={14} aria-hidden="true" /> : <Play size={14} aria-hidden="true" />}{" "}
                 {tourActive ? "Salir del recorrido" : modelReady ? "Recorrido guiado" : "Cargando modelo 3D…"}
               </button>
-              <button type="button" className="btn btn-sm" onClick={resetView} title="Quita aislamiento, explosión, corte y modo datos, y vuelve a la cámara inicial">
+              <button
+                type="button"
+                className="btn btn-sm"
+                aria-pressed={fpsLevel !== null}
+                onClick={() => (fpsLevel !== null ? setFpsLevel(null) : enterFirstPerson())}
+                disabled={!campus.data || !modelReady}
+                title="Recorrido en primera persona: WASD o cruceta para caminar, arrastrar para mirar, Esc para salir"
+              >
+                <Footprints size={14} aria-hidden="true" /> {fpsLevel !== null ? "Salir de primera persona" : "Primera persona"}
+              </button>
+              <button type="button" className="btn btn-sm" onClick={() => { setFpsLevel(null); resetView(); }} title="Quita aislamiento, explosión, corte y modo datos, y vuelve a la cámara inicial">
                 <RotateCcw size={14} aria-hidden="true" /> Restablecer vista
               </button>
             </div>
@@ -313,7 +337,10 @@ export default function CommandCenter() {
                       if (tourActive) tour.stop();
                       setFocusOrbitUntil(0);
                     }}
-                    cinematic={tour.state.status === "playing" || focusOrbit}
+                    cinematic={fpsLevel === null && (tour.state.status === "playing" || focusOrbit)}
+                    firstPersonLevel={fpsLevel}
+                    onFirstPersonLevel={setFpsLevel}
+                    onExitFirstPerson={() => setFpsLevel(null)}
                     onModelState={setModelState}
                     viewResetToken={resetToken}
                     {...(focusSpaceIds ? { focusSpaceIds } : {})}
