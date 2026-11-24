@@ -99,3 +99,19 @@ El tiempo extra no es de red: en una pestaña oculta el navegador frena `request
 5. Pulsar **Restablecer vista** para ver la ventana roja de A401 en la fachada.
 6. Pulsar **Restaurar**: el color vuelve a la normalidad.
 7. Vista **Atrio**: indicador de recorrido del ascensor.
+
+## 9. Pruebas (local, 24-nov-2026)
+- **Tipos:** sin errores.
+- **Unitarias e integración:** 294 (contratos 9, API 91, web 184, simulador 10). Nueva: la alerta en la ventana de la fachada se enciende y vuelve al restaurar.
+- **Build:** ok.
+- **gitleaks:** sin hallazgos.
+- **e2e contra Docker reconstruido:**
+  - **1.ª ejecución: 14 aprobadas y 1 fallida.** «Estabilidad móvil» superó su límite de 240 s, porque mi pestaña de Chrome renderizaba el gemelo a unos 113 FPS en paralelo mientras las pruebas usaban WebGL por software.
+  - **Esa prueba sola:** aprobada en 3,0 min.
+  - **2.ª ejecución completa, sin carga paralela:** **15 aprobadas y 3 omitidas a propósito (4,6 min).**
+- **Vistas comprobadas** en los e2e móviles (botones reales de «Vistas de cámara»):
+  - Fachada, Aérea, Atrio y Referencia;
+  - P1, P5, P6, P10 y «todos»;
+  - noche;
+  - páginas `/ar`, `/acceso`, `/reloj`, `/incidentes` y `/asistente`.
+- **Con GPU:** Fachada, Atrio, P4 aislado, anomalía y restauración.
