@@ -99,3 +99,5 @@ Archivo `engine-assistant-regression.test.ts`, con **46 pruebas**:
 - **La fallida** es «Estabilidad móvil · navegación completa, vistas 3D, día/noche, pisos y regreso», con WebGL por software. No se guardó el mensaje de error, porque el log se recortó.
 - **Esa prueba sola:** **aprobada en 3,3 min.**
 - **Relación con el asistente:** ninguna directa. La prueba solo abre `/asistente`, sin preguntar nada. Esta prueba ya falló por su límite de tiempo en el hito 8 cuando la máquina estaba cargada.
+
+**2.ª ejecución completa, con log íntegro:** **15 aprobadas y 3 omitidas a propósito (5,2 min).**
