@@ -16,13 +16,15 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { lazy, Suspense, useCallback, useMemo, useReducer, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useState } from "react";
 import type { Space } from "@campuspulse/contracts";
 import { INITIAL_VIEW, reduceView, type ViewAction } from "../twin/view-state";
 import { buildTour, pickTourTarget, type TourStep } from "../twin/tour";
 import { useGuidedTour } from "../twin/useGuidedTour";
 import { useReducedMotion } from "../hooks/useReducedMotion";
 import { DemoPanel } from "../components/DemoPanel";
+import { FlowStrip } from "../components/FlowStrip";
+import type { PipelineStep } from "../demo/pipeline";
 import { Link, useLocation } from "react-router";
 import { TWIN_LEVELS } from "../twin/constants";
 import type { TwinLayer } from "../twin/types";
@@ -95,6 +97,9 @@ export default function CommandCenter() {
     if (step.selectTarget && tourTargetId) setSelected(tourTargetId);
   };
   const tour = useGuidedTour(tourSteps, applyTourStep, reducedMotion);
+  const [modelState, setModelState] = useState<"loading" | "glb" | "procedural">("loading");
+  const modelReady = modelState !== "loading";
+  const [flow, setFlow] = useState<PipelineStep[] | null>(null);
   const tourActive = tour.state.status !== "idle";
   const startTour = () => {
     const t = pickTourTarget(campus.data?.spaces ?? [], statusById, selected);
@@ -108,11 +113,21 @@ export default function CommandCenter() {
     if (tourActive) tour.stop();
     dispatchView(a);
   };
+  // Tras el enfoque automatico de una alerta, la camara orbita despacio unos segundos (se corta al interactuar).
+  const [focusOrbitUntil, setFocusOrbitUntil] = useState(0);
+  const [nowTick, setNowTick] = useState(0);
+  useEffect(() => {
+    if (focusOrbitUntil <= Date.now()) return;
+    const id = window.setTimeout(() => setNowTick((n) => n + 1), focusOrbitUntil - Date.now() + 50);
+    return () => window.clearTimeout(id);
+  }, [focusOrbitUntil]);
+  const focusOrbit = focusOrbitUntil > Date.now() + nowTick * 0;
   const onDemoFocus = useCallback(
     (space: Space) => {
       tour.stop();
       dispatchView({ type: "isolate", level: space.level });
       setSelected(space.id);
+      setFocusOrbitUntil(Date.now() + 14_000);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
@@ -124,6 +139,53 @@ export default function CommandCenter() {
   const selectedSpace = selected ? spaces.get(selected) : undefined;
   // P1-P10 (P6-P10 existen en el modelo aunque no tengan espacios instrumentados).
   const levels = TWIN_LEVELS;
+
+  /** Barra del recorrido: superpuesta abajo en escritorio y DEBAJO del lienzo en movil (no tapa el modelo). */
+  const renderTourBar = (cls: string) =>
+    tour.step ? (
+      <div
+                className={`rounded-xl border border-line bg-panel/95 p-3 shadow-lg ${cls}`}
+                role="region"
+                aria-label="Recorrido guiado"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="m-0 text-[11px] font-medium uppercase tracking-wide text-ink-2">
+                    Recorrido guiado · paso {tour.state.index + 1} de {tourSteps.length}
+                    {tour.state.status === "paused" ? " · en pausa" : ""}
+                  </p>
+                  <div className="flex gap-1">
+                    {tour.state.status === "playing" ? (
+                      <button type="button" className="btn btn-sm !min-h-[30px] !px-2" onClick={tour.pause} aria-label="Pausar recorrido">
+                        <Pause size={14} aria-hidden="true" />
+                      </button>
+                    ) : (
+                      <button type="button" className="btn btn-sm !min-h-[30px] !px-2" onClick={tour.resume} aria-label="Reanudar recorrido">
+                        <Play size={14} aria-hidden="true" />
+                      </button>
+                    )}
+                    <button type="button" className="btn btn-sm !min-h-[30px] !px-2" onClick={tour.restart} aria-label="Reiniciar recorrido">
+                      <SkipBack size={14} aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm !min-h-[30px] !px-2 num"
+                      onClick={() => tour.setSpeed(tour.state.speed === 1 ? 0.5 : 1)}
+                      aria-label={`Velocidad ${tour.state.speed === 1 ? "normal" : "reducida"}; cambiar`}
+                    >
+                      {tour.state.speed === 1 ? "1×" : "½×"}
+                    </button>
+                    <button type="button" className="btn btn-sm !min-h-[30px] !px-2" onClick={tour.stop} aria-label="Salir del recorrido">
+                      <X size={14} aria-hidden="true" />
+                    </button>
+                  </div>
+                </div>
+                <p className="m-0 mt-1 text-sm font-semibold text-ink" aria-live="polite">{tour.step.title}</p>
+                <p className="m-0 hidden text-xs text-ink-2 sm:block">{tour.step.caption}</p>
+                <div className="mt-2 h-1 overflow-hidden rounded bg-line" aria-hidden="true">
+                  <div className="h-full bg-ok" style={{ width: `${((tour.state.index + 1) / Math.max(1, tourSteps.length)) * 100}%`, transition: reducedMotion ? "none" : "width .3s" }} />
+                </div>
+              </div>
+    ) : null;
 
   const occRatio = k && k.capacity_total > 0 ? k.occupancy_total / k.capacity_total : 0;
   const dash = "—";
@@ -211,10 +273,11 @@ export default function CommandCenter() {
                 className="btn btn-sm"
                 aria-pressed={tourActive}
                 onClick={() => (tourActive ? tour.stop() : startTour())}
-                disabled={!campus.data}
-                title="Recorrido guiado: aérea, fachada, atrio, piso y aula con sus sensores"
+                disabled={!campus.data || (!tourActive && !modelReady)}
+                title={modelReady ? "Recorrido guiado: aérea, fachada, atrio, piso y aula con sus sensores" : "Disponible cuando termine de cargar el modelo 3D"}
               >
-                {tourActive ? <X size={14} aria-hidden="true" /> : <Play size={14} aria-hidden="true" />} {tourActive ? "Salir del recorrido" : "Recorrido guiado"}
+                {tourActive ? <X size={14} aria-hidden="true" /> : <Play size={14} aria-hidden="true" />}{" "}
+                {tourActive ? "Salir del recorrido" : modelReady ? "Recorrido guiado" : "Cargando modelo 3D…"}
               </button>
               <button type="button" className="btn btn-sm" onClick={resetView} title="Quita aislamiento, explosión, corte y modo datos, y vuelve a la cámara inicial">
                 <RotateCcw size={14} aria-hidden="true" /> Restablecer vista
@@ -248,7 +311,10 @@ export default function CommandCenter() {
                     onPresetChange={(id) => manual({ type: "preset", id })}
                     onUserInteract={() => {
                       if (tourActive) tour.stop();
+                      setFocusOrbitUntil(0);
                     }}
+                    cinematic={tour.state.status === "playing" || focusOrbit}
+                    onModelState={setModelState}
                     viewResetToken={resetToken}
                     {...(focusSpaceIds ? { focusSpaceIds } : {})}
                   />
@@ -262,52 +328,14 @@ export default function CommandCenter() {
               <TwinSkeleton />
             )}
 
-            {tour.step ? (
-              <div
-                className="absolute inset-x-2 bottom-12 z-20 mx-auto max-w-xl rounded-xl border border-line bg-panel/95 p-3 shadow-lg sm:inset-x-auto sm:left-1/2 sm:w-[min(36rem,calc(100%-1rem))] sm:-translate-x-1/2"
-                role="region"
-                aria-label="Recorrido guiado"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="m-0 text-[11px] font-medium uppercase tracking-wide text-ink-2">
-                    Recorrido guiado · paso {tour.state.index + 1} de {tourSteps.length}
-                    {tour.state.status === "paused" ? " · en pausa" : ""}
-                  </p>
-                  <div className="flex gap-1">
-                    {tour.state.status === "playing" ? (
-                      <button type="button" className="btn btn-sm !min-h-[30px] !px-2" onClick={tour.pause} aria-label="Pausar recorrido">
-                        <Pause size={14} aria-hidden="true" />
-                      </button>
-                    ) : (
-                      <button type="button" className="btn btn-sm !min-h-[30px] !px-2" onClick={tour.resume} aria-label="Reanudar recorrido">
-                        <Play size={14} aria-hidden="true" />
-                      </button>
-                    )}
-                    <button type="button" className="btn btn-sm !min-h-[30px] !px-2" onClick={tour.restart} aria-label="Reiniciar recorrido">
-                      <SkipBack size={14} aria-hidden="true" />
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-sm !min-h-[30px] !px-2 num"
-                      onClick={() => tour.setSpeed(tour.state.speed === 1 ? 0.5 : 1)}
-                      aria-label={`Velocidad ${tour.state.speed === 1 ? "normal" : "reducida"}; cambiar`}
-                    >
-                      {tour.state.speed === 1 ? "1×" : "½×"}
-                    </button>
-                    <button type="button" className="btn btn-sm !min-h-[30px] !px-2" onClick={tour.stop} aria-label="Salir del recorrido">
-                      <X size={14} aria-hidden="true" />
-                    </button>
-                  </div>
-                </div>
-                <p className="m-0 mt-1 text-sm font-semibold text-ink" aria-live="polite">{tour.step.title}</p>
-                <p className="m-0 hidden text-xs text-ink-2 sm:block">{tour.step.caption}</p>
-                <div className="mt-2 h-1 overflow-hidden rounded bg-line" aria-hidden="true">
-                  <div className="h-full bg-ok" style={{ width: `${((tour.state.index + 1) / Math.max(1, tourSteps.length)) * 100}%`, transition: reducedMotion ? "none" : "width .3s" }} />
-                </div>
+            {flow ? (
+              <div className="pointer-events-auto absolute left-2 right-2 top-12 z-20 flex justify-center sm:top-14">
+                <FlowStrip steps={flow} reduced={reducedMotion} />
               </div>
             ) : null}
+            {tour.step ? <div className="hidden sm:block">{renderTourBar("absolute bottom-12 left-1/2 z-20 w-[min(36rem,calc(100%-1rem))] -translate-x-1/2")}</div> : null}
 
-            {selectedSpace ? (
+            {selectedSpace && !tourActive ? (
               <SpacePanel
                 space={selectedSpace}
                 live={liveBySpace.get(selectedSpace.id)}
@@ -316,6 +344,7 @@ export default function CommandCenter() {
               />
             ) : null}
           </div>
+          {tour.step ? <div className="border-t border-line p-2 sm:hidden">{renderTourBar("")}</div> : null}
           <p className="border-t border-line px-3 py-2 text-[11px] text-ink-2">
             Datos simulados. La geometría es provisional y no representa planos oficiales del edificio.
             {focusSpaceIds?.length ? ` Enfocando ${focusSpaceIds.length} espacio(s) indicados por el asistente.` : ""}
@@ -324,7 +353,7 @@ export default function CommandCenter() {
 
         <div className="flex flex-col gap-4 self-start">
         {isAdmin && campus.data ? (
-          <DemoPanel spaces={campus.data.spaces} onFocus={onDemoFocus} suggestedSpaceId={selected} />
+          <DemoPanel spaces={campus.data.spaces} onFocus={onDemoFocus} suggestedSpaceId={selected} onSteps={setFlow} />
         ) : null}
         {/* Alertas */}
         <Panel title="Alertas activas" icon={<Flame size={16} aria-hidden="true" />} className="self-start" bodyClassName="p-2">

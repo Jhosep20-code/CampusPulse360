@@ -1,5 +1,5 @@
 import type { LiveSnapshot } from "@campuspulse/contracts";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getLive } from "../lib/api";
 
 export type LiveStatus = "live" | "reconnecting" | "offline";
@@ -9,6 +9,8 @@ export interface LiveState {
   status: LiveStatus;
   /** Epoch ms de la ultima respuesta correcta (200 o 304). */
   lastUpdated: number | null;
+  /** Consulta /live de inmediato (p. ej. tras lanzar o restaurar un escenario) sin esperar al siguiente ciclo. */
+  refresh?: () => void;
 }
 
 export const LIVE_INTERVAL_MS = 10_000;
@@ -23,6 +25,8 @@ const OFFLINE_AFTER_FAILURES = 3;
  */
 export function useLive(intervalMs: number = LIVE_INTERVAL_MS): LiveState {
   const [state, setState] = useState<LiveState>({ data: null, status: "reconnecting", lastUpdated: null });
+  const nowRef = useRef<() => void>(() => {});
+  const refresh = useCallback(() => nowRef.current(), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -72,6 +76,10 @@ export function useLive(intervalMs: number = LIVE_INTERVAL_MS): LiveState {
       }
     };
     document.addEventListener("visibilitychange", onVisibility);
+    nowRef.current = () => {
+      clearTimeout(timer);
+      void tick();
+    };
     void tick();
 
     return () => {
@@ -79,8 +87,9 @@ export function useLive(intervalMs: number = LIVE_INTERVAL_MS): LiveState {
       clearTimeout(timer);
       ctrl.abort();
       document.removeEventListener("visibilitychange", onVisibility);
+      nowRef.current = () => {};
     };
   }, [intervalMs]);
 
-  return state;
+  return { ...state, refresh };
 }

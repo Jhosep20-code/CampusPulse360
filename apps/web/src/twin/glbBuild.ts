@@ -123,6 +123,8 @@ interface Entry {
 }
 
 const WINDOW_GEN_K = 0.55;
+const ALERT_CRITICAL = new Color("#FF3B4E");
+const ALERT_WARNING = new Color("#F0B95B");
 const WINDOW_EMISSIVE = 1.4;
 /** Brillo minimo de servicio de las ventanas de noche (fraccion del maximo). */
 export const WINDOW_SERVICE_K = 0.28;
@@ -247,7 +249,33 @@ export class GlbMaterials {
   /** Brillo nocturno de la ventana de un espacio segun su ocupacion (0..1). */
   setWindowGlow(meshId: string, k: number): void {
     const m = this.windowSpace.get(meshId);
-    if (m) m.emissive.set(WINDOW_LIT).multiplyScalar(k);
+    if (!m) return;
+    m.userData["glowK"] = k;
+    if (!this.alerts.has(meshId)) m.emissive.set(WINDOW_LIT).multiplyScalar(k);
+  }
+
+  /** mesh_id -> alerta visible en la fachada (estado calculado por la API). */
+  private readonly alerts = new Map<string, "warning" | "critical">();
+  private reducedMotion = false;
+
+  /**
+   * Alertas por espacio: la ventana de ese espacio se ilumina en dorado (advertencia) o rojo pulsante (critico),
+   * tambien de dia, para que la anomalia se vea desde la fachada. Al desaparecer, vuelve a su brillo normal.
+   */
+  setAlerts(next: ReadonlyMap<string, "warning" | "critical">, reducedMotion = false): void {
+    this.reducedMotion = reducedMotion;
+    for (const id of [...this.alerts.keys()]) {
+      if (next.has(id)) continue;
+      this.alerts.delete(id);
+      const m = this.windowSpace.get(id);
+      if (m) m.emissive.set(WINDOW_LIT).multiplyScalar(typeof m.userData["glowK"] === "number" ? (m.userData["glowK"] as number) : 0);
+    }
+    for (const [id, lv] of next) this.alerts.set(id, lv);
+  }
+
+  /** Para pruebas y el inspector: alertas activas en las ventanas. */
+  activeAlerts(): ReadonlyMap<string, "warning" | "critical"> {
+    return this.alerts;
   }
 
   /** Dia/noche, modo datos y corte de seccion. Mismas reglas de opacidad que la ruta procedural. */
@@ -279,6 +307,17 @@ export class GlbMaterials {
         // Luz interior moderada: apenas tenue de dia, calida de noche.
         mat.emissiveIntensity = MathUtils.lerp(0.1, 0.55, a.night);
       }
+    }
+    if (this.alerts.size === 0) return;
+    const t = performance.now() / 1000;
+    for (const [id, lv] of this.alerts) {
+      const m = this.windowSpace.get(id);
+      if (!m) continue;
+      const pulse = this.reducedMotion ? 1 : lv === "critical" ? 0.5 + 0.5 * Math.sin(t * 4.2) : 0.85 + 0.15 * Math.sin(t * 2.2);
+      m.emissive.set(lv === "critical" ? ALERT_CRITICAL : ALERT_WARNING);
+      m.emissiveIntensity = (lv === "critical" ? 1.1 : 0.8) + 0.9 * pulse;
+      m.opacity = Math.max(m.opacity, lv === "critical" ? 0.55 + 0.35 * pulse : 0.6);
+      m.visible = true;
     }
   }
 

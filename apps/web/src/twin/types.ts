@@ -39,6 +39,10 @@ export interface TwinProps {
   viewResetToken?: number;
   /** El usuario empezo a mover la camara a mano (arrastre, pellizco o rueda): p. ej. cancela el recorrido guiado. */
   onUserInteract?: () => void;
+  /** Recorrido guiado activo: transiciones de camara lentas y orbita continua (sin efecto con movimiento reducido). */
+  cinematic?: boolean;
+  /** Estado de carga del modelo 3D (el padre bloquea el recorrido hasta que este listo). */
+  onModelState?: (state: "loading" | "glb" | "procedural") => void;
   /** Modo noche: ventanas emisivas segun ocupacion. */
   night?: boolean;
   /** Perfil de calidad; "auto" decide por PerformanceMonitor. */

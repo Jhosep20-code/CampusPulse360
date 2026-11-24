@@ -25,6 +25,20 @@
         "dev"
       ],
       "port": 5173
+    },
+    {
+      "name": "evidencias-video",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8799",
+        "--bind",
+        "127.0.0.1",
+        "--directory",
+        "docs/entregables/FINAL/capturas/video"
+      ],
+      "port": 8799
     }
   ]
 }

@@ -104,6 +104,27 @@ describe("buildGlbModel", () => {
   });
 });
 
+describe("alertas visibles en la fachada", () => {
+  it("la ventana del espacio en alerta se enciende de dia (rojo en critico) y vuelve a su brillo al restaurar", () => {
+    const m = build();
+    const id = "SPC_2_A201";
+    const win = m.mats.windowSpace.get(id)!;
+    expect(win).toBeDefined();
+    m.mats.setWindowGlow(id, 0.3);
+    m.mats.update({ night: 0, data: 0, section: 0 });
+    expect(win.visible).toBe(false); // de dia, sin alerta, la ventana nocturna no se ve
+    m.mats.setAlerts(new Map([[id, "critical"]]), true);
+    m.mats.update({ night: 0, data: 0, section: 0 });
+    expect(win.visible).toBe(true);
+    expect(win.opacity).toBeGreaterThan(0.5);
+    expect(win.emissive.r).toBeGreaterThan(win.emissive.b); // rojo
+    m.mats.setAlerts(new Map(), true);
+    m.mats.update({ night: 0, data: 0, section: 0 });
+    expect(win.visible).toBe(false);
+    expect(m.mats.activeAlerts().size).toBe(0);
+  });
+});
+
 describe("reduccion de draw calls", () => {
   it("la clase MATTE conserva el color de cada material como color de vertice", () => {
     const m = build();

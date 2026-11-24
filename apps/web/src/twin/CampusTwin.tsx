@@ -731,7 +731,9 @@ function SpaceVolume({ geom }: { geom: SpaceGeom }) {
     const baseOpacity = MathUtils.lerp(0.16, 0.5, ctx.anim.current.data) * (1 - sec);
     const selOpacity = MathUtils.lerp(0.82, 0.34, sec);
     const hovOpacity = MathUtils.lerp(0.72, 0.2, sec);
-    const targetOpacity = faded ? 0.04 : selected ? selOpacity : hovered ? hovOpacity : baseOpacity;
+    // Un espacio en alerta se ve tambien en la vista realista (volumen mas opaco), no solo en el panel.
+    const alertOpacity = status === "critical" ? 0.62 : status === "warning" ? 0.45 : 0;
+    const targetOpacity = faded ? 0.04 : selected ? Math.max(selOpacity, alertOpacity) : hovered ? hovOpacity : Math.max(baseOpacity, alertOpacity * (1 - sec * 0.5));
     material.opacity = MathUtils.lerp(material.opacity, targetOpacity, ctx.reduced ? 1 : k);
     material.visible = material.opacity > 0.015;
 
@@ -1078,7 +1080,16 @@ function GlbBuilding() {
       }
     }
     applyWindowGlow(glb, k);
-  }, [glb, ctx.floors, ctx.liveMap, ctx.spaceCap]);
+    // Alertas visibles desde la fachada: solo los espacios en advertencia o critico (estado de la API).
+    const alerts = new Map<string, "warning" | "critical">();
+    for (const f of ctx.floors) {
+      for (const g of f.geoms) {
+        const st = ctx.liveMap.get(g.space.id)?.status;
+        if (st === "warning" || st === "critical") alerts.set(g.space.mesh_id, st);
+      }
+    }
+    glb.mats.setAlerts(alerts, ctx.reduced);
+  }, [glb, ctx.floors, ctx.liveMap, ctx.spaceCap, ctx.reduced]);
 
   useFrame((_, dt) => {
     const target = stateRef.current.exploded ? 1 : 0;
@@ -1121,6 +1132,94 @@ function GlbContext({ url, profile, shadows }: { url: string; profile: "high" | 
     model.update(ctx.anim.current.night);
   });
   return <primitive object={model.group} />;
+}
+
+/*
+ * Indicador de recorrido de ascensor (vista Atrio). El GLB NO tiene cabinas: el nucleo es una malla unica y la
+ * disposicion real de los dos grupos de ascensores no esta confirmada. Por eso se muestra un marcador luminoso que
+ * viaja entre niveles frente al muro de ascensores, rotulado como ilustrativo (no es una cabina modelada ni datos).
+ * Posicion tomada del modelo de Blender (build_utp_huancayo.py: cara del nucleo en x = 10,4 m, puerta central z = 0).
+ */
+const ELEV_FACE_X = 10.4 - 0.32;
+const ELEV_DOOR_Z = 0;
+const ELEV_SEQUENCE = [0, 5, 2, 8, 4, 9, 1, 6, 3, 7];
+
+function ElevatorIndicator({ floors }: { floors: FloorInfo[] }) {
+  const ctx = useCtx();
+  const overlay = useContext(OverlayCtx);
+  const marker = useRef<Mesh>(null);
+  const [label, setLabel] = useState<{ level: number; dir: "up" | "down" | "stop" }>({ level: floors[0]?.level ?? 1, dir: "stop" });
+  const st = useRef({ seq: 0, y: (floors[0]?.baseY ?? 0) + 1.3, wait: 1.2 });
+  const yOf = (i: number) => (floors[i]?.baseY ?? 0) + 1.3;
+  // Volumen con fondo (0,5 m hacia el pasillo) para que se lea desde la vista oblicua del Atrio.
+  const geom = useMemo(() => new BoxGeometry(0.5, 0.6, 1.2), []);
+  const mat = useMemo(() => new MeshBasicMaterial({ color: PALETTE.cyan, transparent: true, opacity: 0.9, toneMapped: false }), []);
+  const rail = useMemo(() => {
+    const top = (floors[floors.length - 1]?.baseY ?? 30) + 3.6;
+    const g = new BufferGeometry().setFromPoints([new Vector3(ELEV_FACE_X, 0.3, ELEV_DOOR_Z), new Vector3(ELEV_FACE_X, top, ELEV_DOOR_Z)]);
+    return g;
+  }, [floors]);
+  const railMat = useMemo(() => new LineBasicMaterial({ color: PALETTE.cyan, transparent: true, opacity: 0.35 }), []);
+  useEffect(
+    () => () => {
+      geom.dispose();
+      mat.dispose();
+      rail.dispose();
+      railMat.dispose();
+    },
+    [geom, mat, rail, railMat],
+  );
+  useFrame((state, dt) => {
+    const m = marker.current;
+    if (!m || floors.length === 0) return;
+    const s0 = st.current;
+    const targetIdx = ELEV_SEQUENCE[s0.seq % ELEV_SEQUENCE.length]! % floors.length;
+    const ty = yOf(targetIdx);
+    if (ctx.reduced) {
+      s0.y = ty;
+    } else if (Math.abs(ty - s0.y) > 0.02) {
+      // ~1,6 m/s con arranque y frenado suaves (damp), independiente de los FPS.
+      s0.y = MathUtils.damp(s0.y, ty, 1.6, Math.min(dt, 0.05));
+    }
+    const arrived = Math.abs(ty - s0.y) <= 0.05;
+    if (arrived) {
+      s0.wait -= dt;
+      if (s0.wait <= 0) {
+        s0.seq += 1;
+        s0.wait = ctx.reduced ? 3 : 1.4;
+        const next = yOf(ELEV_SEQUENCE[s0.seq % ELEV_SEQUENCE.length]! % floors.length);
+        setLabel({ level: floors[ELEV_SEQUENCE[s0.seq % ELEV_SEQUENCE.length]! % floors.length]!.level, dir: next > s0.y ? "up" : "down" });
+      } else if (label.dir !== "stop") {
+        setLabel((l) => ({ ...l, dir: "stop" }));
+      }
+    }
+    m.position.set(ELEV_FACE_X, s0.y, ELEV_DOOR_Z);
+    mat.opacity = ctx.reduced ? 0.9 : 0.7 + 0.25 * Math.sin(state.clock.elapsedTime * 5);
+  });
+  const arrow = label.dir === "up" ? "▲" : label.dir === "down" ? "▼" : "●";
+  return (
+    <group raycast={noRaycast}>
+      <lineSegments geometry={rail} material={railMat} raycast={noRaycast} />
+      <mesh ref={marker} geometry={geom} material={mat} raycast={noRaycast}>
+        <Html center position={[-0.6, 0.75, 0]} zIndexRange={[18, 0]} style={{ pointerEvents: "none" }} {...(overlay ? { portal: overlay as RefObject<HTMLElement> } : {})}>
+          <div
+            style={{
+              background: PALETTE.panel,
+              border: `1px solid ${PALETTE.cyan}`,
+              color: PALETTE.text,
+              borderRadius: 6,
+              padding: "2px 6px",
+              font: '600 11px/1.3 "IBM Plex Sans", system-ui, sans-serif',
+              whiteSpace: "nowrap",
+            }}
+          >
+            {arrow} Ascensor · P{label.level}
+            <div style={{ fontSize: 9, fontWeight: 400, opacity: 0.75 }}>indicador ilustrativo, sin cabina modelada</div>
+          </div>
+        </Html>
+      </mesh>
+    </group>
+  );
 }
 
 /** Draw calls reales del ultimo fotograma (renderer.info), para el inspector y un log de desarrollo. */
@@ -1230,8 +1329,10 @@ function CameraRig({
   reduced,
   coarse,
   onUserInteract,
+  cinematic = false,
 }: {
   onUserInteract?: (() => void) | undefined;
+  cinematic?: boolean;
   coarse: boolean;
   floors: FloorInfo[];
   bounds: Box3;
@@ -1256,6 +1357,25 @@ function CameraRig({
     c.addEventListener("controlstart", onStart);
     return () => c.removeEventListener("controlstart", onStart);
   }, []);
+
+  // Movimiento cinematografico del recorrido: orbita lenta y continua alrededor del objetivo actual. En el Atrio
+  // (corte de seccion) solo se balancea +-0,22 rad para no mostrar el corte de lado. Se suma al destino de la
+  // transicion en curso (rotate con transicion), asi no corta las transiciones entre presets. Usa delta time.
+  const sway = useRef(0);
+  useFrame((state, dt) => {
+    const c = ref.current;
+    if (!c || !cinematic || reduced) return;
+    const step = Math.min(dt, 0.05);
+    if (presetRef.current === "atrium") {
+      const target = 0.22 * Math.sin(state.clock.elapsedTime * 0.45);
+      const d = target - sway.current;
+      sway.current = target;
+      void c.rotate(d, 0, true);
+    } else {
+      sway.current = 0;
+      void c.rotate(0.11 * step, 0, true);
+    }
+  });
   const viewport = useThree((s) => s.size);
   const hadFocus = useRef(false);
   const mounted = useRef(false);
@@ -1380,7 +1500,8 @@ function CameraRig({
       maxDistance={CAMERA_LIMITS.maxDistance}
       minPolarAngle={CAMERA_LIMITS.minPolarAngle}
       maxPolarAngle={CAMERA_LIMITS.maxPolarAngle}
-      smoothTime={reduced ? 0.001 : coarse ? 0.22 : 0.28}
+      // En el recorrido las transiciones duran ~1,5-3 s (descenso y acercamientos visibles), no un salto.
+      smoothTime={reduced ? 0.001 : cinematic ? 1.1 : coarse ? 0.22 : 0.28}
       draggingSmoothTime={reduced ? 0.001 : coarse ? 0.08 : 0.12}
       // Tactil: un dedo orbita, dos dedos hacen zoom (pellizco) y panoramica; giro algo mas fino.
       azimuthRotateSpeed={coarse ? 0.8 : 1}
@@ -1435,6 +1556,7 @@ function Scene({
   initialPreset,
   onSource,
   onUserInteract,
+  cinematic,
   model,
   clip,
 }: SceneProps & { model: TwinModel | null; clip: Plane }) {
@@ -1590,6 +1712,7 @@ function Scene({
       <mesh geometry={res.hills} material={mats.hills} frustumCulled={false} raycast={noRaycast} />
 
       {procedural ? <Batches /> : <GlbBuilding />}
+      {!procedural && section && model ? <ElevatorIndicator floors={floors} /> : null}
       {!procedural ? (
         <GlbBoundary fallback={null}>
           <Suspense fallback={null}>
@@ -1616,6 +1739,7 @@ function Scene({
         reduced={reduced}
         coarse={profile === "low"}
         onUserInteract={onUserInteract}
+        cinematic={cinematic ?? false}
       />
       <CursorSync pointer={hoveredId !== null || pickHover} />
     </Ctx.Provider>
@@ -1731,11 +1855,18 @@ export default function CampusTwin({
   onPresetChange,
   viewResetToken,
   onUserInteract,
+  cinematic,
+  onModelState,
   quality = "auto",
   className,
 }: TwinProps) {
   const reduced = usePrefersReducedMotion();
   const [source, setSource] = useState<"loading" | "glb" | "procedural">(MODEL_URL === null ? "procedural" : "loading");
+  const modelStateRef = useRef(onModelState);
+  modelStateRef.current = onModelState;
+  useEffect(() => {
+    modelStateRef.current?.(source);
+  }, [source]);
   const profile = useMemo(
     () => resolveProfile(quality, typeof window !== "undefined" && typeof window.matchMedia === "function" ? window.matchMedia.bind(window) : undefined),
     [quality],
@@ -1926,6 +2057,7 @@ export default function CampusTwin({
     initialPreset,
     onSource: setSource,
     ...(onUserInteract ? { onUserInteract } : {}),
+    ...(cinematic !== undefined ? { cinematic } : {}),
   };
   const isolatedHasNoSpaces =
     isolatedLevel !== null && isolatedLevel !== undefined && !campus.spaces.some((s) => s.level === isolatedLevel);

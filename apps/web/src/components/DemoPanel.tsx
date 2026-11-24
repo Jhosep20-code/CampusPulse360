@@ -3,7 +3,7 @@ import { CheckCircle2, CircleDashed, CircleMinus, FlaskConical, Loader2, Play, R
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLiveCtx } from "../app/context";
 import { api } from "../lib/api";
-import { launchIncident, pipelineSettled, pipelineSteps, type StepState } from "../demo/pipeline";
+import { launchIncident, pipelineSettled, pipelineSteps, type PipelineStep, type StepState } from "../demo/pipeline";
 
 const KINDS: Array<{ id: ScenarioKind; label: string }> = [
   { id: "co2", label: "CO₂ elevado" },
@@ -31,6 +31,8 @@ export interface DemoPanelProps {
   onFocus: (space: Space) => void;
   /** Espacio sugerido (p. ej. el seleccionado en el gemelo). */
   suggestedSpaceId?: string | null;
+  /** Pasos actuales (para el flujo animado sobre el gemelo); null sin escenario activo. */
+  onSteps?: (steps: PipelineStep[] | null) => void;
 }
 
 /**
@@ -38,7 +40,7 @@ export interface DemoPanelProps {
  * datos reales de la API, el avance Sensor -> API -> reglas -> bot -> incidencia -> IA -> gemelo. No hace llamadas de
  * IA: el diagnostico lo pide el bot del servidor (1 por minuto).
  */
-export function DemoPanel({ spaces, onFocus, suggestedSpaceId }: DemoPanelProps) {
+export function DemoPanel({ spaces, onFocus, suggestedSpaceId, onSteps }: DemoPanelProps) {
   const live = useLiveCtx();
   const sorted = useMemo(() => [...spaces].sort((a, b) => a.level - b.level || a.code.localeCompare(b.code)), [spaces]);
   const [spaceId, setSpaceId] = useState<string>(() => sorted.find((s) => s.code !== "A301")?.id ?? sorted[0]?.id ?? "");
@@ -60,6 +62,13 @@ export function DemoPanel({ spaces, onFocus, suggestedSpaceId }: DemoPanelProps)
   const liveSpace = launch ? live.data?.spaces.find((s) => s.space_id === launch.space_id) : undefined;
   const steps = launch ? pipelineSteps({ launch, live: liveSpace, botRuns: runs, incidents }) : [];
   const settled = steps.length > 0 && pipelineSettled(steps);
+  const stepsKey = steps.map((x) => x.state + x.detail).join("|");
+  const onStepsRef = useRef(onSteps);
+  onStepsRef.current = onSteps;
+  useEffect(() => {
+    onStepsRef.current?.(launch ? steps : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stepsKey, launch]);
 
   // Sondeo acotado: se detiene al resolverse todo o a los 6 min. Pausa con la pestana oculta.
   useEffect(() => {
@@ -114,6 +123,8 @@ export function DemoPanel({ spaces, onFocus, suggestedSpaceId }: DemoPanelProps)
       setRuns([]);
       setIncidents([]);
       setLaunch(r);
+      // El gemelo refleja la lectura en cuanto /live la devuelve (sin esperar el ciclo de 10 s).
+      live.refresh?.();
       const sp = spaces.find((s) => s.id === r.space_id);
       if (sp) onFocus(sp);
     } catch (e) {
@@ -130,6 +141,7 @@ export function DemoPanel({ spaces, onFocus, suggestedSpaceId }: DemoPanelProps)
     try {
       const r = await api.scenarioRestore(target);
       setLaunch(null);
+      live.refresh?.();
       setNote(`Restaurado: ${r.removed ? "escenario retirado" : "sin escenario activo"}, ${r.resolved} incidencia(s) cerrada(s) y lectura normal registrada.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo restaurar");
