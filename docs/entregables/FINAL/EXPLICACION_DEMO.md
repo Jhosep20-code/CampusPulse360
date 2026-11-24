@@ -1,6 +1,6 @@
 # Cómo funciona CampusPulse 360: explicación para la exposición
 
-**Verificado el 23-nov-2026** en código, configuración de producción y una ejecución real.
+**Verificado el 23-nov-2026** en código, configuración de producción y una ejecución real. Actualizado el 24-nov (vías de ingesta, 7 reglas y Telegram).
 
 ## Modelo de IA (confirmado, no solo documentado)
 | Uso | Código | Proveedor y modelo en producción |
@@ -25,22 +25,23 @@ Si se agota la cuota diaria (10.000 neuronas, con un límite propio de 250 llama
 1. **Sensores IoT (simulados).**
    - Hay 10 dispositivos virtuales, uno por espacio. Miden 5 variables: CO₂, temperatura, humedad, ocupación y potencia.
    - Siguen perfiles por tipo de espacio y por hora de Lima (un aula se llena en horario de clases y el CO₂ sube con la ocupación).
-   - Un gateway firma cada lote con **HMAC-SHA256** y lo envía a `POST /api/v1/ingest`. El Worker rechaza firmas inválidas y relojes desfasados más de 60 s.
-   - En producción, un simulador en la nube publica una lectura por minuto y se detiene si llega un gateway real. Todo dato lleva `source=sim` y la insignia **SIMULADO**.
+   - **Vía 1 (Docker):** el simulador firma cada lote con **HMAC-SHA256** y lo envía a `POST /api/v1/ingest`. El Worker rechaza firmas inválidas y relojes desfasados más de 60 s.
+   - **Vía 2 (demo pública):** un simulador en la nube escribe una lectura por minuto **directamente en D1, sin HMAC**, y se detiene si un gateway ha informado en los últimos 2 min.
+   - Los escenarios los lanza un administrador con su sesión. Todo dato es simulado y lleva la insignia **SIMULADO**.
 2. **Detección de anomalías (reglas en SQL).** Las reglas de `alert_rules` exigen una condición **sostenida**:
    - CO₂ ≥ 1200 ppm durante 2 min (advertencia);
    - CO₂ ≥ 1500 ppm durante 1 min (crítico);
-   - temperatura ≥ 28 °C durante 3 min;
-   - ocupación ≥ 100 % del aforo durante 1 min (sobreaforo).
+   - temperatura ≥ 28 °C durante 3 min (advertencia) y ≥ 30 °C durante 1 min (crítico);
+   - ocupación ≥ 100 % del aforo durante 1 min (sobreaforo);
+   - consumo ≥ 4500 W durante 2 min (advertencia) y ≥ 6000 W durante 1 min (crítico).
 3. **RPA (bots programados).** Un Cron de Cloudflare se ejecuta **cada minuto** y:
    - evalúa las reglas;
    - abre la incidencia (deduplicada, sin repetir la misma);
    - pide el diagnóstico;
-   - notifica (Telegram si está configurado);
    - registra la ejecución en `bot_runs`;
    - cierra solas las incidencias que llevan 10 min normalizadas.
 
-   Otro Cron diario genera el reporte.
+   Otro Cron diario genera el reporte. Telegram **no está configurado**: no se envían notificaciones.
 4. **Cuándo interviene la IA.**
    - **Diagnóstico:** cuando el bot abre una incidencia (como máximo una por minuto, para cuidar la cuota). El prompt incluye las lecturas reales de 30 min, el umbral y el aforo. La salida es JSON validado con zod: causa probable, severidad, acciones, evidencia y confianza.
    - **Asistente:** cuando alguien pregunta. Elige entre consultas **de solo lectura** predefinidas (nunca escribe SQL libre), cita los espacios y puede mover la cámara del gemelo hacia ellos (`focus_spaces`).

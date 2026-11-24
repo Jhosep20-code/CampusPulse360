@@ -1,32 +1,19 @@
 # Guía de acceso de administrador y pruebas físicas (S25 Ultra y Watch6 Classic)
 
-**Demo:** https://campuspulse.campuspulse-api.workers.dev · **Estado al 23-nov-2026**
+**Demo:** https://campuspulse.campuspulse-api.workers.dev · **Estado al 24-nov-2026**
 
-> **Seguridad:** el token de arranque es un secreto. No lo pegues en chats, capturas, commits ni documentos. Está en tu PC, en `infra/production.secrets.local.env` (variable `BOOTSTRAP_TOKEN`). Ese archivo está excluido de git.
+> **Seguridad:** nunca pegues tokens ni claves en chats, capturas, commits o documentos.
 
-## 1. Estado verificado en producción (consultas de solo lectura a D1)
+## 1. Estado en producción (24-nov-2026)
 | Elemento | Valor |
 |---|---|
-| Usuarios / administradores | 0 / 0 |
-| Passkeys registradas | 0 |
-| Token de arranque | **No usado** (el secreto `BOOTSTRAP_TOKEN` existe en el Worker) |
+| Usuarios / administradores | 1 / 1 |
+| Passkeys registradas | 2 (escritorio y Android) |
+| Token de arranque | **Consumido**: no permite registrar más cuentas |
 | RP ID / origen WebAuthn | `campuspulse.campuspulse-api.workers.dev` / `https://campuspulse.campuspulse-api.workers.dev` |
 
-**Por qué Windows mostró «Algo ha ido mal»:** pulsaste «Iniciar sesión con passkey» cuando todavía **no existía ninguna passkey** de CampusPulse en ese equipo. No fue un fallo al crear credenciales. La página ahora lo explica.
-
-## 2. Crear tu cuenta de administrador (Windows 11, una sola vez)
-1. Usa Chrome o Edge actualizados en tu PC con Windows Hello configurado (PIN, huella o rostro). Abre la demo → **Acceso**.
-2. En **Alta inicial**:
-   - **Token de arranque:** copia el valor de `BOOTSTRAP_TOKEN` desde `infra/production.secrets.local.env`, solo el valor, sin comillas ni espacios.
-   - **Nombre:** tu nombre.
-   - **Rol:** **Administrador**.
-3. Pulsa **Registrar passkey**. Windows pedirá crear una passkey para `campuspulse.campuspulse-api.workers.dev`; confirma con tu PIN, huella o rostro.
-4. Verás «Passkey registrada y sesión iniciada»; en Acceso aparecerá «Sesión activa: … (administrador)». **Desde ese momento el token queda consumido:** nadie más puede crear cuentas con él, y serás el único administrador.
-5. Comprueba que tienes permisos: en **Automatizaciones** los interruptores de reglas y los escenarios de demostración (solo admin) deben estar habilitados.
-
-**Si falla:**
-- **«Token de arranque inválido»:** el valor no es exacto. Revisa espacios y comillas.
-- **«Se canceló o expiró»:** repite el paso y confirma el aviso de Windows dentro de los 5 minutos.
+## 2. Cuenta de administrador
+**Ya está creada; no hay que repetir el alta.** Entra en **Acceso → Iniciar sesión con passkey**. Si Windows muestra «Algo ha ido mal», ese equipo no tiene una passkey de CampusPulse: vincúlalo como en el §3. El alta con token local de Docker se explica en `LEEME.txt` §3.
 
 ## 3. Acceso desde el Galaxy S25 Ultra (vincular el teléfono)
 Una passkey de Windows Hello se guarda en el PC y no se sincroniza con Android. Por eso, el teléfono se vincula a **tu misma cuenta** con un código de un solo uso:
@@ -77,7 +64,7 @@ Generar un código nuevo invalida el anterior. El código no crea usuarios ni ca
 
 **Referencia con GPU en el navegador del PC:** perfil móvil con 29 / 141 / 19 draw calls.
 
-## 7. Galaxy Watch6 Classic (no probado todavía)
+## 7. Galaxy Watch6 Classic (probado el 23-nov en una versión anterior; repetir sobre `004eaa4`)
 1. En el reloj, abrir el navegador (Samsung Internet para Wear OS, si está instalado) y entrar en `https://campuspulse.campuspulse-api.workers.dev/reloj`.
 2. Comprobar:
    - que la esfera circular se ve completa;
