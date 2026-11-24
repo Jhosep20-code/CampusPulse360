@@ -1717,16 +1717,29 @@ function FpsOverlay({
     touchAction: "none",
     userSelect: "none",
   };
+  // Tactil: ayuda corta y paneles separados (info arriba, cruceta abajo a la derecha) para no tapar el modelo.
+  const touch = typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
   return (
-    <div
-      role="region"
-      aria-label="Recorrido en primera persona"
-      style={{ position: "absolute", left: 8, right: 8, bottom: 8, display: "flex", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: 8, pointerEvents: "none" }}
-    >
-      <div style={{ pointerEvents: "auto", background: "rgba(8,15,29,0.86)", border: `1px solid ${PALETTE.border}`, borderRadius: 12, padding: "8px 10px", color: PALETTE.text, maxWidth: 360 }}>
+    <div role="region" aria-label="Recorrido en primera persona" style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 30 }}>
+      <div
+        style={{
+          position: "absolute",
+          left: 8,
+          ...(touch ? { top: 8 } : { bottom: 8 }),
+          pointerEvents: "auto",
+          background: "rgba(8,15,29,0.86)",
+          border: `1px solid ${PALETTE.border}`,
+          borderRadius: 12,
+          padding: touch ? "6px 8px" : "8px 10px",
+          color: PALETTE.text,
+          maxWidth: touch ? "calc(100% - 16px)" : 360,
+        }}
+      >
         <p style={{ margin: 0, font: "600 12px system-ui, sans-serif", color: PALETTE.cyan }}>Primera persona · Piso P{level}</p>
         <p style={{ margin: "2px 0 6px", font: "11px system-ui, sans-serif", color: "#93A3BC" }}>
-          WASD o flechas para caminar · arrastra para mirar · Shift corre · RePag/AvPag cambia de piso · Esc sale. Interior esquemático, dimensiones estimadas.
+          {touch
+            ? "Cruceta para caminar · desliza para mirar. Interior esquemático."
+            : "WASD o flechas para caminar · arrastra para mirar · Shift corre · RePag/AvPag cambia de piso · Esc sale. Interior esquemático, dimensiones estimadas."}
         </p>
         <div style={{ display: "flex", gap: 6 }}>
           <button type="button" style={btn} disabled={i <= 0} onClick={() => onLevel(levels[i - 1]!)} aria-label="Bajar un piso">
@@ -1740,7 +1753,10 @@ function FpsOverlay({
           </button>
         </div>
       </div>
-      <div style={{ pointerEvents: "auto", display: "grid", gridTemplateColumns: "repeat(3, 44px)", gridTemplateRows: "repeat(2, 44px)", gap: 4 }} aria-label="Cruceta de movimiento">
+      <div
+        style={{ position: "absolute", right: 8, bottom: 8, pointerEvents: "auto", display: "grid", gridTemplateColumns: "repeat(3, 44px)", gridTemplateRows: "repeat(2, 44px)", gap: 4 }}
+        aria-label="Cruceta de movimiento"
+      >
         <span />
         <button type="button" style={btn} aria-label="Avanzar" {...pad(1, 0)}>▲</button>
         <span />
