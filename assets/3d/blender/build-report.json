@@ -2,12 +2,12 @@
   "blender": "5.3.0",
   "meshopt": false,
   "draco": false,
-  "blend_bytes": 350832,
+  "blend_bytes": 409752,
   "LOD0": {
     "objects": 264,
     "meshes": 237,
-    "triangles": 54084,
-    "vertices": 36144,
+    "triangles": 56768,
+    "vertices": 38908,
     "materials": [
       "BOOKS_A",
       "BOOKS_B",
@@ -38,7 +38,7 @@
       "WINDOW_NIGHT",
       "WOOD"
     ],
-    "glb_bytes": 2914500
+    "glb_bytes": 3002148
   },
   "CONTEXT": {
     "objects": 10,
@@ -61,8 +61,8 @@
   "LOD1": {
     "objects": 234,
     "meshes": 207,
-    "triangles": 23476,
-    "vertices": 15712,
+    "triangles": 24688,
+    "vertices": 17012,
     "materials": [
       "BRAND_RED",
       "CEILING",
@@ -86,12 +86,12 @@
       "WINDOW_NIGHT",
       "WOOD"
     ],
-    "glb_bytes": 1277204
+    "glb_bytes": 1317664
   },
   "AR": {
     "meshes": 29,
-    "triangles": 20140,
-    "glb_bytes": 1104356,
+    "triangles": 21352,
+    "glb_bytes": 1144680,
     "scale": "1:60"
   }
 }

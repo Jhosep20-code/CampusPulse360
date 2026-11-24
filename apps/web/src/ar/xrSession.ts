@@ -24,11 +24,13 @@ import {
 import { PALETTE } from "../twin/constants";
 import { scaleForWidth } from "./logic";
 import { applySpaceColors, loadCampusModel } from "./model";
+import { INITIAL_PLACEMENT, onFrame as placementFrame, onReset as placementReset, onTap as placementTap, type PlacementState } from "./placement";
 
 /*
  * Sesion WebXR (nivel A) con la API de three (renderer.xr) y la del navegador.
  * No usa @react-three/xr. Solo se ejecuta en navegadores con WebXR immersive-ar
- * (Chrome Android + ARCore). SIN VERIFICAR EN DISPOSITIVO FISICO desde este repo.
+ * (Chrome Android + ARCore). La colocacion ocurre en un fotograma de ANIMACION (ver placement.ts): el XRFrame
+ * de un evento "select" no trae resultados de hit-test. Verificacion en el S25 Ultra: pendiente tras esta correccion.
  */
 
 export interface XrCallbacks {
@@ -145,6 +147,7 @@ export function startArSession(opts: XrStartOptions): Promise<XrHandle> {
     let anchor: XRAnchor | null = null;
     let placed = false;
     let ended = false;
+    let pstate: PlacementState = INITIAL_PLACEMENT;
     const raycaster = new Raycaster();
 
     renderer.xr.setReferenceSpaceType("local");
@@ -156,7 +159,7 @@ export function startArSession(opts: XrStartOptions): Promise<XrHandle> {
       void session.end();
     } else {
       callbacks.onStatus(
-        `AR iniciada con ${modelSource === "glb" ? "el modelo de Blender" : "la geometría procedural (el GLB no cargó)"}. Apunta a una superficie con textura, espera el aro cian y toca para colocar la maqueta.`,
+        `AR iniciada con ${modelSource === "glb" ? "el modelo de Blender" : "la geometría procedural (el GLB no cargó)"}. Buscando superficie… mueve el teléfono despacio sobre una mesa con textura hasta ver el aro cian.`,
       );
     }
 
@@ -170,14 +173,8 @@ export function startArSession(opts: XrStartOptions): Promise<XrHandle> {
       })
       .catch((e: unknown) => callbacks.onStatus(`No se pudo iniciar el hit-test: ${e instanceof Error ? e.message : String(e)}`));
 
-    const place = (frame: XRFrame, refSpace: XRReferenceSpace): void => {
-      if (!hitTestSource) return;
-      const hit = frame.getHitTestResults(hitTestSource)[0];
-      const pose = hit?.getPose(refSpace);
-      if (!hit || !pose) {
-        callbacks.onStatus("Aún no hay superficie detectada. Mueve el dispositivo despacio sobre una superficie con textura.");
-        return;
-      }
+    /** Coloca con el hit-test de un fotograma de ANIMACION (unico momento en que hay resultados y anclas validas). */
+    const place = (frame: XRFrame, refSpace: XRReferenceSpace, hit: XRHitTestResult, pose: XRPose): void => {
       holder.matrix.fromArray(pose.transform.matrix);
       holder.matrixWorldNeedsUpdate = true;
       // Orienta la fachada principal (+Z) hacia el usuario en el momento de colocar.
@@ -205,7 +202,6 @@ export function startArSession(opts: XrStartOptions): Promise<XrHandle> {
         );
       }
       callbacks.onPlaced(true, false);
-      callbacks.onStatus("Maqueta colocada. Toca un espacio para ver sus datos.");
     };
 
     const pick = (frame: XRFrame, refSpace: XRReferenceSpace, source: XRInputSource): void => {
@@ -227,8 +223,11 @@ export function startArSession(opts: XrStartOptions): Promise<XrHandle> {
     const onSelect = (ev: XRInputSourceEvent): void => {
       const refSpace = renderer.xr.getReferenceSpace();
       if (!refSpace) return;
-      if (!placed) place(ev.frame, refSpace);
-      else pick(ev.frame, refSpace, ev.inputSource);
+      if (!placed) {
+        const t = placementTap(pstate, performance.now());
+        pstate = t.state;
+        if (t.status) callbacks.onStatus(t.status);
+      } else pick(ev.frame, refSpace, ev.inputSource);
     };
     session.addEventListener("select", onSelect);
 
@@ -237,13 +236,14 @@ export function startArSession(opts: XrStartOptions): Promise<XrHandle> {
         const refSpace = renderer.xr.getReferenceSpace();
         if (refSpace) {
           if (!placed && hitTestSource) {
-            const pose = frame.getHitTestResults(hitTestSource)[0]?.getPose(refSpace);
-            if (pose) {
-              reticle.visible = true;
-              reticle.matrix.fromArray(pose.transform.matrix);
-            } else {
-              reticle.visible = false;
-            }
+            const hit = frame.getHitTestResults(hitTestSource)[0];
+            const pose = hit?.getPose(refSpace);
+            const step = placementFrame(pstate, Boolean(hit && pose), performance.now());
+            pstate = step.state;
+            reticle.visible = step.showReticle;
+            if (pose) reticle.matrix.fromArray(pose.transform.matrix);
+            if (step.place && hit && pose) place(frame, refSpace, hit, pose);
+            if (step.status) callbacks.onStatus(step.status);
           }
           if (placed && anchor) {
             const pose = frame.getPose(anchor.anchorSpace, refSpace);
@@ -261,13 +261,15 @@ export function startArSession(opts: XrStartOptions): Promise<XrHandle> {
 
     const resetPlacement = () => {
       placed = false;
+      const rs = placementReset();
+      pstate = rs.state;
       holder.visible = false;
       anchor?.delete();
       anchor = null;
       setSelected(null);
       callbacks.onSelect(null);
       callbacks.onPlaced(false, false);
-      callbacks.onStatus("Apunta a una superficie y toca para volver a colocar la maqueta.");
+      callbacks.onStatus(rs.status);
     };
 
     const cleanup = () => {

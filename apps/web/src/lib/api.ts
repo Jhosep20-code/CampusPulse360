@@ -223,6 +223,10 @@ export const api = {
     request("/auth/passkey/login/verify", z.unknown(), { method: "POST", json: { challenge_id, response } }),
   passkeyRegisterOptions: (body: { bootstrap_token: string; name: string; role: "admin" | "operator" }) =>
     request("/auth/passkey/register/options", PasskeyOptions, { method: "POST", json: body }),
+  /** Con sesion: codigo de un solo uso (10 min) para registrar una passkey en OTRO dispositivo de la misma cuenta. */
+  passkeyLinkCode: () =>
+    request("/auth/passkey/link/code", z.object({ code: z.string(), expires_at: z.number() }), { method: "POST", json: {} }),
+  passkeyLinkOptions: (code: string) => request("/auth/passkey/link/options", PasskeyOptions, { method: "POST", json: { code } }),
   passkeyRegisterVerify: (challenge_id: string, response: unknown) =>
     request("/auth/passkey/register/verify", z.unknown(), { method: "POST", json: { challenge_id, response } }),
 };

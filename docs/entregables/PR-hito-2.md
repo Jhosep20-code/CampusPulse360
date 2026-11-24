@@ -43,6 +43,18 @@
 - Diez pisos y los 10 espacios instrumentados se conservan. P6–P10 se rotulan "sin espacios instrumentados".
 - Aviso visible: "Modelo aproximado basado en fotografía · dimensiones estimadas · sin planos verificados".
 
+### Acceso, AR e identidad nocturna (23-nov)
+- **Passkeys:**
+  - vinculación de otro dispositivo con un código de un solo uso (10 min, guardado como hash, migración 0005) que añade la passkey a la misma cuenta;
+  - mensajes que distinguen un login sin passkey de un fallo de registro;
+  - pruebas de punta a punta con verificación WebAuthn real.
+- **AR nivel A:** la colocación ocurre en el fotograma de animación (antes leía el hit-test en el fotograma del toque, que nunca trae resultados), con estados «buscando», «detectada» y «colocada». **Pendiente de prueba física en el S25.**
+- **Noche:**
+  - las letras de la marca UTP se encienden;
+  - letrero «Universidad Tecnológica del Perú» en la banda sobre la planta baja (posición aproximada);
+  - sin materiales nuevos.
+- **IA confirmada en producción:** Workers AI `@cf/openai/gpt-oss-20b` (no la API de OpenAI). Detalle en `docs/entregables/FINAL/EXPLICACION_DEMO.md`.
+
 ### Otras funciones
 - **AR:** WebXR, Scene Viewer y vista 3D. Se corrigió el error móvil "l is not a function": una limpieza de efecto inválida.
 - Vista de reloj circular en `/reloj`.
@@ -54,7 +66,7 @@
   - pruebas visuales WebGL excluidas del CI por defecto (se ejecutan con `VISUAL=1`).
 
 ### Pruebas (local, 23-nov-2026)
-- **Unitarias e integración:** 260 (contratos 9, simulador 10, web 164, API 77).
+- **Unitarias e integración:** 273 (contratos 9, simulador 10, web 172, API 82).
 - **CI:** el job `deploy` ahora pasa `CLOUD_SIM:on`, igual que la producción actual. Sin ese cambio, un deploy desde `main` habría apagado el simulador en la nube.
 - **e2e:** 15 aprobadas y 3 omitidas a propósito, contra el stack Docker con el GLB.
 - **gitleaks:** sin hallazgos en todo el historial.

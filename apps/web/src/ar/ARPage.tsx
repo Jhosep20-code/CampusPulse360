@@ -95,7 +95,11 @@ export default function ARPage() {
   useEffect(() => {
     const el = controlsRef.current;
     if (!el) return;
-    const stop = (e: Event) => e.preventDefault();
+    // Solo los elementos interactivos del panel bloquean el toque; el resto de la pantalla coloca/selecciona.
+    const stop = (e: Event) => {
+      const t = e.target as Element | null;
+      if (t && t !== el && t.closest?.("button, input, select, label, a, [data-xr-ui]")) e.preventDefault();
+    };
     el.addEventListener("beforexrselect", stop);
     return () => el.removeEventListener("beforexrselect", stop);
   }, [active]);
@@ -268,6 +272,7 @@ export default function ARPage() {
               <p
                 role="status"
                 aria-live="polite"
+                data-xr-ui=""
                 className="max-w-[70%] rounded-lg border border-line bg-panel/90 px-3 py-2 text-sm"
                 style={{ pointerEvents: "auto" }}
               >
@@ -284,6 +289,7 @@ export default function ARPage() {
                   className="rounded-xl border border-line bg-panel/95 p-3 text-sm"
                   style={{ pointerEvents: "auto" }}
                   aria-label="Espacio seleccionado"
+                  data-xr-ui=""
                 >
                   <p className="font-semibold">{selectedInfo.name}</p>
                   <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">

@@ -389,7 +389,7 @@ def glyph(group, mat, ch, x, y, z, size, depth=0.08):
     cu.align_x, cu.align_y = "CENTER", "CENTER"
     cu.size = size
     cu.extrude = depth / 2
-    cu.resolution_u = 4 if FINE else 2
+    cu.resolution_u = 3 if FINE else 1
     ob = bpy.data.objects.new("GLYPH", cu)
     bpy.context.scene.collection.objects.link(ob)
     me = bpy.data.meshes.new_from_object(ob.evaluated_get(bpy.context.evaluated_depsgraph_get()))
@@ -472,7 +472,11 @@ def build_curtain_and_generic(k):
         glass_h = H - SIGN_H
         box(g, "GLASS_GROUND", CWCX, glass_h / 2, DP / 2 - G_SETBACK, CWW, glass_h, 0.1)
         box(g, "ROOF", CWCX, H - SIGN_H / 2, DP / 2 - 0.25, CWW + 0.6, SIGN_H, 0.5)   # banda gris bajo el muro cortina (foto)
-        box(g, "LED_CROWN", CWCX, H - SIGN_H / 2, DP / 2 + 0.02, CWW, 0.07, 0.03)
+        # v3.1: letrero "Universidad Tecnologica del Peru" en la banda gris sobre la planta baja (banda visible en la foto
+        # exterior; el texto se inspira en la referencia del equipo, posicion y tamano APROXIMADOS). Letras LED_CROWN:
+        # blancas de dia y encendidas de noche (el visor modula su emision); la tira LED baja al borde inferior.
+        box(g, "LED_CROWN", CWCX, H - SIGN_H + 0.06, DP / 2 + 0.02, CWW, 0.05, 0.03)
+        glyph(g, "LED_CROWN", "Universidad Tecnológica del Perú", CWCX, H - SIGN_H / 2 + 0.04, DP / 2 + 0.05, 0.8, depth=0.05)
         span = CWW - PIER_S
         for i in range(G_PIERS):
             px = CWX0 + PIER_S / 2 + i * span / (G_PIERS - 1)
@@ -873,7 +877,7 @@ def build_roof():
     zl = DP / 2 + 0.32
     for (xx, yy, mat, ch) in ((xu, yt, "BRAND_RED", "U"), (xt, yt, "FRAME_DARK", "T"), (xt, yp, "BRAND_RED", "P")):
         box(g, mat, xx, yy, zl, sq, sq, 0.14)
-        glyph(g, "WHITE_PANEL", ch, xx, yy - 0.05, zl + 0.07 + 0.04, sq * 0.78)
+        glyph(g, "LED_CROWN", ch, xx, yy - 0.05, zl + 0.07 + 0.04, sq * 0.78)   # letras retroiluminadas de noche
     # Linea LED de la coronacion (frente y laterales); material emisivo aparte de las ventanas.
     box(g, "LED_CROWN", 0, ROOF_Y + 0.5, DP / 2 + 0.02, W - 1.0, 0.08, 0.04)
     box(g, "LED_CROWN", -W / 2 - 0.02, ROOF_Y + 0.5, 0, 0.04, 0.08, DP - 1.0)
@@ -1405,6 +1409,13 @@ def setup_ref_stairs():
     set_camera((ATR["minX"] - 0.15, base(1) + SLAB_T + 1.4, 0.0), (CORE["minX"], base(5) + 1.0, 0.0), 84)
 
 
+def setup_sign_night():
+    """Acercamiento nocturno al acceso: letrero iluminado y marca UTP (v3.1)."""
+    setup_night()
+    target = (CWCX, 9.0, DP / 2)
+    set_camera(cam_polar(-10, 9, 44, target), target, 40)
+
+
 def floor_ground():
     global CLIP
     saved, CLIP = CLIP, None
@@ -1433,6 +1444,7 @@ def render_all():
         ("ref-exterior.png", setup_ref_exterior, None),
         ("ref-ascensores.png", setup_ref_elevators, None),
         ("ref-escaleras.png", setup_ref_stairs, None),
+        ("letrero-noche.png", setup_sign_night, dict(win_split=True)),
     ]
     global RES
     for name, fn, rb in jobs:
