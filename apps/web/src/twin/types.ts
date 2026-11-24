@@ -37,6 +37,8 @@ export interface TwinProps {
   onPresetChange?: (id: TwinPresetId) => void;
   /** Cambia cada vez que el padre pide "Restablecer vista" (camara inicial y sin estados residuales). */
   viewResetToken?: number;
+  /** El usuario empezo a mover la camara a mano (arrastre, pellizco o rueda): p. ej. cancela el recorrido guiado. */
+  onUserInteract?: () => void;
   /** Modo noche: ventanas emisivas segun ocupacion. */
   night?: boolean;
   /** Perfil de calidad; "auto" decide por PerformanceMonitor. */

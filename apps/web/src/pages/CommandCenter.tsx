@@ -6,18 +6,27 @@ import {
   Flame,
   Layers,
   Moon,
+  Pause,
+  Play,
   RotateCcw,
+  SkipBack,
   Thermometer,
   Users,
   Wind,
+  X,
   Zap,
 } from "lucide-react";
-import { lazy, Suspense, useMemo, useReducer, useState } from "react";
-import { INITIAL_VIEW, reduceView } from "../twin/view-state";
+import { lazy, Suspense, useCallback, useMemo, useReducer, useState } from "react";
+import type { Space } from "@campuspulse/contracts";
+import { INITIAL_VIEW, reduceView, type ViewAction } from "../twin/view-state";
+import { buildTour, pickTourTarget, type TourStep } from "../twin/tour";
+import { useGuidedTour } from "../twin/useGuidedTour";
+import { useReducedMotion } from "../hooks/useReducedMotion";
+import { DemoPanel } from "../components/DemoPanel";
 import { Link, useLocation } from "react-router";
 import { TWIN_LEVELS } from "../twin/constants";
 import type { TwinLayer } from "../twin/types";
-import { useCampusCtx, useLiveCtx, useSpaceIndex } from "../app/context";
+import { useCampusCtx, useLiveCtx, useRole, useSpaceIndex } from "../app/context";
 import { KpiCard } from "../components/KpiCard";
 import { SpacePanel } from "../components/SpacePanel";
 import { SeverityBadge, StatusBadge } from "../components/StatusBadge";
@@ -62,12 +71,50 @@ export default function CommandCenter() {
   const [view, dispatchView] = useReducer(reduceView, INITIAL_VIEW);
   const [resetToken, setResetToken] = useState(0);
   const { exploded, night, dataMode, isolatedLevel: isolated } = view;
-  const setIsolated = (level: number | null) => dispatchView({ type: "isolate", level });
+  // Manejadores manuales: cancelan el recorrido guiado si esta activo (manual() se define mas abajo).
+  const setIsolated = (level: number | null) => manual({ type: "isolate", level });
   const resetView = () => {
+    tour.stop();
     dispatchView({ type: "reset" });
     setResetToken((n) => n + 1);
   };
   const [selected, setSelected] = useState<string | null>(null);
+  const { isAdmin } = useRole();
+  const reducedMotion = useReducedMotion();
+
+  // Recorrido guiado: secuencia de acciones de la maquina de estados de la vista (las camaras son los presets).
+  const statusById = useMemo(() => new Map((live.data?.spaces ?? []).map((s) => [s.space_id, s.status])), [live.data]);
+  const [tourSteps, setTourSteps] = useState<TourStep[]>([]);
+  const [tourTargetId, setTourTargetId] = useState<string | null>(null);
+  const applyTourStep = (step: TourStep) => {
+    for (const a of step.actions) dispatchView(a);
+    if (step.actions.some((a) => a.type === "reset")) setResetToken((n) => n + 1);
+    if (step.clearSelection) setSelected(null);
+    if (step.selectTarget && tourTargetId) setSelected(tourTargetId);
+  };
+  const tour = useGuidedTour(tourSteps, applyTourStep, reducedMotion);
+  const tourActive = tour.state.status !== "idle";
+  const startTour = () => {
+    const t = pickTourTarget(campus.data?.spaces ?? [], statusById, selected);
+    if (!t) return;
+    setTourTargetId(t.spaceId);
+    setTourSteps(buildTour(t));
+    tour.play();
+  };
+  /** Cualquier accion manual cancela el recorrido (la vista queda donde el usuario la deja). */
+  const manual = (a: ViewAction) => {
+    if (tourActive) tour.stop();
+    dispatchView(a);
+  };
+  const onDemoFocus = useCallback(
+    (space: Space) => {
+      tour.stop();
+      dispatchView({ type: "isolate", level: space.level });
+      setSelected(space.id);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   const k = live.data?.kpis;
   const incidents = useActiveIncidents(k?.open_incidents);
@@ -132,7 +179,7 @@ export default function CommandCenter() {
               ))}
             </div>
             <div className="ml-auto flex flex-wrap items-center gap-1.5">
-              <button type="button" className="btn btn-sm" aria-pressed={exploded} onClick={() => dispatchView({ type: "explode", on: !exploded })}>
+              <button type="button" className="btn btn-sm" aria-pressed={exploded} onClick={() => manual({ type: "explode", on: !exploded })}>
                 <Layers size={14} aria-hidden="true" /> Pisos explotados
               </button>
               <label className="sr-only" htmlFor="aislar-piso">
@@ -151,11 +198,21 @@ export default function CommandCenter() {
                   </option>
                 ))}
               </select>
-              <button type="button" className="btn btn-sm" aria-pressed={dataMode} onClick={() => dispatchView({ type: "data", on: !dataMode })}>
+              <button type="button" className="btn btn-sm" aria-pressed={dataMode} onClick={() => manual({ type: "data", on: !dataMode })}>
                 <Eye size={14} aria-hidden="true" /> Modo datos
               </button>
               <button type="button" className="btn btn-sm" aria-pressed={night} onClick={() => dispatchView({ type: "night", on: !night })}>
                 <Moon size={14} aria-hidden="true" /> Modo noche
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm"
+                aria-pressed={tourActive}
+                onClick={() => (tourActive ? tour.stop() : startTour())}
+                disabled={!campus.data}
+                title="Recorrido guiado: aérea, fachada, atrio, piso y aula con sus sensores"
+              >
+                {tourActive ? <X size={14} aria-hidden="true" /> : <Play size={14} aria-hidden="true" />} {tourActive ? "Salir del recorrido" : "Recorrido guiado"}
               </button>
               <button type="button" className="btn btn-sm" onClick={resetView} title="Quita aislamiento, explosión, corte y modo datos, y vuelve a la cámara inicial">
                 <RotateCcw size={14} aria-hidden="true" /> Restablecer vista
@@ -186,7 +243,10 @@ export default function CommandCenter() {
                     dataMode={dataMode}
                     night={night}
                     cameraPreset={view.preset}
-                    onPresetChange={(id) => dispatchView({ type: "preset", id })}
+                    onPresetChange={(id) => manual({ type: "preset", id })}
+                    onUserInteract={() => {
+                      if (tourActive) tour.stop();
+                    }}
                     viewResetToken={resetToken}
                     {...(focusSpaceIds ? { focusSpaceIds } : {})}
                   />
@@ -199,6 +259,51 @@ export default function CommandCenter() {
             ) : (
               <TwinSkeleton />
             )}
+
+            {tour.step ? (
+              <div
+                className="absolute inset-x-2 top-14 z-20 mx-auto max-w-xl rounded-xl border border-line bg-panel/95 p-3 shadow-lg sm:inset-x-auto sm:left-1/2 sm:w-[min(36rem,calc(100%-1rem))] sm:-translate-x-1/2"
+                role="region"
+                aria-label="Recorrido guiado"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="m-0 text-[11px] font-medium uppercase tracking-wide text-ink-2">
+                    Recorrido guiado · paso {tour.state.index + 1} de {tourSteps.length}
+                    {tour.state.status === "paused" ? " · en pausa" : ""}
+                  </p>
+                  <div className="flex gap-1">
+                    {tour.state.status === "playing" ? (
+                      <button type="button" className="btn btn-sm !min-h-[30px] !px-2" onClick={tour.pause} aria-label="Pausar recorrido">
+                        <Pause size={14} aria-hidden="true" />
+                      </button>
+                    ) : (
+                      <button type="button" className="btn btn-sm !min-h-[30px] !px-2" onClick={tour.resume} aria-label="Reanudar recorrido">
+                        <Play size={14} aria-hidden="true" />
+                      </button>
+                    )}
+                    <button type="button" className="btn btn-sm !min-h-[30px] !px-2" onClick={tour.restart} aria-label="Reiniciar recorrido">
+                      <SkipBack size={14} aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm !min-h-[30px] !px-2 num"
+                      onClick={() => tour.setSpeed(tour.state.speed === 1 ? 0.5 : 1)}
+                      aria-label={`Velocidad ${tour.state.speed === 1 ? "normal" : "reducida"}; cambiar`}
+                    >
+                      {tour.state.speed === 1 ? "1×" : "½×"}
+                    </button>
+                    <button type="button" className="btn btn-sm !min-h-[30px] !px-2" onClick={tour.stop} aria-label="Salir del recorrido">
+                      <X size={14} aria-hidden="true" />
+                    </button>
+                  </div>
+                </div>
+                <p className="m-0 mt-1 text-sm font-semibold text-ink" aria-live="polite">{tour.step.title}</p>
+                <p className="m-0 text-xs text-ink-2">{tour.step.caption}</p>
+                <div className="mt-2 h-1 overflow-hidden rounded bg-line" aria-hidden="true">
+                  <div className="h-full bg-ok" style={{ width: `${((tour.state.index + 1) / Math.max(1, tourSteps.length)) * 100}%`, transition: reducedMotion ? "none" : "width .3s" }} />
+                </div>
+              </div>
+            ) : null}
 
             {selectedSpace ? (
               <SpacePanel
@@ -215,6 +320,10 @@ export default function CommandCenter() {
           </p>
         </Panel>
 
+        <div className="flex flex-col gap-4 self-start">
+        {isAdmin && campus.data ? (
+          <DemoPanel spaces={campus.data.spaces} onFocus={onDemoFocus} suggestedSpaceId={selected} />
+        ) : null}
         {/* Alertas */}
         <Panel title="Alertas activas" icon={<Flame size={16} aria-hidden="true" />} className="self-start" bodyClassName="p-2">
           {incidents.loading && !incidents.data ? (
@@ -253,6 +362,7 @@ export default function CommandCenter() {
             <EmptyState title="Sin alertas activas" hint="No hay incidencias abiertas, pendientes ni reconocidas." />
           )}
         </Panel>
+        </div>
       </div>
     </div>
   );

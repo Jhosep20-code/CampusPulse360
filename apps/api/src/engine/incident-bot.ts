@@ -134,7 +134,7 @@ export async function runIncidentBot(env: Env, now: number): Promise<BotRunSumma
       env.DB.prepare(
         `INSERT OR REPLACE INTO readings (device_id, ts, co2_ppm, temp_c, rh_pct, occupancy, power_w, source)
          SELECT device_id, ?1, co2_ppm, temp_c, rh_pct, occupancy, power_w, 'sim-scenario'
-           FROM scenario_overrides WHERE until > ?1`,
+           FROM scenario_overrides WHERE until > ?1 AND mode = 'values'`,
       ).bind(now),
       env.DB.prepare("DELETE FROM scenario_overrides WHERE until <= ?1").bind(now),
     ]);

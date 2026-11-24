@@ -53,7 +53,7 @@ import {
   type Group,
 } from "three";
 import { describeEmptyLevels, describeSpaces, describeTwin, liveBySpaceId } from "./a11y";
-import { STATUS_LABEL, colorForSpace, emissiveForNight, primaryValueLabel } from "./colors";
+import { STATUS_LABEL, colorForSpace, emissiveForNight, primaryValueLabel, statusCause } from "./colors";
 import {
   createPhotoSlot,
   initialCompareState,
@@ -868,17 +868,21 @@ function SpaceLabel({
 function SpaceBeacon({ geom, anchor }: { geom: SpaceGeom; anchor: Vec3 }) {
   const ctx = useCtx();
   const overlay = useContext(OverlayCtx);
-  const status = ctx.liveMap.get(geom.space.id)?.status;
+  const live = ctx.liveMap.get(geom.space.id);
+  const status = live?.status;
   const critical = status === "critical";
-  const color = critical ? PALETTE.critical : PALETTE.gold;
-  const text = critical ? "crítico" : "advertencia";
+  const offline = status === "offline";
+  // Color y texto salen del estado calculado por la API (reglas de STATUS_THRESHOLDS), nunca de la animacion.
+  const color = offline ? PALETTE.offline : critical ? PALETTE.critical : PALETTE.gold;
+  const text = offline ? "sin conexión" : critical ? "crítico" : "advertencia";
+  const cause = statusCause(live, geom.space.capacity);
   return (
     <Html position={anchor} center zIndexRange={[24, 0]} style={{ pointerEvents: "none" }} {...(overlay ? { portal: overlay as RefObject<HTMLElement> } : {})}>
       <style>{"@keyframes cpBeacon{0%{transform:scale(.8);opacity:.85}100%{transform:scale(2.1);opacity:0}}"}</style>
       <button
         type="button"
-        aria-label={`Seleccionar ${geom.space.name}, ${text}`}
-        title={`${geom.space.name}: ${text}`}
+        aria-label={`Seleccionar ${geom.space.name}, ${text}: ${cause.label}`}
+        title={`${geom.space.name}: ${text} (${cause.label})`}
         onClick={() => ctx.select(geom.space.id)}
         style={{
           pointerEvents: "auto",
@@ -896,8 +900,16 @@ function SpaceBeacon({ geom, anchor }: { geom: SpaceGeom; anchor: Vec3 }) {
         }}
       >
         <span style={{ position: "relative", width: 24, height: 24, display: "grid", placeItems: "center" }}>
-          {ctx.reduced ? null : (
-            <span style={{ position: "absolute", inset: 0, borderRadius: "50%", border: `2px solid ${color}`, animation: "cpBeacon 1.8s ease-out infinite" }} />
+          {ctx.reduced || offline ? null : (
+            <span
+              style={{
+                position: "absolute",
+                inset: 0,
+                borderRadius: "50%",
+                border: `2px solid ${color}`,
+                animation: `cpBeacon ${critical ? "1.1s" : "1.8s"} ease-out infinite`,
+              }}
+            />
           )}
           <span
             aria-hidden="true"
@@ -914,11 +926,11 @@ function SpaceBeacon({ geom, anchor }: { geom: SpaceGeom; anchor: Vec3 }) {
               boxShadow: `0 0 0 1px ${color}, 0 2px 8px rgba(0,0,0,.55)`,
             }}
           >
-            !
+            {offline ? "⊘" : "!"}
           </span>
         </span>
-        <span style={{ background: PALETTE.panel, color: PALETTE.text, borderRadius: 4, padding: "2px 5px", border: `1px solid ${color}` }}>
-          {geom.space.code}
+        <span style={{ background: PALETTE.panel, color: PALETTE.text, borderRadius: 4, padding: "2px 5px", border: `1px solid ${color}`, whiteSpace: "nowrap" }}>
+          {geom.space.code} · {cause.label}
         </span>
       </button>
     </Html>
@@ -956,7 +968,7 @@ function FloorGroup({ floor }: { floor: FloorInfo }) {
   });
   const beaconGeoms = floor.geoms.filter((g) => {
     const st = ctx.liveMap.get(g.space.id)?.status;
-    return shown(g) && (st === "warning" || st === "critical");
+    return shown(g) && (st === "warning" || st === "critical" || st === "offline");
   });
   const outlines = floor.geoms.filter((g) => g.space.id === ctx.selectedId || g.space.id === ctx.hoveredId);
   // Balizas y etiquetas: en el GLB van en ANCHOR_SPC_* (se mueven con el piso al explotar).
@@ -1217,7 +1229,9 @@ function CameraRig({
   isolatedLevel,
   reduced,
   coarse,
+  onUserInteract,
 }: {
+  onUserInteract?: (() => void) | undefined;
   coarse: boolean;
   floors: FloorInfo[];
   bounds: Box3;
@@ -1232,6 +1246,16 @@ function CameraRig({
 }) {
   const ref = useRef<CameraControls>(null);
   const camera = useThree((s) => s.camera);
+  // "controlstart" solo lo emite camera-controls ante entrada del usuario (no en setLookAt programatico).
+  const interactRef = useRef(onUserInteract);
+  interactRef.current = onUserInteract;
+  useEffect(() => {
+    const c = ref.current;
+    if (!c) return;
+    const onStart = () => interactRef.current?.();
+    c.addEventListener("controlstart", onStart);
+    return () => c.removeEventListener("controlstart", onStart);
+  }, []);
   const viewport = useThree((s) => s.size);
   const hadFocus = useRef(false);
   const mounted = useRef(false);
@@ -1410,6 +1434,7 @@ function Scene({
   presetReq,
   initialPreset,
   onSource,
+  onUserInteract,
   model,
   clip,
 }: SceneProps & { model: TwinModel | null; clip: Plane }) {
@@ -1590,6 +1615,7 @@ function Scene({
         isolatedLevel={isolatedLevel}
         reduced={reduced}
         coarse={profile === "low"}
+        onUserInteract={onUserInteract}
       />
       <CursorSync pointer={hoveredId !== null || pickHover} />
     </Ctx.Provider>
@@ -1704,6 +1730,7 @@ export default function CampusTwin({
   cameraPreset,
   onPresetChange,
   viewResetToken,
+  onUserInteract,
   quality = "auto",
   className,
 }: TwinProps) {
@@ -1898,6 +1925,7 @@ export default function CampusTwin({
     presetReq,
     initialPreset,
     onSource: setSource,
+    ...(onUserInteract ? { onUserInteract } : {}),
   };
   const isolatedHasNoSpaces =
     isolatedLevel !== null && isolatedLevel !== undefined && !campus.spaces.some((s) => s.level === isolatedLevel);

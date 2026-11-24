@@ -253,6 +253,35 @@ export type BotRun = z.infer<typeof BotRun>;
 export const ScenarioName = z.enum(["aula-saturada", "falla-climatizacion", "normalizar"]);
 export type ScenarioName = z.infer<typeof ScenarioName>;
 
+/** Escenario configurable (solo admin, datos SIMULADOS): cualquier espacio instrumentado y tipo de anomalia. */
+export const ScenarioKind = z.enum(["co2", "temperature", "occupancy", "power", "offline"]);
+export type ScenarioKind = z.infer<typeof ScenarioKind>;
+export const CustomScenarioRequest = z.object({
+  space_id: z.string().min(1).max(64),
+  kind: ScenarioKind,
+  level: z.enum(["warning", "critical"]),
+  duration_min: z.number().int().min(3).max(15).default(8),
+});
+export type CustomScenarioRequest = z.input<typeof CustomScenarioRequest>;
+export const CustomScenarioResponse = z.object({
+  space_id: z.string(),
+  device_id: z.string(),
+  kind: ScenarioKind,
+  level: z.enum(["warning", "critical"]),
+  started_at: EpochMs,
+  until: EpochMs,
+  /** Lecturas sim-scenario insertadas al lanzar (rampa de 2 min y 4 min sostenidos hasta ahora). */
+  inserted: z.number().int(),
+  /** Perfil objetivo que el bot mantiene cada minuto (null en 'offline': no hay lecturas). */
+  profile: MetricValues.nullable(),
+  /** Reglas habilitadas que el perfil cumple (la deteccion la hace el bot, no este endpoint). */
+  expected_rules: z.array(z.object({ id: z.string(), name: z.string(), severity: z.string() })),
+});
+export type CustomScenarioResponse = z.infer<typeof CustomScenarioResponse>;
+export const RestoreScenarioRequest = z.object({ space_id: z.string().min(1).max(64) });
+export const RestoreScenarioResponse = z.object({ space_id: z.string(), resolved: z.number().int(), removed: z.number().int() });
+export type RestoreScenarioResponse = z.infer<typeof RestoreScenarioResponse>;
+
 /* ---------------------------------------------------------------- sistema */
 
 export const HealthResponse = z.object({

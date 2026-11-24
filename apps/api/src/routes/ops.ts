@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { ChatRequest, ScenarioName, type AlertRule } from "@campuspulse/contracts";
+import { ChatRequest, CustomScenarioRequest, RestoreScenarioRequest, ScenarioName, type AlertRule } from "@campuspulse/contracts";
 import { audit, auditStmt } from "../lib/audit";
 import { currentUser, requireRole } from "../auth/session";
 import { safeJson, type AppEnv } from "../lib/db";
@@ -10,7 +10,7 @@ import { jsonBody } from "../lib/validate";
 import { assistantChat } from "../ai/chat";
 import { runIncidentBot } from "../engine/incident-bot";
 import { runReportBot } from "../engine/report-bot";
-import { applyScenario } from "../engine/scenarios";
+import { applyCustomScenario, applyScenario, restoreSpace } from "../engine/scenarios";
 
 export const opsRoutes = new Hono<AppEnv>();
 
@@ -98,6 +98,25 @@ opsRoutes.get("/reports/:id", async (c) => {
 });
 
 /* ---------------------------------------------------------------- escenarios */
+
+/* Escenario configurable (datos SIMULADOS): cualquier espacio instrumentado y tipo de anomalia. Debe ir antes de :name. */
+opsRoutes.post("/scenarios/custom", requireRole("admin"), rateLimit("scenarios", 6), async (c) => {
+  const body = await jsonBody(c, CustomScenarioRequest);
+  const user = currentUser(c);
+  const now = Date.now();
+  const result = await applyCustomScenario(c.env, body, now);
+  await audit(c.env.DB, now, user.id, "scenario.custom", body.space_id, { kind: body.kind, level: body.level, duration_min: body.duration_min });
+  return c.json(result);
+});
+
+opsRoutes.post("/scenarios/restore", requireRole("admin"), rateLimit("scenarios", 6), async (c) => {
+  const body = await jsonBody(c, RestoreScenarioRequest);
+  const user = currentUser(c);
+  const now = Date.now();
+  const result = await restoreSpace(c.env, body.space_id, now, user.id);
+  await audit(c.env.DB, now, user.id, "scenario.restore", body.space_id, result);
+  return c.json({ space_id: body.space_id, ...result });
+});
 
 opsRoutes.post("/scenarios/:name", requireRole("admin"), rateLimit("scenarios", 6), async (c) => {
   const name = ScenarioName.safeParse(c.req.param("name"));

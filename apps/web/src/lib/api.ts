@@ -4,6 +4,8 @@ import {
   BotRun,
   CampusResponse,
   ChatResponse,
+  CustomScenarioResponse,
+  RestoreScenarioResponse,
   ForecastResponse,
   HealthResponse,
   IncidentDetailResponse,
@@ -15,6 +17,7 @@ import {
   SystemInfo,
   AlertRule,
   type ChatRequest,
+  type CustomScenarioRequest,
   type IncidentPatch,
   type IncidentStatus,
   type Metric,
@@ -209,6 +212,11 @@ export const api = {
   reports: (signal?: AbortSignal) => request("/reports", listOf(ReportMeta), { signal }),
   report: (id: string, signal?: AbortSignal) =>
     request(`/reports/${encodeURIComponent(id)}`, ReportDetail, { signal }),
+  /** Escenario configurable (admin, datos simulados): espacio, tipo, nivel y duracion. */
+  scenarioCustom: (body: CustomScenarioRequest) =>
+    request("/scenarios/custom", CustomScenarioResponse, { method: "POST", json: body }),
+  scenarioRestore: (space_id: string) =>
+    request("/scenarios/restore", RestoreScenarioResponse, { method: "POST", json: { space_id } }),
   scenario: (name: ScenarioName) =>
     request(`/scenarios/${encodeURIComponent(name)}`, z.unknown(), { method: "POST" }),
 

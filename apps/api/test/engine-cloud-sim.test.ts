@@ -33,7 +33,7 @@ describe("simulador en la nube (telemetria simulada)", () => {
   it("omite dispositivos con escenario activo y no duplica en el mismo minuto", async () => {
     const now = Date.now();
     await E.DB.prepare(
-      "INSERT INTO scenario_overrides VALUES ('DEV_3_A301','aula-saturada',?1,?2,1700,27,58,52,2100)",
+      "INSERT INTO scenario_overrides (device_id, scenario, started_at, until, co2_ppm, temp_c, rh_pct, occupancy, power_w) VALUES ('DEV_3_A301','aula-saturada',?1,?2,1700,27,58,52,2100)",
     ).bind(now, now + 600_000).run();
     expect((await runCloudSimTick(env(true), now)).inserted).toBe(9);
     await runCloudSimTick(env(true), now + 1000);
