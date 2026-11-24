@@ -74,3 +74,17 @@ Ver `docs/entregables/FINAL/EXPLICACION_DEMO.md`.
 - **Unitarias e integración:** 273 (contratos 9, API 82, web 172, simulador 10).
 - **e2e contra el stack Docker reconstruido:** 15 aprobadas y 3 omitidas a propósito. En ese stack, `link/options` con un código inválido devuelve 403 (la migración 0005 está aplicada) y `link/code` sin sesión devuelve 401.
 - **B3/B4 completas sobre SwiftShader:** no se relanzaron. Siguen documentadas como pendientes.
+
+## 7. Despliegue (23-nov-2026, 19:05 aprox.)
+- **Migración D1 remota:** `0005_link_codes.sql` aplicada. Es aditiva: crea la tabla `link_codes` y no toca datos existentes.
+- **Versión desplegada:** `207d3808-9c4e-4cad-9c9d-2e07fcb0aa91` (commit 252de1f), con las mismas variables que la anterior.
+- **Rollback:** a la versión anterior con `npx wrangler rollback 3d66c483-bf84-4d5a-a3ab-72f2046f3883` desde apps/api. La tabla nueva no afecta a esa versión.
+- **Verificado en producción:**
+  - `/system/health` ok, con `commit 252de1f`.
+  - Las 6 rutas responden 200 y los 3 GLB llegan como `model/gltf-binary`.
+  - `link/options` con un código inválido → 403; `link/code` sin sesión → 401; `register/options` con un token incorrecto → 403.
+  - `login/options` usa `rpId = campuspulse.campuspulse-api.workers.dev` con `userVerification = required`.
+- **D1 después del despliegue:** 0 usuarios, 0 passkeys y token de arranque **todavía sin usar**. El alta del administrador queda para la persona responsable.
+- **GPU en producción:**
+  - Fachada: 43 draw calls, 0 degeneradas.
+  - Modo noche: 65 draw calls, letras U/T/P encendidas.

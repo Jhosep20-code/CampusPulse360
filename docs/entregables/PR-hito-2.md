@@ -1,8 +1,8 @@
 ## Hito 2–5: despliegue público, IA real, gemelo de 10 pisos con modelo Blender, AR y correcciones
 
 **Producción:** https://campuspulse.campuspulse-api.workers.dev (Cloudflare Workers Free)
-- Versión desplegada `3d66c483` (commit `b760757`, modelo Blender v3).
-- Respaldo inmediato `fdf7a207` (commit `3e99078`). Para volver: `wrangler rollback fdf7a207-5ad4-4a89-a47d-1daae54a2b9f`.
+- Versión desplegada `207d3808` (commit `252de1f`: passkeys con vinculación, AR corregida y marca nocturna; migración D1 0005 aplicada).
+- Respaldo inmediato `3d66c483` (commit `b760757`). Para volver: `wrangler rollback 3d66c483-bf84-4d5a-a3ab-72f2046f3883`.
 - Respaldo anterior `4852654b` (commit `9c453f6`).
 - Respaldo anterior `b23b261c` (commit `4bac699`).
 
