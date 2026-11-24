@@ -1,519 +1,534 @@
 # CampusPulse 360
 
-## Gemelo digital inteligente de la UTP Huancayo con IoT, automatización, IA generativa, DevOps y experiencia inmersiva web
+## Gemelo digital inteligente de la UTP Huancayo con IoT simulado, automatización RPA, IA generativa, DevOps y experiencia inmersiva web
 
-**Informe técnico único — Proyecto Final (Unidad 5) y Tarea Académica N.° 5**
+**Informe técnico — Proyecto Final (Unidad 5) y Tarea Académica N.° 5**
 
 | Dato | Valor |
 |---|---|
 | Universidad | Universidad Tecnológica del Perú — sede Huancayo |
-| Curso | **[COMPLETAR: nombre exacto del curso y sección]** |
-| Docente | **[COMPLETAR]** |
+| Curso | **[COMPLETAR: nombre del curso y sección]** |
+| Docente | **[COMPLETAR: nombre del docente]** |
 | Grupo | **[COMPLETAR: número de grupo]** |
-| Integrantes | **[COMPLETAR: apellidos y nombres, código y rol de cada integrante]** |
-| Fecha de entrega | 27 de noviembre de 2026 |
+| Integrante 1 | **[COMPLETAR: apellidos, nombres y código]** — rol: backend, IoT, RPA, IA y DevOps |
+| Integrante 2 | **[COMPLETAR: apellidos, nombres y código]** — rol: gemelo 3D, interfaz, inmersión (AR / primera persona) y documentación |
+| Fecha | 27 de noviembre de 2026 |
 | Demo pública | https://campuspulse.campuspulse-api.workers.dev |
 | Repositorio | https://github.com/Jhosep20-code/CampusPulse360 (rama `feature/hito-2`, PR #1) |
-| Versión en producción | Worker `d9180962` · commit `513ce1e` · D1 con migraciones 0001–0007 |
 
-> **Declaraciones de honestidad:**
-> - **Telemetría:** toda es **simulada**; no hay sensores físicos. La interfaz la rotula «SIMULADO».
-> - **Modelo 3D:** es **representativo**. Las dimensiones están estimadas a partir de fotografías, sin planos.
-> - **IA:** se usa **Cloudflare Workers AI con el modelo `@cf/openai/gpt-oss-20b`** (pesos abiertos publicados por OpenAI), **no la API oficial de OpenAI**.
-> - **TA5:** se resuelve con una alternativa inmersiva **web**. Unity **no** se implementó (§8).
-> - **Cifras:** todas proceden de ejecuciones reales registradas en `docs/evidencias/`. Las pruebas pendientes se indican como tales.
+> **Alcance y honestidad del documento:**
+> - **Sensores:** telemetría **simulada**, no hay sensores físicos.
+> - **Modelo 3D:** **aproximado**; las medidas se estimaron con fotografías, sin planos oficiales.
+> - **IA:** se usa **Cloudflare Workers AI con `@cf/openai/gpt-oss-20b`**, un modelo de pesos abiertos de OpenAI. **No es la API oficial de OpenAI**.
+> - **TA5:** se resuelve con una alternativa inmersiva **web**. **No hay proyecto Unity.**
+> - **Evidencias:** toda cifra procede de ejecuciones registradas en `docs/evidencias/`. Lo pendiente se declara como tal.
+> - **Versiones:** se separa lo publicado en producción de lo que solo está en la rama (§11).
 
 ---
 
 ## Resumen ejecutivo
-CampusPulse 360 es un gemelo digital de la sede UTP Huancayo, funcional y desplegado públicamente.
+CampusPulse 360 es un gemelo digital de la sede UTP Huancayo, desplegado públicamente en Cloudflare con **costo adicional S/ 0,00**.
 
-**La cadena completa, en producción:**
-1. Diez sensores simulados envían CO₂, temperatura, humedad, ocupación y consumo eléctrico.
-2. Una API en Cloudflare Workers valida y guarda las lecturas en D1.
-3. Cada minuto, un bot (RPA) evalúa 7 reglas, abre y cierra incidencias y pide un diagnóstico a la IA (gpt-oss-20b).
-4. El gemelo 3D de 10 pisos, modelado en Blender, cambia de color, ilumina la ventana del aula afectada y enfoca la cámara.
+Cadena de funcionamiento:
+1. Diez sensores **simulados** envían CO₂, temperatura, humedad, ocupación y consumo eléctrico.
+2. Una API firmada (HMAC) guarda las lecturas en D1.
+3. Un **bot RPA** se ejecuta cada minuto, evalúa **7 reglas sostenidas**, abre una única incidencia por condición y solicita un **diagnóstico con IA** (gpt-oss-20b en Workers AI). Si la IA falla, usa un respaldo por reglas rotulado «sin IA».
+4. El **gemelo 3D de 10 pisos** (modelo de Blender 5.3 visualizado con Three.js) colorea el espacio afectado, muestra una baliza con el valor, ilumina su ventana en la fachada y enfoca la cámara.
 
-**Además:**
-- un **asistente conversacional** que responde con datos reales del backend (rankings y porcentajes calculados de forma determinista);
-- **realidad aumentada WebXR**;
-- un **recorrido cinematográfico guiado** y un **recorrido en primera persona** por los 10 pisos;
+Funciones adicionales:
+- un **asistente conversacional** cuyos rankings y porcentajes calcula el backend;
+- **AR WebXR**;
+- un **recorrido cinematográfico guiado**;
 - una **vista de reloj**;
 - **acceso con passkeys**;
 - **CI/CD** con GitHub Actions y Docker.
 
-**Costo adicional: S/ 0,00** (planes gratuitos).
+Para la TA5 se añadió un **recorrido en primera persona** con colisiones sobre el mismo modelo.
 
-**Resultados verificados (24-nov-2026):**
-- **Producción:** CI en verde en los tres últimos commits publicados.
-- **Pruebas:** 349 unitarias y de integración y 15 e2e en verde.
-- **Diagnóstico IA:** una incidencia crítica real de CO₂ en A401 se diagnosticó **en vivo en 2,09 s**.
-- **Asistente:** respuestas contrastadas con los datos del backend.
+**Resultados verificados el 24-nov-2026:**
 
-**Pendiente de evidencia física:** AR en el Galaxy S25 Ultra y la vista en el Galaxy Watch6 Classic.
+| Ámbito | Resultado |
+|---|---|
+| Escenarios en producción | 4 escenarios controlados abrieron la incidencia **crítica** esperada (CO₂ en A401; temperatura en el Hall con la nueva regla crítica; sobreaforo en el Auditorio; consumo en LAB1) |
+| Diagnósticos | **3 en vivo** con gpt-oss-20b (1,7–4,0 s) y **1 por respaldo de reglas**, rotulado «sin IA» |
+| Pruebas automáticas | **350 pruebas** unitarias y de integración en verde y **15 e2e** en Docker (3 omitidas a propósito) |
+| CI | En verde en GitHub |
+| Primera persona | **109 FPS** en el navegador visible |
+
+**Pendiente:**
+- validar la AR en el Galaxy S25 Ultra con la versión final;
+- grabar el video;
+- completar los datos académicos;
+- autorizar el despliegue de la primera persona.
 
 ---
 
-## 1. Introducción y problemática
+## 1. Problema y justificación
 La gestión de las condiciones de un campus universitario suele ser **reactiva y fragmentada**:
-- las incidencias ambientales (aire viciado por CO₂, calor) y de aforo se detectan tarde y se reportan a mano;
-- no existe una vista unificada del estado de cada aula, piso y servicio;
-- no se anticipa la saturación de los espacios ni el deterioro de la calidad del aire;
-- quienes deciden (operaciones, seguridad, docentes) no tienen una herramienta común para preguntar «¿qué está pasando?» y obtener una respuesta con datos.
+1. Las anomalías de calidad del aire (CO₂), temperatura, aforo y consumo eléctrico se detectan tarde y se reportan manualmente.
+2. No existe una vista unificada del estado de cada aula y cada piso.
+3. Quien decide no puede preguntar «¿qué está pasando?» y obtener una respuesta respaldada por datos.
 
-**Relevancia actual:**
-- La ventilación y el aforo de las aulas se convirtieron en criterios de salud y de calidad educativa.
-- Los gemelos digitales, el IoT y la IA generativa ya son tecnologías accesibles, incluso con costo cero en la nube.
+**Justificación:**
+- La ventilación y el aforo de las aulas son criterios de salud y de calidad del servicio educativo.
+- Los gemelos digitales, el IoT y la IA generativa ya son accesibles con planes gratuitos en la nube.
+- Un prototipo integrado demuestra cómo detectar, explicar y comunicar estas situaciones en minutos y sin infraestructura propia.
 
-> **[COMPLETAR, opcional]:** si el equipo cuenta con datos reales de la sede (número de aulas, aforo total, incidencias reportadas), añádalos aquí **con su fuente**. No se incluyen estadísticas sin una fuente verificable.
+> **[COMPLETAR, opcional]:** dato institucional con su fuente (número de aulas o aforo de la sede). No se incluyen estadísticas sin fuente verificable.
 
 ## 2. Objetivos
-**Objetivo general:** diseñar, implementar y desplegar públicamente un gemelo digital de la UTP Huancayo que monitoree el estado de los espacios, automatice la detección y el diagnóstico de incidencias y permita explorar el edificio en 3D, en AR y en primera persona.
+**Objetivo general:** diseñar, implementar y desplegar un gemelo digital de la UTP Huancayo que monitoree el estado de los espacios, automatice la detección y el diagnóstico de incidencias y permita explorar el edificio en 3D, en AR y en primera persona.
 
-| Objetivo específico | Meta | Resultado real (fuente) |
+| Objetivo específico | Indicador | Resultado real (evidencia) |
 |---|---|---|
-| **OE1 IoT:** recibir y visualizar telemetría | 10 dispositivos × 5 variables, lectura por minuto | **Cumplido:**<br>• 10 dispositivos × 5 variables en producción;<br>• ingesta con firma HMAC verificada (910/910 lecturas aceptadas);<br>• simulador en la nube cada minuto.<br>(hito-3; captura `produccion/06`) |
-| **OE2 RPA:** detectar y gestionar incidencias sin intervención | Una incidencia por condición sostenida; cierre automático | **Cumplido:**<br>• bot cada minuto (`success`), 7 reglas, deduplicación y cierre tras 10 min normalizados (`cerradas=2`);<br>• incidencias en A301, A401, BIB y LOBBY.<br>(hito-3, hito-10; capturas `produccion/02` y `04`) |
-| **OE3 IA:** diagnóstico y respuestas útiles con datos reales | JSON válido, causa, acciones y evidencia citada | **Cumplido:**<br>• diagnóstico de A401 en vivo en 2.092 ms, que cita 1.720 ppm y 43/45 personas;<br>• asistente con rankings verificados contra `/live`.<br>(hito-9, hito-10; capturas `produccion/03` y `07`) |
-| **OE4 DevOps:** probar y construir automáticamente | Pipeline con pruebas, e2e en Docker y secretos | **Cumplido:**<br>• GitHub Actions en verde (gitleaks, tipos, pruebas, build, e2e con Docker Compose + Playwright, imagen del simulador);<br>• deploy con rollback.<br>(captura `produccion/10`) |
-| **OE5 Experiencia:** 3D fluido, multidispositivo e inmersivo | ≥ 30 FPS en escritorio; móvil; AR | **Parcial:**<br>• 113 FPS de media en escritorio con GPU (hito-8);<br>• vista móvil verificada en navegador y e2e;<br>• **la AR física en el S25 Ultra está pendiente** |
-| **OE6 Predicción:** pronóstico a 30 min | Holt con error medido | **Cumplido en pruebas:** Holt con backtest (MAE) sobre datos simulados (pruebas unitarias) |
+| **OE1 IoT:** recibir y visualizar telemetría | 10 dispositivos × 5 variables, cada minuto | **Logrado:**<br>• 10 × 5 en producción;<br>• ingesta HMAC con 910/910 lecturas aceptadas;<br>• simulador en la nube cada minuto<br>(hito-3; Fig. «Telemetría») |
+| **OE2 RPA:** gestionar incidencias sin intervención | Una incidencia por condición sostenida; cierre automático | **Logrado:**<br>• bot cada minuto en `success`;<br>• 7 reglas;<br>• deduplicación;<br>• cierre tras 10 min normalizados;<br>• incidencias en A301, A401, BIB, LOBBY, LAB1 y AUD<br>(hito-3, hito-10; §10) |
+| **OE3 IA:** diagnóstico y respuestas útiles con datos reales | JSON válido con causa, acciones y evidencia; rankings correctos | **Logrado:**<br>• 4 diagnósticos en vivo verificados (A401, LOBBY y AUD el 24-nov, A301 el 22-nov);<br>• asistente contrastado con `/live` en 20 preguntas<br>(hito-9, hito-10) |
+| **OE4 DevOps:** probar y construir automáticamente | Pipeline con pruebas, e2e en Docker y secretos | **Logrado:** GitHub Actions en verde (gitleaks, tipos, pruebas, build, e2e con Docker Compose + Playwright, imagen del simulador) |
+| **OE5 Experiencia:** 3D fluido, multidispositivo e inmersivo | ≥ 30 FPS en escritorio; móvil; AR | **Parcial:**<br>• 113 FPS en el recorrido y 109 FPS en primera persona (escritorio con GPU);<br>• vista móvil verificada en navegador;<br>• **la AR física solo tiene una prueba anterior sin captura** (§7.6) |
+| **OE6 Predicción:** pronóstico a 30 min | Error medido | **Logrado en pruebas:** Holt con backtest MAE sobre datos simulados |
 
 ## 3. Alcance y metodología
-**Alcance:**
-- un edificio (10 pisos);
-- 10 espacios instrumentados en P1–P5: hall, biblioteca, 4 aulas, 2 laboratorios, auditorio y oficinas;
-- P6–P10 modelados y rotulados «sin espacios instrumentados»;
-- 7 reglas de alerta;
-- un asistente de IA de solo lectura;
-- tres niveles de AR;
-- vista de reloj;
-- recorridos guiado y en primera persona.
+**Incluido:**
+- **Edificio:** 10 pisos, con 10 espacios instrumentados en P1–P5:
+  - P1: hall y biblioteca;
+  - P2: aulas A201 y A202;
+  - P3: aula A301 y laboratorio de cómputo;
+  - P4: aula A401 y laboratorio de IoT;
+  - P5: auditorio y oficinas.
+- **Pisos P6–P10:** modelados y rotulados «sin espacios instrumentados».
+- **Lógica:** 7 reglas, bot RPA, asistente de IA de solo lectura y escenarios de demostración.
+- **Experiencia:** tres niveles de AR, vista de reloj y recorridos guiado y en primera persona.
 
-**Fuera de alcance:**
-- sensores físicos;
-- planos oficiales;
-- VR con visor;
-- Unity (ver §8);
-- la API oficial de OpenAI.
+**Excluido:** sensores físicos, planos oficiales, VR con visor, Unity y la API oficial de OpenAI.
 
-**Metodología: iterativa por hitos, con verificación antes de declarar terminado cada módulo:**
-- **Análisis de las rúbricas:** `docs/requisitos/`.
-- **Decisiones registradas:** `docs/decisiones/ADR-001…005`.
-- **Riesgos:** `docs/riesgos.md`.
-- **Ciclo de cada hito:** diseño → implementación → pruebas automáticas → despliegue con respaldo → evidencias en `docs/evidencias/hito-1 … hito-10`.
+**Metodología:** iterativa por hitos (hito-1 a hito-10), con verificación antes de cerrar cada módulo:
+1. Análisis de las rúbricas (`docs/requisitos/`).
+2. Decisiones registradas (`docs/decisiones/ADR-001…005`).
+3. Implementación con pruebas automáticas.
+4. Despliegue con respaldo de D1 y opción de rollback.
+5. Evidencias fechadas (`docs/evidencias/`).
 
-**Herramientas de trabajo:** Git con PR #1 sobre `main` (sin fusión automática), CI en cada push, Docker Compose para el stack local y respaldo de D1 antes de cada migración.
+**Prácticas de trabajo:**
+- control de versiones con PR #1, sin fusión automática a `main`;
+- CI en cada push;
+- Docker Compose para el entorno local y de contingencia.
 
-## 4. Arquitectura de la solución
-```
- FUENTES (todas source = sim)                   CLOUDFLARE (plan Free)                         CLIENTES
- ───────────────────────────                    ─────────────────────────────────────          ─────────────────────────
- Simulador IoT (Docker / nube) ──HTTPS+HMAC──►  Worker "campuspulse" (Hono, TypeScript)  ◄──►  Escritorio: Centro de mando
- Escenarios de demostración ──(admin)───────►   ├─ /api/v1/*  ──► D1 (SQLite)                  + gemelo 3D + primera persona
-                                                ├─ Cron * * * * *: bot de incidencias          Móvil (S25 Ultra): /ar WebXR
-                                                │    reglas → incidencia → IA → aviso          Reloj (Watch6): /reloj
-                                                ├─ Cron 0 12 * * *: bot de reportes
-                                                ├─ Workers AI: @cf/openai/gpt-oss-20b
-                                                │    (respaldo determinista "sin IA")
-                                                └─ Static Assets: SPA React + GLB (Blender)
- CI/CD: GitHub Actions → gitleaks → tipos/pruebas/build → e2e Docker Compose + Playwright → imagen GHCR → deploy (condicionado)
-```
+## 4. Arquitectura y flujo de datos
+![Arquitectura de la solución](capturas/diagramas/arquitectura.png)
 
-**Cadena de valor (cada paso es verificable en la interfaz, en la franja «Sensor → API → Reglas → Bot → Incidencia → IA → Gemelo»):**
-```
-Sensor simulado ─► API (HMAC, zod) ─► D1 (readings) ─► Reglas sostenidas (SQL) ─► Bot RPA (cron 1 min)
-   ─► Incidencia (dedup) ─► Diagnóstico IA (JSON validado) ─► Gemelo 3D (color, baliza, ventana, cámara)
-```
+![Cadena de valor y recuperación](capturas/diagramas/flujo-datos.png)
 
-**Decisiones clave (ADR):**
-- **Workers + D1 + Workers AI en el plan Free** (ADR-001).
-- **Proveedor de IA intercambiable** (ADR-002): Workers AI, un adaptador para la API oficial de OpenAI que solo se activa con una clave propia, y un respaldo por reglas.
-- **Passkeys sin contraseñas** (ADR-003).
-- **Alternativa web para la TA5** (ADR-005).
+**Decisiones de arquitectura:**
+- **ADR-001:** Workers, D1 y Workers AI en el plan Free; agregaciones en SQL para respetar el límite de CPU.
+- **ADR-002:** proveedor de IA intercambiable (Workers AI, adaptador para la API oficial de OpenAI sin activar y respaldo por reglas).
+- **ADR-003:** passkeys sin contraseñas.
+- **ADR-005:** alternativa web para la TA5.
 
-**Monorepo pnpm:**
+**Organización del monorepo (pnpm):**
 
 | Módulo | Contenido |
 |---|---|
-| `apps/api` | Hono, D1, bots, IA |
-| `apps/web` | React 19, Three.js/R3F |
+| `apps/api` | Hono, D1, bots e IA |
+| `apps/web` | React 19 y Three.js/R3F |
 | `packages/contracts` | Contratos zod compartidos |
-| `tools/simulator` | Simulador IoT y su imagen Docker |
-| `tools/e2e` | Playwright |
+| `tools/simulator` | Simulador IoT e imagen Docker |
+| `tools/e2e` | Pruebas Playwright |
 | `assets/3d/blender` | Modelo reproducible por script |
 | `infra/` | Docker Compose |
 
 ## 5. Tecnologías utilizadas y justificación
 | Eje del curso | Tecnología | Justificación |
 |---|---|---|
-| IoT | Simulador TypeScript (perfiles por tipo de espacio y hora de Lima), ingesta HTTPS con HMAC-SHA256 y anti-replay de ±60 s | Protocolo compatible con un ESP32 real sin cambiar la API |
-| RPA / bots | Cron Triggers de Workers: bot de incidencias por minuto y bot de reportes diario | Automatización sin servidores propios, con registro en `bot_runs` |
-| IA generativa | Workers AI `@cf/openai/gpt-oss-20b`, prompts versionados y salidas JSON validadas con zod | Gratuito (10.000 neuronas/día), con function calling y razonamiento |
-| CI/CD y contenedores | GitHub Actions y Docker (simulador, stack local, e2e con Docker Compose, imagen en GHCR) | Pruebas automáticas en cada push y entorno reproducible sin conexión |
-| Inmersivas (AR/VR) | Blender 5.3 → GLB; Three.js / React Three Fiber; WebXR (AR); Scene Viewer; recorrido en primera persona | Multiplataforma sin instalación; mismo modelo en web, AR y primera persona |
-| Interfaz | React 19, TypeScript, Tailwind, diseño accesible (identidad #080F1D / #17243A / #2962FF / #22D3D6 / #F0B95B) | Responsive de 360 a 1920 px, vista de reloj circular |
-| Datos | Cloudflare D1 (SQLite): lecturas, incidencias, reglas, salidas de IA, auditoría | 100.000 escrituras/día gratis; consumo medido en torno al 21 % |
-| Seguridad | Passkeys (WebAuthn), roles, CSRF, CSP/HSTS, rate limit, gitleaks | Sin contraseñas almacenadas ni registro público |
+| IoT | Simulador TypeScript con perfiles por tipo de espacio y hora de Lima; HTTPS con HMAC-SHA256 y anti-replay de ±60 s | El mismo protocolo admitiría un ESP32 real sin cambiar la API |
+| RPA / bots | Cron Triggers: bot de incidencias por minuto y bot de reportes diario | Automatización sin servidores propios, auditada en `bot_runs` |
+| IA generativa | Workers AI `@cf/openai/gpt-oss-20b`; prompts versionados; salidas JSON validadas con zod | Gratuito (10.000 neuronas al día), con function calling |
+| CI/CD y contenedores | GitHub Actions; Docker (simulador, stack local, e2e con Compose, imagen en GHCR) | Pruebas automáticas en cada push; entorno reproducible sin conexión |
+| Inmersión | Blender 5.3 → GLB; Three.js / React Three Fiber; WebXR; Scene Viewer; primera persona | Multiplataforma y sin instalación; un mismo modelo para todo |
+| Interfaz | React 19, TypeScript, Tailwind; identidad visual #080F1D / #17243A / #2962FF / #22D3D6 / #F0B95B | Responsive de 360 a 1920 px, accesible, con vista de reloj circular |
+| Datos | Cloudflare D1 (SQLite) | 100.000 escrituras al día gratis; uso medido de ~21 % |
+| Seguridad | Passkeys (WebAuthn), roles, CSRF, CSP/HSTS, límite de solicitudes, gitleaks | Sin contraseñas almacenadas ni registro público |
 
-## 6. Implementación del sistema
-### 6.1 IoT (simulado)
-- **Dispositivos:** 10 (`DEV_<piso>_<código>`), uno por espacio, con 5 variables: `co2_ppm`, `temp_c`, `rh_pct`, `occupancy` y `power_w`.
+## 6. Implementación y funcionamiento
+### 6.1 IoT simulado
+- **Dispositivos:** 10 (`DEV_<piso>_<código>`), uno por espacio, con 5 variables: CO₂, temperatura, humedad, ocupación y potencia.
 - **Simulador:**
-  - curvas diarias de ocupación por tipo de espacio;
-  - CO₂ por balance de masa sencillo, temperatura dependiente de la ocupación y la hora, y ruido;
-  - modos `live`, `backfill` y `scenario`;
-  - imagen Docker publicada por CI.
-- **Ingesta:** `POST /api/v1/ingest` en lotes firmados (HMAC por gateway, ventana de ±60 s y claves revocables). En producción, un simulador en la nube mantiene la demo viva y se detiene cuando llega un gateway real.
-- **Escenarios de demostración** (solo administradores), en cualquiera de los 10 espacios:
-  - tipos: CO₂, temperatura, sobreaforo, consumo y **sin conexión**;
-  - intensidad: advertencia o crítica;
-  - insertan una rampa de lecturas `sim-scenario`;
-  - «Restaurar» cierra solo las incidencias de ese espacio.
+  - curvas de ocupación por tipo de espacio y hora;
+  - CO₂ por balance de masa sencillo;
+  - temperatura dependiente de la ocupación y del día;
+  - ruido aleatorio.
+  - Funciona en Docker (local) y en la nube (cada minuto).
+- **Ingesta:** `POST /api/v1/ingest` con lotes firmados por gateway y ventana de ±60 s. Las firmas inválidas reciben **401**, verificado en producción el 24-nov.
+- **Escenarios de demostración** (solo administrador):
+  - CO₂, temperatura, sobreaforo, consumo o **sin conexión**, en advertencia o crítica, en cualquiera de los 10 espacios;
+  - generan una rampa de lecturas `sim-scenario`;
+  - **Restaurar** cierra solo las incidencias del espacio.
 
 ### 6.2 API y datos
-- **API:** Hono en Workers, `/api/v1`, errores RFC 7807 y validación zod con contratos compartidos con el frontend.
-- **D1** (migraciones 0001–0007, todas aditivas):
-  - estructura: `spaces`, `devices`, `readings`;
-  - reglas e incidencias: `alert_rules`, `incidents`, `incident_events`;
-  - automatización e IA: `ai_outputs`, `bot_runs`, `reports`;
-  - acceso y control: `users`, `passkeys`, `audit_log`, `scenario_overrides`.
-- **Estado en vivo:** `/live` entrega el estado de cada espacio. El frontend lo consulta cada 10 s (con ETag) y se pausa con la pestaña oculta.
+- **API:** Hono en Workers (`/api/v1`), validación zod con contratos compartidos y errores RFC 7807.
+- **D1:** migraciones **0001–0007**, todas aditivas. Antes de aplicar la 0006 y la 0007 se respaldó D1 (exportación con SHA-256 y Time Travel) y se ensayó la migración sobre una copia.
+- **Estado en vivo:** el frontend consulta `/live` cada 10 s (con ETag) y deja de hacerlo con la pestaña oculta.
 
-### 6.3 Reglas y RPA
-**Reglas activas (7):**
-- **CO₂:** ≥ 1.200 ppm durante 120 s (advertencia) y ≥ 1.500 ppm durante 60 s (crítica).
-- **Temperatura:** ≥ 28 °C durante 180 s (advertencia) y ≥ 30 °C durante 60 s (crítica).
-- **Sobreaforo:** ≥ 100 % durante 60 s (crítica).
-- **Consumo:** ≥ 4.500 W durante 120 s (advertencia) y ≥ 6.000 W durante 60 s (crítica).
+### 6.3 Reglas y automatización RPA
+| Regla | Condición | Severidad |
+|---|---|---|
+| CO₂ elevado / CO₂ crítico | ≥ 1.200 ppm 120 s / ≥ 1.500 ppm 60 s | advertencia / crítica |
+| Temperatura alta / crítica | ≥ 28 °C 180 s / ≥ 30 °C 60 s (`RULE_TEMP_CRIT`, migración 0007) | advertencia / crítica |
+| Sobreaforo | ≥ 100 % del aforo durante 60 s | crítica |
+| Consumo elevado / crítico | ≥ 4.500 W 120 s / ≥ 6.000 W 60 s | advertencia / crítica |
 
-**Bot de incidencias** (cron cada minuto; captura `produccion/04`):
-1. Detecta en SQL las condiciones sostenidas.
-2. Abre una sola incidencia por espacio y regla (`dedup_key`); la regla crítica suprime la de advertencia de la misma métrica.
-3. Diagnostica como máximo una incidencia por ciclo.
-4. Cierra automáticamente las que llevan 10 min normalizadas.
-5. Registra cada ejecución en `bot_runs` (por ejemplo, «reglas=7; nuevas=0»).
+**Ciclo del bot** (cada minuto):
+1. Detecta las condiciones sostenidas en SQL.
+2. Abre **una** incidencia por espacio y regla. La regla crítica suprime la de advertencia de la misma métrica.
+3. Diagnostica una incidencia por ciclo.
+4. Cierra las que llevan 10 min normalizadas.
+5. Registra la ejecución en `bot_runs` (por ejemplo, «reglas=7; nuevas=0»).
 
-**Bot de reportes:** diario a las 07:00 (hora de Perú), con rollups y resumen.
-
-**Corrección del 24-nov:** el gemelo marcaba «crítico» a 31,2 °C, pero solo existía la regla de advertencia. Se añadió `RULE_TEMP_CRIT` (migración 0007), con una prueba de coherencia que recorre los 4 tipos × 2 intensidades en 3 espacios.
+**Coherencia gemelo–incidencia:**
+- El 24-nov se detectó que una temperatura de 31,2 °C se veía «crítica» en el gemelo pero abría una incidencia de advertencia.
+- **Corrección:** `RULE_TEMP_CRIT`.
+- **Verificación en producción:** la incidencia del Hall fue **crítica**.
+- **Prueba de coherencia:** recorre 4 tipos × 2 intensidades en 3 espacios.
 
 ### 6.4 IA generativa y prompt engineering
-- **Tarea clave: diagnóstico de incidencias** (prompt `diagnose@1.0.0`):
-  - **Rol:** operador de facilities.
-  - **Contexto inyectado:** lecturas de los últimos 30 min, la regla, el aforo y el historial.
-  - **Ejemplos:** 2 few-shot.
-  - **Salida JSON:** `{causa_probable, severidad, acciones[], evidencia[{device_id, metric, valor}], confianza}`, validada con zod y con un reintento.
-  - **Regla:** «si el dato no está en el contexto, decir que no se sabe».
-  - **Ejemplo real en producción** (captura `produccion/03`): CO₂ crítico en A401. Causa «El nivel de CO₂ alcanzó 1720 ppm con 43 personas presentes en un aula de capacidad 45…», 4 acciones, evidencia citada, confianza del 80 %, `workers-ai · @cf/openai/gpt-oss-20b`, 2.092 ms.
-- **Asistente conversacional** (prompt `assistant@1.1.0`):
-  - **Herramientas de solo lectura** (nunca SQL libre): estado del campus, estado de un espacio, ranking por métrica, espacios por condición, incidencias, actividad del bot, diagnósticos de IA y pronóstico.
-  - **Familias conocidas:** para 18 familias de preguntas, el backend elige la herramienta y calcula rankings y porcentajes. La IA solo redacta.
-  - **Validación de fidelidad:** si la redacción omite el espacio o la cifra calculada, se descarta y se responde con el resultado verificado, rotulado `fallback`.
-  - **Origen del rediseño:** corrige un defecto real («el espacio más ocupado respecto a su aforo» respondía «no hay»; hito-9).
-- **Cuota y respaldo:**
-  - límite propio de 250 llamadas/día y contador visible en «Sistema» (46/250 llamadas y 821/10.000 neuronas el 24-nov; captura `produccion/05`);
-  - sin cupo o sin red, el sistema responde con reglas deterministas rotuladas «sin IA».
-- **Proveedor:**
-  - `gpt-oss-20b` es un modelo de pesos abiertos de OpenAI servido por Cloudflare. **No es la API oficial de OpenAI**, que no tiene cuota gratuita.
-  - Existe un adaptador para la API oficial (probado con mocks) que **no está activado**.
-  - **Riesgo de interpretación:** la rúbrica dice «con APIs de OpenAI». Un evaluador estricto podría considerarlo un cumplimiento parcial (§11).
+**Tarea clave: diagnóstico de incidencias** (prompt `diagnose@1.0.0`):
+- rol de operador de facilities;
+- contexto con las lecturas de 30 min, la regla, el aforo y el historial;
+- 2 ejemplos (*few-shot*);
+- salida JSON `{causa_probable, severidad, acciones[], evidencia[], confianza}` validada con zod, con un reintento;
+- regla «si el dato no está en el contexto, dilo».
+
+**Asistente** (prompt `assistant@1.1.0`):
+- **Herramientas** de solo lectura (nunca SQL libre).
+- **Cálculos en el backend:** en 18 familias de preguntas, el backend elige la herramienta y calcula rankings y porcentajes; la IA redacta.
+- **Validación de fidelidad:** una respuesta que omite el espacio o la cifra calculada se descarta y se usa el resultado verificado, rotulado `fallback`.
+- **Defecto corregido:** «el espacio más ocupado respecto a su aforo» respondía «no hay» (hito-9).
+
+**Diagnósticos verificados en producción:**
+
+| Incidencia | Proveedor y modelo | Modo | Latencia |
+|---|---|---|---|
+| CO₂ crítico en A401 (24-nov) | workers-ai · @cf/openai/gpt-oss-20b | **en vivo** | 2.092 ms |
+| Temperatura crítica en el Hall (24-nov) | workers-ai · @cf/openai/gpt-oss-20b | **en vivo** | 3.971 ms |
+| Sobreaforo en el Auditorio, 180/150 (24-nov) | workers-ai · @cf/openai/gpt-oss-20b | **en vivo** | 1.696 ms |
+| Consumo crítico en LAB1, 6.400 W (24-nov) | rules-fallback · rules-v1 | **respaldo (sin IA)** | — |
+
+- **Fallo en LAB1:** la llamada a Workers AI devolvió una respuesta vacía. El sistema la registró (`valid_json = 0`) y aplicó el respaldo por reglas, **rotulado «sin IA» en la interfaz**. No se presenta como respuesta de IA.
+- **Mejora en la rama:** el respaldo para consumo eléctrico ahora da una causa y 3 acciones concretas (antes: «sin pauta específica»). Aún no está en producción (§11).
+
+**Cuota y proveedor:**
+- límite propio de 250 llamadas al día;
+- consumo del 24-nov: 48 llamadas y unas 874 neuronas de 10.000;
+- `gpt-oss-20b` es de OpenAI, pero **servido por Cloudflare: no es la API oficial de OpenAI**. Existe un adaptador oficial (probado con mocks) que no está activado.
 
 ### 6.5 CI/CD y contenedores
-**Workflow `.github/workflows/ci.yml`** (captura `produccion/10`):
-1. Escaneo de secretos (gitleaks).
-2. Tipos, pruebas y build.
-3. e2e con Docker Compose + Playwright (Worker, D1 local y simulador en contenedores).
-4. Imagen Docker del simulador en GHCR.
-5. Deploy a Cloudflare, condicionado a `main` y a `DEPLOY_ENABLED` (desactivado a propósito).
+- **Pipeline:** `.github/workflows/ci.yml`:
+  1. gitleaks;
+  2. tipos, pruebas y build;
+  3. e2e con Docker Compose + Playwright;
+  4. imagen del simulador en GHCR;
+  5. deploy a Cloudflare, condicionado a `main` y a `DEPLOY_ENABLED`, **desactivado por diseño**.
+- **Despliegue a producción:** manual y controlado. Se respalda D1, se audita la migración, se despliega con `wrangler deploy` desde el commit aprobado y se deja anotado el rollback.
+- **Docker Compose local:** API (Worker + D1 local), cron y simulador. Es el entorno de contingencia sin internet; sin acceso a Workers AI, la IA cae al respaldo rotulado.
 
-**Ejecuciones en verde:** `513ce1e` (7 min 9 s), `72a68a2` y `e682243` (en el 2.º intento).
+![Docker Compose: salida real del stack local (24-nov)](capturas/produccion/15-docker-compose-local.png)
 
-**Despliegue a producción**, manual y controlado:
-1. Respaldo de D1: exportación con SHA-256 y marcador de Time Travel.
-2. Auditoría y ensayo de cada migración sobre una copia del respaldo.
-3. `wrangler deploy` desde el commit aprobado en CI.
-4. Rollback documentado (`wrangler rollback 207d3808…`).
+![GitHub Actions en verde: secretos, pruebas, e2e Docker e imagen del simulador](capturas/produccion/10-github-actions-ci.jpg)
 
-**Docker local:** `docker compose up` levanta el stack completo sin internet (modo de contingencia para la feria).
-
-## 7. Gemelo digital e inmersión web
+## 7. Gemelo 3D, inmersión web y TA5
 ### 7.1 Modelo arquitectónico (Blender 5.3)
 - **Script reproducible:** `assets/3d/blender/build_utp_huancayo.py`.
-  - Jerarquía `BUILDING / FACADE / ROOF / ATRIUM / STAIRS / ELEVATORS / FLOOR_P01–P10 / SPC_* / SENSOR_ANCHORS`.
-  - Materiales PBR (vidrio de muro cortina, paneles, madera, acero, losas).
-  - Exporta GLB de escritorio, móvil y AR.
-- **Edificio:**
-  - **Fachada:** paño blanco, muro cortina azul de 7 franjas y marca UTP iluminada de noche.
-  - **Interior:** atrio con escaleras en zigzag y barandas, núcleo de 3 ascensores, aulas con mobiliario, laboratorios y biblioteca.
-- **Fidelidad:** contrastada con fotografías y videos oficiales (`docs/referencias/matriz-correspondencia-v3.md`). Las dimensiones son **estimadas**.
+  - Jerarquía `FACADE / ATRIUM / STAIRS / ELEVATORS / FLOOR_P01–P10 / SPC_*`.
+  - Materiales PBR.
+  - Exporta GLB para escritorio, móvil y AR.
+- **Elementos:**
+  - fachada con muro cortina y marca UTP iluminada de noche;
+  - atrio con escaleras en zigzag;
+  - núcleo de 3 ascensores;
+  - aulas con mobiliario.
+- **Medidas:** estimadas a partir de fotografías y videos (sin planos).
 
-![Exterior de día (render de Blender)](capturas/blender/exterior-dia.png)
-![Atrio y escaleras (render de Blender)](capturas/blender/atrio.png)
+![Render del modelo de Blender (exterior)](capturas/blender/exterior-dia.png)
 
-### 7.2 Visor 3D (Three.js / React Three Fiber)
-- **Vistas:** Fachada, Aérea, Atrio (corte de sección), Referencia (comparación con una foto local que no sale del dispositivo), aislar P1–P10, pisos explotados, modo datos y modo noche.
+### 7.2 Visor 3D y alertas
+- **Vistas:** Fachada, Aérea, Atrio (corte), Referencia (comparación con foto local), pisos explotados, aislamiento P1–P10, modo datos y modo noche.
 - **Capas de datos:** estado, CO₂, temperatura, ocupación y energía.
-- **Alertas visibles:**
-  - transición de color del volumen del espacio;
-  - pulso en crítico;
-  - baliza con el valor («A401 · CO₂ 1.720 ppm»);
-  - **ventana de la fachada iluminada** (dorada en advertencia, roja pulsante en crítico);
-  - enfoque y órbita de cámara;
-  - vuelta automática al estado normal al restaurar (hito-8; capturas `demo-animada/00–02`).
-- **Rendimiento con GPU** (hito-8):
-  - Fachada: 43 draw calls; piso aislado: 28.
-  - **113 FPS de media** durante el recorrido y **117 FPS** en reposo.
-  - Perfil móvil con LOD reducido y `prefers-reduced-motion` respetado.
+- **Respuesta a una alerta:**
+  - cambio de color y pulso en crítico;
+  - **baliza con el valor**;
+  - **ventana iluminada en la fachada**;
+  - enfoque de cámara;
+  - restauración al estado normal.
+- **Localización:** el 24-nov, tres anomalías simultáneas solo colorearon sus 3 espacios; el resto siguió normal (KPI «7/10 normales, 3 críticos»).
+- **Rendimiento con GPU:** 43 draw calls en la fachada, **113 FPS** de media en el recorrido y 117 en reposo.
 
-![Centro de mando con el gemelo y el panel Demostración (producción)](capturas/produccion/01-centro-de-mando-admin.jpg)
-![A401 en crítico con el piso aislado](capturas/demo-animada/01-a401-critico-piso-aislado.jpg)
-![Ventana de A401 en rojo en la fachada y flujo completo](capturas/demo-animada/02-a401-fachada-ventana-roja-flujo-completo.jpg)
+![Tres anomalías simultáneas: solo LOBBY, LAB1 y AUD en crítico, con sus balizas (producción, 24-nov)](capturas/produccion/11-tres-anomalias-gemelo-localizado.jpg)
+
+![A401 en crítico: piso aislado y ventana roja en la fachada con el flujo completo](capturas/demo-animada/02-a401-fachada-ventana-roja-flujo-completo.jpg)
 
 ### 7.3 Recorrido cinematográfico guiado
-**Pasos:** aérea → fachada → atrio → piso → aula con sensores.
+- **Recorrido:** aérea → fachada → atrio → piso → aula, con movimiento continuo de cámara.
+- **Controles:** pausa, reinicio y cancelación (al arrastrar la cámara o con «Salir»).
+- **Indicador ilustrativo de ascensor:** el GLB no tiene cabinas.
+- **Verificado en producción (24-nov):** pausa sostenida 9 s, reinicio al paso 1 y cancelación.
+- **Grabación real:** 55 s, con movimiento en el 87 % de las muestras.
 
-**Comportamiento:**
-- movimiento continuo de cámara (órbita y transiciones de 1,1 s);
-- **pausa**, **reinicio** y **cancelación** al arrastrar la cámara o con «Salir»;
-- indicador ilustrativo del ascensor en el Atrio. Es «sin cabina modelada»: el GLB no tiene cabinas.
+### 7.4 Recorrido en primera persona (TA5)
+| Aspecto | Implementación |
+|---|---|
+| Control | **WASD / flechas**, **Shift** para correr, **arrastrar con ratón o dedo** para mirar, **cruceta táctil** en móvil |
+| Altura | Ojos a 1,65 m sobre la losa |
+| Colisiones | Rectángulos en planta con las **mismas medidas del script de Blender**: muros exteriores, vacío del atrio (desde P2), escaleras, núcleo de ascensores y tabiques de los ambientes, **con 5 puertas como único paso** |
+| Pisos | **P1–P10 mediante controles** (RePag/AvPag o botones). **Las escaleras no se recorren físicamente** |
+| Salida | Esc o «Salir»: vuelven las cámaras orbitales y el Centro de mando; se cancela el recorrido guiado |
+| Limitaciones | El mobiliario no colisiona; interior esquemático |
 
-**Verificado en producción el 24-nov (hito-10):**
-- pausa mantenida 9 s en el paso 5;
-- reinicio al paso 1;
-- cancelación por arrastre y con el botón.
+**Verificación (24-nov, build de producción en Docker, navegador visible):**
+- **Rendimiento:** **109 FPS**.
+- **Movimiento y colisiones:**
+  - caminando con W se cruza la puerta central del hall hacia el pasillo;
+  - el núcleo de ascensores detiene el desplazamiento lateral;
+  - a 3,6 m de una puerta, el tabique detiene el avance.
+- **Pisos:** el cambio se detiene en P10.
+- **Salida:** Esc devuelve la vista orbital.
+- **Errores:** ninguno en la consola.
+- **Pruebas:** 7 pruebas unitarias de colisiones.
+- **Móvil:** los controles quedaron dentro del lienzo y accesibles.
 
-**Grabación real:** 55 s (`capturas/video/demo-animada-local.webm`), con el 87 % de las muestras en movimiento.
+**Estado:** en la rama y en el stack local. **No está desplegado en producción** (§11).
 
-### 7.4 Recorrido en primera persona (FPS) — nuevo para la TA5
-Botón **«Primera persona»** en el Centro de mando (`apps/web/src/twin/fps.ts`, `CampusTwin.tsx`).
+![Primera persona: pasillo de P1 tras cruzar la puerta del hall](capturas/primera-persona/04-p1-pasillo-tras-cruzar-puerta.png)
 
-**Controles:**
-- **WASD o flechas** para caminar y **Shift** para correr;
-- **arrastrar con el ratón o el dedo** para mirar;
-- **cruceta táctil** en el móvil;
-- **RePag/AvPag** o botones para subir o bajar de piso (P1–P10), y **Esc** para salir.
+![Primera persona: el núcleo de ascensores bloquea el paso](capturas/primera-persona/05-p1-colision-nucleo-ascensores.png)
 
-**Cámara:** a 1,65 m sobre la losa.
-
-**Colisiones simples** en planta, con las mismas medidas con las que Blender construye el GLB:
-- muros exteriores;
-- vacío del atrio desde P2;
-- escaleras;
-- núcleo de ascensores;
-- tabiques de aulas y oficinas, con sus 5 puertas como único paso.
-
-El mobiliario no colisiona (simplificación declarada).
-
-**Sin geometría ni dependencias nuevas.** Al salir vuelven las cámaras orbitales; el modo cancela el recorrido guiado.
-
-**Verificación (24-nov, local con el GLB):**
-- 7 pruebas unitarias de colisiones;
-- en la app, caminando con W desde el hall se cruza la puerta central y el atrio de P1 hasta el muro posterior;
-- a 3,6 m de la puerta, el tabique detiene el avance a 0,35 m;
-- el cambio de piso P1→P10 se detiene en P10;
-- Esc devuelve la vista Fachada.
-
-**Pendiente:** medir los FPS en un equipo con la ventana visible y en el S25. La pestaña de pruebas estaba en segundo plano y Chrome la limitaba a 1,5 FPS, lo que no representa el rendimiento real.
-
-![Primera persona: hall de P1 frente a la puerta central](capturas/primera-persona/01-p1-hall-puerta-central.png)
-![Primera persona: pasillo de P5 y atrio con escaleras y núcleo](capturas/primera-persona/02-p5-pasillo-atrio.png)
 ![Primera persona: aula A201 (P2) con mobiliario y muro cortina](capturas/primera-persona/03-p2-aula-a201.png)
 
-### 7.5 Realidad aumentada y reloj
-- **AR (`/ar`), en tres niveles:**
-  - **A:** WebXR `immersive-ar` con hit-test, maqueta de unos 0,60 m y colores en vivo;
-  - **B:** Scene Viewer de ARCore con el GLB de AR (estático);
-  - **C:** vista 3D, que **no es AR**.
-  - En escritorio la página indica correctamente que no hay WebXR (captura `produccion/08`). **La prueba en el Galaxy S25 Ultra está pendiente.**
-- **Reloj (`/reloj`):** esfera circular con la alerta más grave, KPIs y la etiqueta SIMULADO (captura `produccion/09`). Simulada en el navegador; **la prueba en el Galaxy Watch6 Classic está pendiente**.
-- **Notificaciones al reloj:** Telegram **no está configurado**, porque falta el token del bot.
+### 7.5 Realidad aumentada
+**Niveles de `/ar`:**
+- **A:** WebXR `immersive-ar` con hit-test, maqueta de unos 0,60 m y colores en vivo;
+- **B:** Scene Viewer de ARCore con el GLB de AR, estático;
+- **C:** vista 3D, que **no es AR**.
 
-## 8. Adaptación técnica de la TA5: alternativa inmersiva web
+**Evidencia:**
+- en producción la página ofrece los tres niveles y, en escritorio, indica correctamente que no hay WebXR;
+- el código de AR **no ha cambiado** desde la versión desplegada el 23-nov (`207d3808`);
+- el equipo reportó una prueba física en el S25 Ultra, **pero no hay capturas de esa prueba en los archivos del proyecto**.
+
+**Pendiente:** validar y capturar la AR con la versión final.
+
+### 7.6 Vista de reloj
+- **`/reloj`:** esfera circular con la alerta más grave, CO₂ medio, ocupación y la etiqueta SIMULADO.
+- **Evidencia física:** fotografías del **Galaxy Watch6 Classic** del 23-nov a las 19:52 (versión `207d3808`), con «Campus normal» y «CO₂ medio 790 ppm». El código del reloj no ha cambiado desde entonces.
+- **Telegram:** **no está configurado**. No hay notificaciones al reloj; es integración futura.
+
+![Galaxy Watch6 Classic: vista /reloj (foto del 23-nov)](capturas/dispositivos/watch6-reloj-co2-medio-2026-11-23.png)
+
+## 8. Adaptación técnica de la TA5
 ### 8.1 Qué pide la TA5 y qué se entrega
 - **Lo que pide:**
-  - un proyecto 3D en **Unity** con terreno, objetos, materiales, duplicación y cámara FPS;
+  - un proyecto **Unity** 3D con terreno, objetos, materiales, duplicación y cámara FPS;
   - un proyecto VR en **Unity** con **Meta XR SDK, OpenXR y XR Plug-in Management**, ejecutado en un **simulador VR**.
-- **Lo que entrega el equipo** (decisión ADR-005): la misma experiencia de diseño 3D y recorrido en primera persona, sobre **web**:
+- **Lo que entrega el equipo** (ADR-005):
   - escenario modelado en **Blender 5.3**;
-  - visor **Three.js / React Three Fiber**;
-  - recorrido FPS web;
-  - inmersión con **WebXR (AR)**.
+  - visualización con **Three.js / React Three Fiber**;
+  - recorrido cinematográfico;
+  - recorrido **FPS web** con colisiones;
+  - **AR WebXR** y **Scene Viewer**.
+  - Todo integrado en la misma aplicación del Proyecto Final.
 
-### 8.2 Comparación Unity/VR frente a la alternativa web
-| Aspecto | Unity + XR (lo que pide la consigna) | CampusPulse 360 web (lo entregado) |
+### 8.2 Comparación
+| Aspecto | Unity + XR (lo que pide la consigna) | Alternativa web (lo entregado) |
 |---|---|---|
-| Herramientas y arquitectura | Editor Unity, C#, escenas y prefabs; Meta XR SDK, OpenXR, XR Plug-in Management; build por plataforma | Blender (modelo por script) → GLB → Three.js/R3F en React; un solo build web servido desde Cloudflare |
-| Navegación e interacción 3D | CharacterController + Input System; XR Origin con locomoción | Cámara FPS propia (WASD, ratón o dedo, cruceta táctil, cambio de piso), colisiones en planta; además, cámaras orbitales, recorrido guiado y aislamiento de pisos |
-| Compatibilidad | Ejecutable por plataforma (Windows, Android o visor); instalación previa | Navegadores con WebGL 2 (probado en Chrome/Brave de escritorio y vista móvil emulada; iOS **no probado**); sin instalación; enlace público |
-| Integración con IoT e IA | Requiere programar clientes HTTP o WebSocket hacia la API | Nativa: el mismo gemelo muestra `/live`, incidencias, diagnósticos de IA y el asistente (que mueve la cámara a los espacios citados) |
-| Realidad aumentada | AR Foundation / ARCore (otro proyecto) | WebXR `immersive-ar` (nivel A), Scene Viewer (B) y respaldo 3D (C) en la misma app |
-| Requisitos de hardware | PC con GPU para el editor; visor para VR real (o simulador) | Navegador con WebGL 2; 113 FPS medidos en la laptop del equipo con GPU (hito-8); el móvil usa un LOD reducido (FPS en el S25 pendientes) |
-| Escalabilidad | Un build por plataforma; distribución por tienda o archivo | Despliegue global en el borde (Cloudflare), actualizaciones instantáneas y CI/CD |
-| Limitaciones | Curva de aprendizaje y licencias; integración de datos manual | **Sin VR con visor ni simulador VR de Unity**; colisiones simplificadas (sin mobiliario); interior esquemático |
+| Herramientas | Editor Unity, C#, Meta XR SDK, OpenXR, XR Plug-in Management | Blender (modelo por script) → GLB → Three.js/R3F; un build web |
+| Navegación | CharacterController, XR Origin y locomoción | FPS propio (teclado, ratón, táctil), colisiones en planta, cambio de piso por controles; además, cámaras, recorrido guiado y aislamiento de pisos |
+| Compatibilidad | Ejecutable por plataforma; instalación previa | Navegador con WebGL 2, sin instalación. Probado en Chrome de escritorio y en vista móvil; **iOS no probado** |
+| IoT e IA | Clientes HTTP a programar | Nativo: `/live`, incidencias, diagnósticos y asistente en el mismo gemelo |
+| Realidad aumentada | AR Foundation, en otro proyecto | WebXR (A), Scene Viewer (B) y respaldo 3D (C) |
+| Hardware | PC con GPU; visor para VR real | Navegador con WebGL 2; 109–117 FPS medidos en la laptop con GPU |
+| Escalabilidad | Distribución por build | Despliegue global en el borde, actualización inmediata y CI/CD |
+| Limitaciones | Curva de aprendizaje, licencias, integración manual de datos | **Sin VR con visor ni simulador VR**; colisiones simplificadas; interior esquemático |
 
-### 8.3 Equivalencias y no cumplimientos literales
-- **Funcionalmente equivalente:**
-  - escenario 3D estructurado y ambientado con materiales PBR, duplicación de elementos (aulas, mobiliario, ventanas y barandas instanciadas) y entorno (terreno, calles y edificios vecinos);
-  - recorrido en primera persona con control total del desplazamiento y colisiones;
-  - navegación inmersiva interactiva;
-  - documentación y código organizados.
-- **No cumple literalmente:**
-  - **no** se creó un proyecto en Unity;
-  - **no** se instalaron Meta XR SDK, OpenXR ni XR Plug-in Management;
-  - **no** se ejecutó un simulador VR de Unity;
-  - **no** hay VR con visor.
-  - La inmersión entregada es **AR WebXR** y **primera persona en pantalla**.
-- **Riesgo:** los criterios 4, 5 y 6 de la TA5 (y «en Unity» de los criterios 1 a 3) dependen de que el docente acepte la alternativa. Se recomienda consultarlo **antes** de la entrega.
-
-### 8.4 Camino futuro hacia Unity/OpenXR
-- **Modelo reutilizable:** el GLB (`apps/web/public/models/`) es estándar y conserva la jerarquía `FLOOR_Pxx/SPC_*`, así que puede importarse en Unity con **glTFast**.
-- **Pasos:**
-  1. Añadir XR Origin con OpenXR y XR Interaction Toolkit.
-  2. Reutilizar las colisiones como `BoxCollider` (las mismas medidas de `fps.ts`).
-  3. Conectar `/api/v1/live` para colorear los espacios.
-- **Material de partida:** la rama local `feature/ta5-unity` conserva un paquete C# de partida, **sin compilar ni probar**.
-
-## 9. Pruebas funcionales, resultados y evidencias
-| Tipo | Resultado (fecha) | Dónde |
+### 8.3 Criterio por criterio
+| Criterio TA5 | Equivalente técnico entregado | ¿Cumplimiento literal? |
 |---|---|---|
-| Unitarias e integración | **349 en verde** (24-nov): contratos 9, API 139 (incluye 46 de regresión del asistente y la coherencia de severidades), web 191 (incluye 7 de primera persona), simulador 10 | `pnpm -r test` |
-| e2e (Playwright + Docker Compose) | **15 aprobadas y 3 omitidas a propósito** (5,2 min, local) y en verde en CI | `tools/e2e` y Actions |
-| CI en GitHub | En verde en `513ce1e`, `72a68a2` y `e682243` | Actions |
-| Secretos | gitleaks sin hallazgos en el historial de la rama | CI y local |
-| Producción | `/system/health` ok; bot cada minuto en `success`; IA disponible | Captura `produccion/05` |
-| Asistente con el modelo real | 12 preguntas en local y 8 en producción, comparadas con `/live`: ranking por porcentaje, número absoluto, CO₂, temperatura, consumo, sobreaforo, desconectados, incidencias y estado general | hito-9, hito-10 |
-| Cadena completa | Escenario → reglas → bot → incidencia → diagnóstico en vivo → gemelo, en A301, A401, BIB y LOBBY | Capturas `produccion/02` y `03`; hito-3, hito-8 y hito-10 |
-| Recorrido guiado, vistas y P1–P10 | Aprobado en producción (24-nov) | hito-10 §5 |
-| Primera persona | Aprobado en local con el GLB (24-nov) | §7.4 y `capturas/primera-persona` |
-| AR física y reloj físico | **Pendiente** | — |
+| 1. Escenario 3D **en Unity** | Edificio de 10 pisos, entorno (terreno, calles, edificios vecinos) e interiores en Blender | **No** (herramienta distinta) |
+| 2. Materiales y objetos 3D | PBR en todos los objetos; elementos duplicados e instanciados | Funcionalmente sí (en Blender) |
+| 3. Recorrido tipo FPS | FPS web con control total y colisiones | Funcionalmente sí (**no en Unity**) |
+| 4. Entorno VR **en Unity** | AR WebXR y FPS en pantalla | **No** |
+| 5. Plugins **de Unity** | WebXR Device API, Three.js/R3F, drei | **No** |
+| 6. Navegar el recorrido **VR** en simulador | FPS navegable en pantalla; AR en el móvil | **No** (sin simulador ni visor VR) |
+| 7–10. Informe, capturas, código, redacción | Este informe, capturas clasificadas, monorepo con pruebas | Sí (pendientes los datos académicos) |
 
-![Incidencias generadas por el bot (producción)](capturas/produccion/02-incidencias.jpg)
-![Diagnóstico IA en vivo de CO₂ crítico en A401](capturas/produccion/03-incidencia-a401-diagnostico-ia.jpg)
-![Reglas activas y ejecuciones del bot](capturas/produccion/04-automatizaciones-reglas-bot.jpg)
-![Asistente con respuestas verificables](capturas/produccion/07-asistente-ia.jpg)
-![Telemetría simulada de los 10 espacios](capturas/produccion/06-iot-telemetria.jpg)
-![Sistema: versión desplegada y consumo de IA](capturas/produccion/05-sistema-version-ia.jpg)
-![GitHub Actions en verde](capturas/produccion/10-github-actions-ci.jpg)
+### 8.4 Procedimiento futuro: GLB → Unity + OpenXR
+1. Instalar Unity 6 LTS con la plantilla «VR Core».
+2. Añadir **glTFast** e importar `apps/web/public/models/utp-huancayo.glb`, que conserva la jerarquía `FLOOR_Pxx` / `SPC_*`.
+3. En **XR Plug-in Management**, activar **OpenXR**. Añadir **XR Interaction Toolkit** y un **XR Origin** con locomoción continua y teletransporte.
+4. Crear `BoxCollider` con las mismas medidas de `apps/web/src/twin/fps.ts` (muros, atrio, núcleo y tabiques con puertas).
+5. Probar con el **XR Device Simulator** (sin visor) y, si se requiere, con **Meta XR SDK**.
+6. Opcional: consultar `GET /api/v1/live` desde C# para colorear los `SPC_*`.
 
-## 10. Seguridad, autenticación y costos
-- **Autenticación:**
-  - passkeys (WebAuthn), con firma ECDSA y sin contraseñas almacenadas;
-  - alta solo con un token de arranque de un solo uso, que ya fue consumido;
-  - vinculación de un segundo dispositivo con un código de un solo uso válido 10 min;
+### 8.5 Defensa breve para la sustentación
+> «La TA5 busca el diseño de un escenario 3D, un recorrido en primera persona y una experiencia inmersiva. Las implementamos sobre el **mismo gemelo digital** del Proyecto Final:
+> - un modelo de Blender de 10 pisos;
+> - un recorrido FPS con colisiones;
+> - un recorrido guiado y AR WebXR en el teléfono.
+>
+> Elegimos la web porque funciona sin instalación en cualquier dispositivo, está desplegada públicamente y muestra en tiempo real los datos IoT, las incidencias y los diagnósticos de IA.
+>
+> Somos transparentes: **no hicimos un proyecto Unity ni usamos sus plugins de VR ni un simulador VR**; esos criterios no se cumplen literalmente. El modelo es GLB estándar y documentamos el procedimiento para llevarlo a Unity con OpenXR.»
+
+## 9. Seguridad y costos
+- **Acceso:**
+  - **passkeys** (WebAuthn) sin contraseñas;
+  - alta solo con token de un solo uso, ya consumido;
+  - vinculación de dispositivos con un código de 10 min;
   - sesión en cookie httpOnly/Secure/SameSite=Strict de 8 h.
-  - **En producción:** 1 administrador con 2 passkeys (escritorio y Android).
-- **Autorización y defensas:**
-  - roles (visitante de solo lectura, operador y administrador);
-  - CSRF por Origin y rate limit en D1;
-  - HMAC en la ingesta;
-  - CSP estricta, HSTS, `frame-ancestors 'none'` y `nosniff`;
-  - registro de auditoría de las escrituras.
-- **Secretos:** solo en `wrangler secret` y en GitHub Secrets; gitleaks en CI. Los respaldos de D1 quedan fuera de git (`backups/`).
-- **IA:** herramientas de solo lectura, sin SQL libre, contexto delimitado y sin datos personales en los prompts.
-- **Privacidad:** solo conteos agregados, sin cámaras ni identidades (minimización conforme a la Ley 29733).
-- **Costos: S/ 0,00.**
-  - Workers, D1 y Workers AI en el plan Free, sin facturación.
-  - Consumo medido: unas 21.000 escrituras D1/día (21 % del límite) y 821 de 10.000 neuronas el 24-nov.
-  - Al agotarse la cuota de IA, el sistema responde con reglas rotuladas.
+  - En producción: 1 administrador con 2 passkeys (escritorio y Android).
+- **Autorización verificada en producción (24-nov):**
+  - sin sesión, escenarios, restauración y reglas devuelven **401**;
+  - una ingesta con firma inválida devuelve **401**;
+  - un `Origin` ajeno recibe **403**;
+  - el visitante tiene solo lectura.
+  - Las operaciones administrativas se hicieron con una sesión de administrador válida.
+- **Cabeceras:** CSP estricta, `nosniff`, `X-Frame-Options: DENY` y HSTS.
+- **Secretos:**
+  - solo en `wrangler secret` y en GitHub Secrets;
+  - gitleaks sin hallazgos en el historial;
+  - `.gitignore` excluye `.dev.vars`, `*.local.env`, `infra/*.secrets.local*` y `backups/`;
+  - las capturas públicas tienen recortado el nombre del usuario.
+- **Privacidad:** solo conteos agregados, sin cámaras ni identidades (Ley N.° 29733).
+- **Costos: S/ 0,00.** Workers, D1 y Workers AI en plan Free, sin facturación. Al agotarse la cuota de IA, el sistema responde con reglas rotuladas.
 
-## 11. Matriz de cumplimiento
-**Leyenda:** ✅ cumplido con evidencia · 🟡 parcial o con riesgo · ⏳ pendiente · ❌ no cumplido.
+## 10. Pruebas y resultados
+| Tipo | Resultado | Fecha |
+|---|---|---|
+| Unitarias e integración | **350 aprobadas, 0 fallidas**:<br>• contratos 9;<br>• API 140;<br>• web 191;<br>• simulador 10 | 24-nov (local) |
+| e2e Playwright + Docker Compose | **15 aprobadas, 0 fallidas, 3 omitidas a propósito** (5,5 min) | 24-nov (local) |
+| CI en GitHub | En verde en `513ce1e`, `72a68a2` y `e682243`; el HEAD final se verifica en la PR #1 | 24-nov |
+| gitleaks | Sin hallazgos en el historial de la rama | 24-nov |
+| Asistente con el modelo real | 20 preguntas (12 en local y 8 en producción) contrastadas con `/live`: rankings por aforo y absolutos, CO₂, temperatura, consumo, sobreaforo, desconexión, incidencias y estado general | 24-nov |
+| Escenarios en producción | 4 incidencias críticas coherentes con el estado del gemelo; 3 diagnósticos en vivo y 1 respaldo; las 3 de hoy restauradas (0 abiertas) | 24-nov |
+| Primera persona | 109 FPS; puerta, núcleo, tabique, P10, Esc y móvil verificados | 24-nov (local) |
+| Seguridad | 401 y 403 en operaciones sin autorización | 24-nov (producción) |
 
-### 11.1 Proyecto Final (20 puntos)
-| # | Criterio (máx.) | Función verificable | Prueba / evidencia | Sección del informe | Estado |
+![Incidencias generadas por el bot en los escenarios del 24-nov](capturas/produccion/12-incidencias-escenarios-24nov.jpg)
+
+![Diagnóstico en vivo: temperatura crítica en el Hall (RULE_TEMP_CRIT, gpt-oss-20b, 3.971 ms)](capturas/produccion/13-hall-temp-critica-diagnostico-ia.jpg)
+
+![Respaldo por reglas rotulado «sin IA» (consumo en LAB1)](capturas/produccion/14-lab1-consumo-respaldo-sin-ia.jpg)
+
+![Asistente con respuestas verificadas contra el backend](capturas/produccion/07-asistente-ia.jpg)
+
+![Reglas activas y ejecuciones del bot](capturas/produccion/04-automatizaciones-reglas-bot.jpg)
+
+![Telemetría simulada de los 10 espacios](capturas/produccion/06-iot-telemetria.jpg)
+
+## 11. Estado de versiones: local, GitHub y producción
+| Componente | Producción (Worker `d9180962`, commit `513ce1e`) | Rama `feature/hito-2` (GitHub) |
+|---|---|---|
+| Asistente corregido, gemelo, recorrido guiado, escenarios, AR, reloj, passkeys | **Sí** | Sí |
+| Regla `RULE_TEMP_CRIT` (migración 0007 en D1) | **Sí** (D1 de producción) | Sí |
+| Recorrido en primera persona | **No** (pendiente de autorización de despliegue) | Sí |
+| Severidades en español en el panel Demostración | No | Sí |
+| Respaldo por reglas específico para consumo eléctrico | No | Sí |
+
+**Rollback disponible:**
+- Worker: `npx wrangler rollback 207d3808-9c4e-4cad-9c9d-2e07fcb0aa91`;
+- D1: marcador de Time Travel registrado en hito-10.
+
+## 12. Matriz de cumplimiento
+**Estados:**
+- **CC:** cumplido y comprobado;
+- **IE:** implementado, con evidencia insuficiente;
+- **P:** parcial;
+- **Pe:** pendiente;
+- **NL:** no cumplido literalmente.
+
+### 12.1 Proyecto Final (20 puntos)
+| # | Requisito (máx.) | Implementación | Evidencia | Estado | Corrección necesaria |
 |---|---|---|---|---|---|
-| 1 | Planteamiento del problema y objetivo (2) | Problema, objetivos medibles y resultados reales | Tabla de OE con fuentes | §1–2 | ✅ (falta contexto local con fuente, opcional) |
-| 2 | Aplicación de tecnologías del curso (3) | Los 5 ejes encadenados: IoT → D1 → RPA → IA → gemelo/AR, más CI/CD | Cadena verificada en producción en 4 espacios | §4–7, §9 | ✅ |
-| 3 | Desarrollo técnico del prototipo (3) | Monorepo modular, contratos compartidos, 7 migraciones, bots y escenarios | 349 pruebas, 15 e2e y producción operativa | §6, §9 | ✅ |
-| 4 | CI/CD y contenedores (3) | Actions: gitleaks, pruebas, e2e Docker, imagen GHCR; deploy con respaldo y rollback | Runs en verde y captura `produccion/10` | §6.5 | ✅ (deploy por CI desactivado a propósito; se hace manual y controlado) |
-| 5 | IA y prompt engineering (3) | Diagnóstico JSON (tarea clave), asistente con herramientas y validación de fidelidad | Diagnóstico de A401 en vivo; 20 preguntas verificadas | §6.4 | 🟡 Cumple técnicamente; **riesgo:** Workers AI con un modelo de OpenAI, no la API oficial de OpenAI |
-| 6 | Interfaz Web/AR/VR (1,5) | SPA responsive, gemelo 3D en tiempo real, primera persona, AR de 3 niveles y reloj | Capturas de producción; 113 FPS | §7 | 🟡 hasta probar la AR en el S25 |
-| 7 | Informe técnico (1,5) | Este informe: esquemas, capturas, resultados e impacto | — | Todo | 🟡 faltan los datos académicos y las conclusiones finales |
-| 8 | Presentación final (1,5) | Guion de 5 min con roles | `GUION_DEMO_5MIN.md` | §15 | ⏳ ensayo y **video** pendientes |
-| 9 | Creatividad e innovación (1,5) | Gemelo conversacional (la IA mueve la cámara), alertas en la fachada, recorrido guiado y FPS, passkeys y simulación de escenarios | Capturas y video | §7, §13 | ✅ |
+| 1 | Problema relevante y objetivos medibles (2) | §1–2 con indicadores y resultados | Tabla de objetivos con fuentes | **CC** | Opcional: dato institucional con fuente |
+| 2 | Integración articulada de 3 o más tecnologías (3) | IoT → API → D1 → RPA → IA → gemelo/AR, con CI/CD y Docker | Escenarios en producción (§10); figuras 1–2 | **CC** | — |
+| 3 | Prototipo modular que resuelve el problema (3) | Monorepo, contratos, 7 migraciones, bots, escenarios, asistente | 350 pruebas, 15 e2e, producción operativa | **CC** | — |
+| 4 | CI/CD y contenedores con automatización (3) | Actions (secretos, pruebas, e2e Docker, GHCR); Docker Compose | Runs en verde; salida de Docker Compose | **CC** | Deploy automático desactivado a propósito (manual con respaldo) |
+| 5 | IA con prompts para una tarea clave (3) | Diagnóstico JSON + asistente con validación de fidelidad | 3 diagnósticos en vivo hoy; 20 preguntas verificadas | **CC**, con riesgo | **Riesgo:** «APIs de OpenAI» frente a Workers AI; confirmarlo con el docente |
+| 6 | Interfaz intuitiva, fluida, en tiempo real (1,5) | SPA responsive, gemelo en vivo, FPS, AR, reloj | Capturas; 109–117 FPS; fotos del Watch6 | **IE** | Capturar la AR en el S25 con la versión final |
+| 7 | Informe con esquemas, capturas, resultados e impacto (1,5) | Este informe (Word/PDF) | — | **P** | Completar los datos académicos (Anexo B) |
+| 8 | Presentación con secuencia lógica y participación equitativa (1,5) | Guion de 5 min para 2 integrantes | `GUION_DEMO_5MIN.md` | **Pe** | Grabar el video y ensayar |
+| 9 | Idea original que transforma la solución (1,5) | Gemelo conversacional (la IA mueve la cámara), alertas en la fachada, FPS sobre el gemelo vivo, escenarios configurables | Capturas y video del 23-nov | **CC** | — |
 
-**Entregables del ZIP `PROFINAL_U5_GRUPO_#`:**
+### 12.2 TA5 (20 puntos)
+| # | Criterio | Equivalente entregado | Evidencia | Estado |
+|---|---|---|---|---|
+| 1 | Escenario 3D en Unity | Edificio y entorno en Blender | Renders, GLB | **NL** (equivalente funcional) |
+| 2 | Materiales y objetos 3D | PBR y elementos instanciados | Renders | **CC** en Blender |
+| 3 | Recorrido tipo FPS | FPS web con colisiones | 5 capturas, 7 pruebas, 109 FPS | **CC** en web, local (no en Unity ni en producción) |
+| 4 | Entorno VR en Unity | — | — | **NL** |
+| 5 | Plugins de Unity | Equivalentes web | — | **NL** |
+| 6 | Ejecutar y navegar el recorrido VR | FPS en pantalla; AR en el móvil | Capturas FPS | **NL** |
+| 7 | Informe técnico | Este informe | — | **P** (datos académicos) |
+| 8 | Capturas y evidencias | `capturas/` clasificadas | Inventario | **CC** (falta la AR del S25) |
+| 9 | Código limpio y organizado | Monorepo con módulos y pruebas | Repositorio | **CC** |
+| 10 | Redacción técnica | Este informe | — | **CC** (revisión final del equipo) |
 
-| Entregable | Estado |
-|---|---|
-| Propuesta inicial | **[CONFIRMAR si ya se entregó]** |
-| Informe | Este documento, en Word y PDF |
-| Video de máx. 5 min | **Pendiente de grabar** (guion listo) |
-| Código | Repositorio y ZIP del código |
-| Presentación | **Pendiente de ensayar** |
+## 13. Limitaciones, riesgos y alternativas
+| Limitación o riesgo | Impacto | Alternativa o mitigación |
+|---|---|---|
+| Sensores simulados | No se miden condiciones reales | Mismo protocolo HMAC para un ESP32 con sensor NDIR de CO₂ |
+| Workers AI en lugar de la API oficial de OpenAI | Posible lectura estricta del criterio 5 | Adaptador oficial listo (requiere una clave propia; hoy no se activa por costo) |
+| Fallo o cuota de IA (ocurrió en LAB1) | Diagnóstico sin IA | Respaldo determinista rotulado; mejora de pautas en la rama |
+| Geometría aproximada sin planos | El interior no es fiel | Croquis del equipo y modelo regenerable por script |
+| TA5 sin Unity ni VR con visor | Criterios 4–6 no literales | Procedimiento GLB → Unity/OpenXR (§8.4) |
+| Primera persona sin desplegar | No visible en la URL pública | Despliegue controlado con respaldo y rollback, previa autorización |
+| AR sin captura en la versión final | Evidencia débil del criterio 6 | Probarla y capturarla en el S25 antes de la sustentación |
+| Wi-Fi de la sustentación | Demo en vivo interrumpida | Hotspot del S25, `docker compose up` sin internet y video de respaldo rotulado |
+| Telegram no configurado | Sin avisos al reloj | Integración futura (token del bot) |
 
-### 11.2 TA5 (20 puntos, 10 criterios × 2)
-| # | Criterio | Función verificable en la alternativa web | Evidencia | Sección | Estado |
-|---|---|---|---|---|---|
-| 1 | Diseñar el escenario 3D **en Unity** | Escenario completo de 10 pisos en Blender: terreno, calles, edificios vecinos, interior y mobiliario | Renders y capturas del GLB | §7.1, §8 | 🟡 Equivalente en Blender/Three.js; **no es Unity** |
-| 2 | Aplicar materiales y objetos 3D | Materiales PBR en todos los objetos; elementos duplicados e instanciados | Renders `blender/`, `glb/` | §7.1 | ✅ funcional (herramienta distinta) |
-| 3 | Configurar recorrido tipo FPS | Primera persona: WASD, ratón o dedo, correr, cambio de piso, colisiones | 7 pruebas y 3 capturas | §7.4 | ✅ funcional en web (**no en Unity**) |
-| 4 | Implementar el entorno VR **en Unity** | — (la inmersión es AR WebXR + FPS en pantalla) | — | §8.3 | ❌ no literal |
-| 5 | Instalar y utilizar los plugins **de Unity** | Equivalentes web: WebXR Device API, Three.js/R3F, drei | — | §8.2 | ❌ no literal |
-| 6 | Ejecutar y navegar el recorrido **VR** | FPS navegable en pantalla; AR en el móvil (pendiente de prueba física) | Capturas FPS | §7.4–7.5 | ❌ no literal (sin simulador ni visor VR) |
-| 7 | Elaborar el informe técnico | Este informe único | — | Todo | 🟡 datos del grupo pendientes |
-| 8 | Incluir capturas y evidencias | Capturas organizadas en `capturas/` (producción, primera persona, Blender, GLB, demo) | Inventario | §9, Anexo A | ✅ (faltan las del S25 y el Watch6) |
-| 9 | Mantener código limpio y organizado | Monorepo con módulos, contratos, pruebas y nombres claros | Repositorio | §4 | ✅ |
-| 10 | Redactar con claridad y precisión | Lenguaje técnico y honestidad declarada | — | Todo | ✅ (revisión final del equipo) |
+## 14. Conclusiones y recomendaciones
+**Conclusiones (basadas en los resultados):**
+1. **Cadena completa en producción:** CampusPulse 360 integra los cinco ejes del curso. El 24-nov, cuatro escenarios en espacios distintos (A401, Hall, LAB1 y Auditorio) generaron la incidencia crítica esperada en uno o dos ciclos del bot, con diagnóstico y reflejo en el gemelo, y volvieron al estado normal al restaurar.
+2. **Cálculo determinista más IA:** combinar cálculo determinista en el backend con redacción por IA y validación de fidelidad eliminó las respuestas incorrectas del asistente. Ante un fallo real del modelo (LAB1), el sistema degradó de forma transparente a reglas rotuladas.
+3. **Coherencia de reglas:** la prueba de coherencia entre el estado visual y la severidad detectó y permitió corregir una regla faltante (temperatura crítica), verificada luego en producción.
+4. **TA5 en web:** la alternativa web cubre funcionalmente el escenario 3D y el recorrido en primera persona (109 FPS, colisiones con muros, tabiques, atrio y núcleo) dentro del mismo gemelo con datos en vivo. No sustituye literalmente a Unity ni a la VR con visor.
+5. **Costo y entrega controlada:** el proyecto opera con S/ 0,00. Cada despliegue tuvo respaldo de datos, ensayo de migración y opción de rollback.
 
-## 12. Limitaciones
-1. **Telemetría simulada:** no hay sensores físicos. El protocolo es compatible con un ESP32, pero no se ha probado con hardware.
-2. **IA:** no se usa la API oficial de OpenAI. `gpt-oss-20b` en Workers AI está limitado por la cuota diaria; hay un respaldo determinista rotulado.
-3. **Modelo 3D aproximado:** sin planos. El interior es esquemático y las cabinas de ascensor no están modeladas.
-4. **TA5 sin Unity ni VR con visor:** la inmersión es AR WebXR y primera persona en pantalla.
-5. **Pruebas físicas pendientes:** AR en el S25 Ultra, la vista en el Watch6 y la medición de FPS en el móvil. Telegram no está configurado.
-6. **Primera persona:** colisiones en planta sin mobiliario y cambio de piso por botón (no se suben las escaleras).
-7. **Despliegue:** el despliegue automático desde CI está desactivado a propósito; se hace manual, con respaldo y rollback.
+**Recomendaciones:**
+1. Instalar un sensor físico de CO₂ por el mismo protocolo para validar el modelo con mediciones reales.
+2. Configurar Telegram para las notificaciones al reloj.
+3. Evaluar el adaptador de la API oficial de OpenAI si se dispone de una clave institucional.
+4. Ampliar a unos 20 espacios instrumentados (2 por piso) con migraciones aditivas, dentro del plan gratuito.
+5. Si la asignatura lo exige, llevar el GLB a Unity con OpenXR siguiendo el §8.4.
 
-## 13. Escalabilidad, impacto y trabajo futuro
-- **Escalabilidad:**
-  - la arquitectura en el borde escala sin servidores;
-  - con 10 dispositivos a 1 lectura/min se usa el ~21 % de las escrituras gratuitas de D1;
-  - para unos 20–30 espacios bastaría el plan Free; más allá habría que muestrear o agregar.
-  - Los contratos zod y el patrón `SPC_<piso>_<código>` permiten añadir espacios con migraciones aditivas.
-- **Impacto esperado:**
-  - detección automática de condiciones de riesgo (CO₂, calor, aforo, consumo) en 1–2 ciclos del bot desde la lectura sostenida, con diagnóstico explicable y acciones;
-  - visión unificada del campus por piso y espacio;
-  - consultas en lenguaje natural con respuestas verificables;
-  - todo con costo de operación de S/ 0,00.
-- **Trabajo futuro:**
-  1. Sensores reales (ESP32 + NDIR CO₂) por el mismo protocolo HMAC.
-  2. Telegram y notificaciones al reloj.
-  3. Recintos y núcleo con croquis del equipo.
-  4. Unity/OpenXR a partir del GLB (§8.4).
-  5. WebXR `immersive-vr` con visor.
-  6. Evaluación formal del asistente con `apps/api/eval` (conjunto de preguntas ya preparado).
-
-## 14. Conclusiones
-> **[COMPLETAR por el equipo tras la sustentación].** Propuesta de base, ajustada a lo verificado:
-
-1. CampusPulse 360 integra los cinco ejes del curso en una **cadena funcional y pública**, comprobada en producción con incidencias reales en cuatro espacios distintos:
-   - IoT simulado;
-   - automatización RPA;
-   - IA generativa;
-   - CI/CD con contenedores;
-   - interfaces inmersivas.
-2. **La IA aporta valor cuando trabaja sobre datos calculados por el backend.** La corrección del asistente demostró que los cálculos deterministas y la validación de fidelidad evitan respuestas incorrectas sin renunciar a la redacción natural del modelo.
-3. **La alternativa web cubre de forma funcional** el diseño 3D y el recorrido en primera persona de la TA5, con ventajas de acceso y de integración de datos. No sustituye literalmente a Unity ni a la VR con visor, y así se declara.
-4. **[COMPLETAR: aprendizajes del equipo y resultado de la demostración].**
-
-## 15. Presentación y video
-- **Guion definitivo de máximo 5 minutos:** [`GUION_DEMO_5MIN.md`](GUION_DEMO_5MIN.md).
-- **Inventario de evidencias:** [`INVENTARIO_EVIDENCIAS.md`](INVENTARIO_EVIDENCIAS.md).
-
-## 16. Referencias
-- Cloudflare. *Workers, D1 y Workers AI — Platform limits and pricing.* developers.cloudflare.com (consultado el 21-nov-2026).
-- OpenAI. *gpt-oss-20b* (modelo de pesos abiertos), servido mediante Cloudflare Workers AI (`@cf/openai/gpt-oss-20b`).
-- W3C. *WebXR Device API* y *WebAuthn Level 2*.
-- Three.js / pmndrs. *React Three Fiber* y *drei*. threejs.org, docs.pmnd.rs.
-- Blender Foundation. *Blender 5.3 Manual.*
-- Google. *ARCore supported devices* y *Scene Viewer.* developers.google.com/ar.
-- GitHub. *GitHub Actions documentation.*
-- Unity Technologies. *XR Interaction Toolkit* y *OpenXR Plugin* (referencia para la comparación del §8).
-- Congreso de la República del Perú. *Ley N.° 29733, Ley de Protección de Datos Personales.*
+## 15. Referencias
+- Cloudflare. (2026). *Workers platform limits* y *Pricing*. https://developers.cloudflare.com/workers/platform/limits/ (consultado el 21-nov-2026).
+- Cloudflare. (2026). *D1 limits* y *pricing*. https://developers.cloudflare.com/d1/platform/limits/ (consultado el 21-nov-2026).
+- Cloudflare. (2026). *Workers AI pricing* y *models: @cf/openai/gpt-oss-20b*. https://developers.cloudflare.com/workers-ai/ (consultado el 21-nov-2026).
+- OpenAI. (2025). *gpt-oss: open-weight reasoning models*. https://openai.com/index/introducing-gpt-oss/
+- W3C. (2025). *WebXR Device API*. https://www.w3.org/TR/webxr/
+- W3C. (2021). *Web Authentication: An API for accessing Public Key Credentials, Level 2*. https://www.w3.org/TR/webauthn-2/
+- three.js authors. (2026). *three.js documentation*. https://threejs.org/docs/
+- Poimandres. (2026). *React Three Fiber* y *drei*. https://docs.pmnd.rs/
+- Blender Foundation. (2026). *Blender 5.3 Reference Manual*. https://docs.blender.org/manual/
+- Google. (2026). *ARCore supported devices* y *Scene Viewer*. https://developers.google.com/ar/devices
+- GitHub. (2026). *GitHub Actions documentation*. https://docs.github.com/actions
+- Docker Inc. (2026). *Docker Compose documentation*. https://docs.docker.com/compose/
+- Unity Technologies. (2026). *XR Interaction Toolkit* y *OpenXR Plugin manuals*. https://docs.unity3d.com/ (referencia para el §8)
+- Congreso de la República del Perú. (2011). *Ley N.° 29733, Ley de Protección de Datos Personales*.
 
 ## Anexo A. Evidencias
-- **Por hito:** `docs/evidencias/hito-1.md` … `hito-10-despliegue-asistente.md`.
+- **Inventario clasificado:** `INVENTARIO_EVIDENCIAS.md` (qué demuestra cada captura y dónde se usa).
+- **Registros fechados:** `docs/evidencias/hito-1 … hito-10`.
 - **Decisiones:** `docs/decisiones/ADR-001…005`.
-- **Inventario de capturas** y qué demuestra cada una: [`INVENTARIO_EVIDENCIAS.md`](INVENTARIO_EVIDENCIAS.md).
+
+## Anexo B. Datos que debe completar el equipo
+1. Curso, sección, docente y número de grupo (portada).
+2. Apellidos, nombres y código de los **2 integrantes** (portada).
+3. Si ya se entregó la propuesta inicial (entregable 1).
+4. Opcional: dato institucional con fuente (§1).
+
+## Anexo C. Ejecución
+- **Producción:** https://campuspulse.campuspulse-api.workers.dev
+  - el visitante tiene solo lectura;
+  - el administrador entra con passkey.
+- **Local sin internet:** con Docker Desktop, en la raíz del repositorio, `docker compose up -d` y abrir http://localhost:8787. La IA cae al respaldo rotulado.
+- **Desarrollo:** `pnpm install` → `pnpm -r typecheck` → `pnpm -r test` → `pnpm --filter @campuspulse/web build`; e2e con el stack de Docker levantado: `cd tools/e2e && npx playwright test`.

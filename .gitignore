@@ -47,3 +47,7 @@ docs/referencias/utp-huancayo/comparaciones-privadas/
 
 # Respaldos locales de D1 (contienen datos de produccion)
 backups/
+
+# Paquete de entrega academica (ZIP generado localmente)
+entrega/
+*.local.env
