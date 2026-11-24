@@ -31,7 +31,7 @@ describe("assistantChat", () => {
     expect(r.answer).toContain("simulados");
     const row = await E.DB.prepare("SELECT prompt_id, mode, valid_json FROM ai_outputs").first<{ prompt_id: string; mode: string; valid_json: number }>();
     expect(row).toEqual({ prompt_id: "assistant", mode: "live", valid_json: 1 });
-    expect(await count("SELECT calls AS n FROM ai_quota")).toBe(2); // eleccion + redaccion
+    expect(await count("SELECT calls AS n FROM ai_quota")).toBe(1); // pregunta conocida: herramienta determinista + 1 llamada de redaccion
   });
 
   it("cada herramienta responde una pregunta distinta con respuestas validas", async () => {
@@ -92,7 +92,7 @@ describe("assistantChat", () => {
     expect(r.actions).toEqual([]);
   });
 
-  it("sin proveedor o sin cupo responde en modo fallback con list_spaces_at_risk y lo indica", async () => {
+  it("sin proveedor o sin cupo responde en modo fallback (pregunta no reconocida -> estado del campus) y lo indica", async () => {
     const noProvider = await ask("¿Qué pasa?", { ...E, AI_PROVIDER: "workers-ai", AI: undefined });
     expect(ChatResponse.safeParse(noProvider).success).toBe(true);
     expect(noProvider.meta).toMatchObject({ provider: "rules-fallback", mode: "fallback", latency_ms: null });
