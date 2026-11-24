@@ -80,6 +80,37 @@ La realiza el administrador, con su passkey, desde el escritorio:
 6. Pulsar **Restaurar**: el panel debe indicar «escenario retirado, 1 incidencia(s) cerrada(s)» y A401 debe volver a «Normal». Captura 5.
 7. **Comprobación final:** en **Incidencias** no debe quedar ninguna abierta de A401 y en el Centro de mando debe verse «Sin alertas activas».
 
+## 6 bis. Migración 0007: temperatura crítica (24-nov-2026, 18:43 UTC)
+**Defecto observado en producción:**
+- El escenario «Hall de ingreso · Temperatura anómala · Crítica» (31,2 °C) ponía el gemelo en **crítico**.
+- Sin embargo, abría `RULE_TEMP_HIGH` como **advertencia** (incidencia de LOBBY a las 18:24 UTC, ya resuelta).
+- **Causa:** no existía una regla crítica de temperatura. El gemelo usa `STATUS_THRESHOLDS.temp_c.critical = 30`.
+
+**Antes de aplicar:**
+- **Nuevo respaldo:**
+  - Time Travel `00000011-000006b4-0000512d-298a99c0aaf596b8e1219a5e133af8f1`;
+  - exportación `backups/d1-prod-20261124-pre0007.sql`, con SHA-256 `2c92876540043351ed33a65f23c16cebe181f64114d925a2630ba311029b6693`.
+  - Verificado contra remoto: 1 usuario, 2 passkeys, 10 incidencias, 6 reglas, 25 entradas de auditoría y 0 escenarios activos.
+- **Migraciones pendientes:** solo `0007_temp_critical_rule.sql`.
+- **Ensayo previo** de 0006 + 0007 sobre la copia del respaldo: ningún dato cambia, se suma 1 regla y aplicarla de nuevo no tiene efecto.
+- **Riesgo de falsas alarmas descartado:** la temperatura simulada normal no llega a 30 °C (máximo teórico ≈ 28,9 °C) y en el historial de producción el máximo es 26,9 °C en 23.872 lecturas.
+
+**Aplicación:** `wrangler d1 migrations apply campuspulse-db --remote` → `0007` ✅. **No se volvió a desplegar el Worker**, que sigue en `d9180962` / `513ce1e`.
+
+**Después:**
+- Conteos: 1 / 2 / 10 / **7 reglas** / 25.
+- `GET /rules`: `RULE_TEMP_CRIT temp_c >= 30, 60 s, critical, enabled`.
+- `migrations list` → «No migrations to apply».
+- **Bot:** la ejecución de 18:43:48 UTC dice `reglas=7; nuevas=0`, con `success`. No hay incidencias abiertas ni ninguna `RULE_TEMP_CRIT` espuria.
+- **Reversible** sin borrar nada: `UPDATE alert_rules SET enabled = 0 WHERE id = 'RULE_TEMP_CRIT'`.
+
+**Pendiente (requiere sesión de administrador; el navegador del asistente tiene rol `visitor`):**
+1. En **Demostración**, elegir «P1 · Hall de ingreso (LOBBY)», «Temperatura anómala», «Crítica» y 5 min. Pulsar **Lanzar escenario**.
+2. Comprobar el gemelo: LOBBY en **crítico** con la baliza «31,2 °C».
+3. Tras 1–2 ciclos del cron, en **Incidencias** debe haber **una sola** incidencia: «Temperatura critica en Hall de ingreso», **crítica**. No debe aparecer la de advertencia. El diagnóstico IA debe tener severidad crítica.
+4. Pulsar **Restaurar** y confirmar «Sin alertas activas».
+5. **Nota sobre el texto del panel:** las severidades seguirán apareciendo como «(critical)» o «(warning)» hasta desplegar el Worker con `79dec5a`, que las muestra en español. La severidad en sí ya es correcta con la migración.
+
 ## 7. Consumo
 - **Cuota de la app:** `/system/info` indicaba **32 de 250** llamadas y unas **507 neuronas estimadas** (de 10.000 diarias) al desplegar. Las 8 consultas de esta validación consumen de ese mismo cupo.
 - **Costo:** S/ 0,00. Plan Free, sin facturación.
