@@ -1,6 +1,7 @@
 # ADR-004 — Ampliación Unity para la TA5
 
-- **Estado:** aceptada (21-nov-2026). Se revisará cuando llegue el anexo `TA5_ANEXOS_96SI.docx`, que hoy falta.
+- **Estado:** **sustituida** el 24-nov-2026 por [ADR-005](ADR-005-ta5-inmersiva-web.md) (TA5 con alternativa inmersiva web). Se conserva como registro histórico; Unity no se instaló ni se ejecutó.
+- **Estado anterior:** aceptada (21-nov-2026), pendiente del anexo `TA5_ANEXOS_96SI.docx`.
 - **Rama:** `feature/ta5-unity`, creada desde `eda8a26` con el árbol limpio.
 
 ## Contexto

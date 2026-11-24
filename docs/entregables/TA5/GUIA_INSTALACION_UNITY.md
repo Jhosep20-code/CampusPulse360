@@ -1,3 +1,5 @@
+> **Trabajo futuro, no ejecutado.** La TA5 se entrega con la alternativa web ([ADR-005](../../decisiones/ADR-005-ta5-inmersiva-web.md)). Esta guía se conserva para una posible migración a Unity/OpenXR (informe §8.4).
+
 # Guía de instalación de Unity para la TA5 (acciones del equipo)
 
 Todo es gratuito: Unity Personal está pensado para ingresos y fondos menores de 200.000 USD en 12 meses. La creación de cuentas y la aceptación de licencias las hace el equipo.
