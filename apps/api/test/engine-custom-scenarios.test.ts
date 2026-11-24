@@ -1,3 +1,4 @@
+import { statusFromMetrics } from "@campuspulse/contracts";
 import { beforeEach, describe, expect, it } from "vitest";
 import { runCloudSimTick } from "../src/engine/cloud-sim";
 import { runIncidentBot } from "../src/engine/incident-bot";
@@ -54,6 +55,47 @@ describe("escenarios configurables (datos simulados)", () => {
     expect((await incidentsOf("SPC_5_OFI")).map((i) => i.rule_id)).toEqual(["RULE_TEMP_HIGH"]);
     expect((await incidentsOf("SPC_1_LOBBY")).map((i) => i.rule_id)).toEqual(["RULE_OVERCAP"]);
     expect((await incidentsOf("SPC_3_LAB1")).map((i) => i.rule_id)).toEqual(["RULE_POWER_CRIT"]);
+  });
+
+  it("coherencia: la severidad de la regla que abre la incidencia coincide con el estado del gemelo (todos los perfiles)", async () => {
+    const SEV: Record<string, number> = { warning: 1, critical: 2 };
+    const cases: Array<[string, number]> = [["SPC_1_LOBBY", 120], ["SPC_4_A401", 45], ["SPC_4_LAB2", 25]];
+    for (const [spaceId, capacity] of cases) {
+      for (const kind of ["co2", "temperature", "occupancy", "power"] as const) {
+        for (const level of ["warning", "critical"] as const) {
+          await reset();
+          const r = await applyCustomScenario(E, { space_id: spaceId, kind, level, duration_min: 5 }, NOW);
+          const status = statusFromMetrics(r.profile!, capacity, NOW, NOW);
+          const label = `${spaceId} ${kind} ${level}`;
+          expect(status, label).toBe(level);
+          const top = Math.max(0, ...r.expected_rules.map((x) => SEV[x.severity] ?? 0));
+          if (kind === "occupancy" && level === "warning") {
+            // 95 % del aforo: advertencia visual sin incidencia (el sobreaforo empieza en el 100 %). El panel lo indica.
+            expect(r.expected_rules, label).toEqual([]);
+          } else {
+            expect(top, label).toBe(SEV[level]);
+          }
+        }
+      }
+    }
+  });
+
+  it("regresion: temperatura CRITICA en el Hall (LOBBY) abre una incidencia critica, no de advertencia", async () => {
+    const r = await applyCustomScenario(E, { space_id: "SPC_1_LOBBY", kind: "temperature", level: "critical", duration_min: 8 }, NOW);
+    expect(r.profile?.temp_c).toBe(31.2);
+    expect(r.expected_rules.map((x) => x.id).sort()).toEqual(["RULE_TEMP_CRIT", "RULE_TEMP_HIGH"]);
+    await runIncidentBot(E, NOW);
+    // Una sola incidencia: la critica suprime la de advertencia de la misma metrica.
+    expect(await incidentsOf("SPC_1_LOBBY")).toEqual([{ rule_id: "RULE_TEMP_CRIT", severity: "critical", status: "open" }]);
+    const dx = await E.DB.prepare(
+      "SELECT o.output_json FROM ai_outputs o JOIN incidents i ON i.ai_output_id = o.id WHERE i.space_id = 'SPC_1_LOBBY'",
+    ).first<{ output_json: string }>();
+    expect(JSON.parse(dx!.output_json).severidad).toBe("critical");
+    // Advertencia sigue igual.
+    await reset();
+    await applyCustomScenario(E, { space_id: "SPC_1_LOBBY", kind: "temperature", level: "warning", duration_min: 8 }, NOW);
+    await runIncidentBot(E, NOW);
+    expect((await incidentsOf("SPC_1_LOBBY")).map((i) => [i.rule_id, i.severity])).toEqual([["RULE_TEMP_HIGH", "warning"]]);
   });
 
   it("el perfil se mantiene por tick del bot mientras dura y el simulador en la nube no lo pisa", async () => {

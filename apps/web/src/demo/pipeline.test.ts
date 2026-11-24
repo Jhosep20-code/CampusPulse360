@@ -56,6 +56,10 @@ describe("pasos verificables de la demostracion", () => {
     const s = pipelineSteps({ launch, live: liveCrit, botRuns: [run], incidents: [inc({ status: "open", diagnosis: diag, diagnosis_meta: meta })] });
     expect(state(s)).toEqual({ sensor: "done", api: "done", rules: "done", bot: "done", incident: "done", ai: "done", twin: "done" });
     expect(s.find((x) => x.id === "ai")!.detail).toContain("@cf/openai/gpt-oss-20b");
+    // Severidades en espanol y la regla que abre la incidencia (la mas severa) primero.
+    expect(s.find((x) => x.id === "rules")!.detail).toBe("CO2 critico (crítica) · CO2 elevado sostenido (advertencia)");
+    expect(s.find((x) => x.id === "incident")!.detail).toContain("· crítica ·");
+    expect(s.find((x) => x.id === "twin")!.detail).toBe("Estado del espacio: crítico.");
     expect(pipelineSettled(s)).toBe(true);
   });
 

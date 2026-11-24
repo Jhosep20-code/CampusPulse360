@@ -25,6 +25,10 @@ export interface PipelineInput {
 /** Margen para relojes: las incidencias y ejecuciones se buscan desde 1 s antes del lanzamiento. */
 const SKEW_MS = 1000;
 
+/** Severidad en espanol para el panel (la fuente de verdad es la regla del backend). */
+export const SEV_ES: Record<string, string> = { critical: "crítica", warning: "advertencia", info: "informativa" };
+const SEV_RANK: Record<string, number> = { critical: 2, warning: 1, info: 0 };
+
 export function hhmmss(ts: number): string {
   return new Date(ts).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
@@ -63,7 +67,16 @@ export function pipelineSteps(input: PipelineInput): PipelineStep[] {
     : { id: "api", label: "API y D1", state: "done", detail: `${launch.inserted} lecturas sim-scenario guardadas en D1.` };
 
   const rules: PipelineStep = hasRules
-    ? { id: "rules", label: "Reglas", state: "done", detail: launch.expected_rules.map((r) => `${r.name} (${r.severity})`).join(" · ") }
+    ? {
+        id: "rules",
+        label: "Reglas",
+        state: "done",
+        // La mas severa primero: es la que abre la incidencia (suprime la de menor severidad de la misma metrica).
+        detail: [...launch.expected_rules]
+          .sort((a, b) => (SEV_RANK[b.severity] ?? 0) - (SEV_RANK[a.severity] ?? 0))
+          .map((r) => `${r.name} (${SEV_ES[r.severity] ?? r.severity})`)
+          .join(" · "),
+      }
     : {
         id: "rules",
         label: "Reglas",
@@ -80,7 +93,7 @@ export function pipelineSteps(input: PipelineInput): PipelineStep[] {
   const incident: PipelineStep = !hasRules
     ? { id: "incident", label: "Incidencia", state: "skipped", detail: "No corresponde." }
     : inc
-      ? { id: "incident", label: "Incidencia", state: "done", detail: `${inc.title} · ${inc.severity} · abierta ${hhmmss(inc.opened_at)}` }
+      ? { id: "incident", label: "Incidencia", state: "done", detail: `${inc.title} · ${SEV_ES[inc.severity] ?? inc.severity} · abierta ${hhmmss(inc.opened_at)}` }
       : { id: "incident", label: "Incidencia", state: "pending", detail: run ? "El bot ya corrió; esperando la detección sostenida…" : "Pendiente del bot." };
 
   let ai: PipelineStep;
