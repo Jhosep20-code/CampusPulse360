@@ -98,6 +98,20 @@ describe("escenarios configurables (datos simulados)", () => {
     expect((await incidentsOf("SPC_1_LOBBY")).map((i) => [i.rule_id, i.severity])).toEqual([["RULE_TEMP_HIGH", "warning"]]);
   });
 
+  it("sin IA, el respaldo por reglas da una pauta concreta para consumo electrico (no 'sin pauta')", async () => {
+    await applyCustomScenario(E, { space_id: "SPC_3_LAB1", kind: "power", level: "critical", duration_min: 8 }, NOW);
+    await runIncidentBot({ ...E, AI_PROVIDER: "workers-ai", AI: undefined } as typeof E, NOW);
+    const row = await E.DB.prepare(
+      "SELECT o.provider, o.mode, o.output_json FROM ai_outputs o JOIN incidents i ON i.ai_output_id = o.id WHERE i.space_id = 'SPC_3_LAB1'",
+    ).first<{ provider: string; mode: string; output_json: string }>();
+    expect(row).toMatchObject({ provider: "rules-fallback", mode: "fallback" });
+    const d = JSON.parse(row!.output_json) as { causa_probable: string; acciones: string[]; evidencia: Array<{ metric: string; valor: number }> };
+    expect(d.causa_probable).toContain("Consumo eléctrico alto en Laboratorio de computo: 6400 W");
+    expect(d.causa_probable).not.toContain("No hay una pauta");
+    expect(d.acciones).toHaveLength(3);
+    expect(d.evidencia.find((e) => e.metric === "power_w")?.valor).toBe(6400);
+  });
+
   it("el perfil se mantiene por tick del bot mientras dura y el simulador en la nube no lo pisa", async () => {
     await applyCustomScenario(E, { space_id: "SPC_4_A401", kind: "co2", level: "warning", duration_min: 5 }, NOW);
     await runIncidentBot(E, NOW + MIN);
