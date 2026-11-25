@@ -473,7 +473,7 @@ Parámetros comunes en Workers AI: temperatura 0,2, razonamiento «low» y tiemp
 | Primera persona | **Sí** (desde el 24-nov) | Sí |
 | Severidades en español y respaldo para consumo eléctrico | **Sí** | Sí |
 
-Los commits de la rama **posteriores** a `004eaa4` contienen documentación, la presentación y una utilidad local (`infra/generar-env-local.mjs`); **no se volvió a desplegar**.
+Los commits de la rama **posteriores** a `004eaa4` contienen documentación, la presentación y una utilidad local (`infra/generar-env-local.mjs`); **no se volvió a desplegar**. También amplían de 4 a 8 min el límite de la prueba e2e móvil de navegación, que superó ese tiempo en GitHub Actions el 25-nov (sin cambios en la aplicación; causa no confirmada).
 
 **Cambio de secreto (25-nov):** se rotó la clave del gateway. Cloudflare generó la versión `182f079c`, con el mismo código y las mismas variables que `9fca1ec7`. Una versión anterior puede restaurar la clave anterior: tras cualquier rollback hay que comprobarla y volver a rotarla.
 

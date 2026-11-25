@@ -20,6 +20,7 @@ Rollback:    Worker d9180962-e65a-4c90-b693-3dd8000693fc, commit 513ce1e.
 Codigo:      03_codigo/codigo-fuente-<commit>.zip. El commit va en el nombre del archivo.
              Respecto de 004eaa4 solo agrega documentacion, evidencias e
              infra/generar-env-local.mjs: el codigo de la aplicacion es el desplegado.
+             Tambien amplia el limite de tiempo de una prueba automatica movil.
 
 ------------------------------------------------------------------------
 2. CONTENIDO DEL PAQUETE

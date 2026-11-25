@@ -3,7 +3,7 @@
 **Producción:** https://campuspulse.campuspulse-api.workers.dev (Cloudflare Workers, plan Free, S/ 0,00)
 - **Desplegado:** commit `004eaa4` (24-nov-2026), Worker `182f079c-19ee-49c6-83ed-f566a57515dc` desde el 25-nov, tras rotar la clave del gateway (mismo código y variables).
 - **Rollback:** Worker `d9180962-e65a-4c90-b693-3dd8000693fc` (commit `513ce1e`). Después hay que verificar la clave del gateway y volver a rotarla.
-- Los commits posteriores a `004eaa4` son documentación, la presentación, evidencias y una utilidad local (`infra/generar-env-local.mjs`). **No se volvió a desplegar.**
+- Los commits posteriores a `004eaa4` son documentación, la presentación, evidencias y una utilidad local (`infra/generar-env-local.mjs`), limpieza de metadatos y un límite de tiempo mayor (8 min) en la prueba e2e móvil de navegación. **No se volvió a desplegar.**
 
 > Esta PR no se fusiona ni activa despliegues: el job `deploy` solo corre en `main` con `DEPLOY_ENABLED=true`, que está desactivada.
 

@@ -27,7 +27,8 @@ test.describe("Estabilidad movil (tactil)", () => {
   });
 
   test("navegacion completa, vistas 3D, dia/noche, pisos y regreso", async ({ page }) => {
-    test.setTimeout(240_000);
+    // El 3D con renderizado por software es lento en CI: esta prueba tardo 2,7 min en verde y supero 4 min otras veces.
+    test.setTimeout(480_000);
     const errors = track(page);
     for (const p of PAGES) {
       await page.goto(p);
