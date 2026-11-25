@@ -77,3 +77,20 @@ Los dos proyectos aislados se eliminaron al terminar. La base del stack local ha
 - AR en el Galaxy S25 Ultra y reloj en el Watch6 sobre `004eaa4`.
 - Primera persona en un teléfono físico.
 - Preparación del modo local en una segunda laptop.
+
+## 9. Actualización del 25-nov: rotación de la clave del gateway
+Autorizada por el propietario. No cambió el código ni la base de datos.
+
+| Comprobación | Resultado |
+|---|---|
+| Cuenta de Cloudflare | Solo la del proyecto |
+| Antes de rotar | Clave vigente aceptada (400 a un cuerpo no válido) y clave aleatoria rechazada (401) |
+| Cambio | `wrangler secret put GATEWAY_KEYS` por entrada estándar; ningún valor se mostró |
+| Versión resultante | `182f079c-19ee-49c6-83ed-f566a57515dc` (origen *Secret Change*), al 100 % |
+| Clave nueva / anterior | 400 (aceptada) / **401 (rechazada)** |
+| Configuración | Mismas variables (`GIT_COMMIT=004eaa4`, `ENVIRONMENT=production`, `CLOUD_SIM=on`, WebAuthn) y secretos `BOOTSTRAP_TOKEN` y `GATEWAY_KEYS` presentes |
+| Después | `/system/health` `ok`, telemetría con lecturas posteriores al cambio y 0 incidencias abiertas |
+
+La comprobación de la clave no inserta lecturas. Usuarios, passkeys y sesiones no se modificaron.
+
+**Rollback:** una versión anterior puede restaurar la clave anterior. Tras cualquier `wrangler rollback` hay que verificar la clave y volver a rotarla.

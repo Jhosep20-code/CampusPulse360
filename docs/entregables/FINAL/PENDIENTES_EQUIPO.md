@@ -1,4 +1,4 @@
-# Pendientes del equipo antes de entregar (al 24-nov-2026)
+# Pendientes del equipo antes de entregar (al 25-nov-2026)
 
 Fecha límite: **viernes 27-nov-2026**. Esta es la lista única de pendientes manuales de la entrega.
 
@@ -20,6 +20,8 @@ Después de editar el Word, actualizar el índice y volver a exportar el PDF.
 - [ ] Si la propuesta inicial (entregable 1) ya se entregó; si no, adjuntarla.
 
 ## 3. Pruebas físicas sobre la versión publicada (`004eaa4`)
+AR y reloj son complementos de la interfaz: **no son requisito del criterio 6**. Conviene probarlos para la sustentación.
+
 - [ ] AR en el Galaxy S25 Ultra (`/ar`, nivel A o B) con captura o grabación.
 - [ ] Reloj en el Galaxy Watch6 Classic (`/reloj`) con foto.
 - [ ] Primera persona en el teléfono.
@@ -27,10 +29,7 @@ Después de editar el Word, actualizar el índice y volver a exportar el PDF.
 - [ ] Preparar el modo sin internet en la laptop de la sustentación (`LEEME.txt` §3).
 
 ## 4. Video (no grabado)
-- [ ] Antes de grabar, revisar estas frases del guion, que no coinciden con la implementación:
-  - 1:15, «el sensor simulado de A401 envía lecturas firmadas a nuestra API»: el escenario entra con la sesión del administrador y se guarda en D1 **sin firma HMAC**;
-  - 2:20, «El asistente no inventa cifras»: es una afirmación absoluta. Decir que el backend calcula las cifras y que la validación **reduce** el riesgo de error;
-  - 4:15, «Cada push ejecuta 350 pruebas»: el pipeline corre en cada actualización del PR.
+- [x] Corregidas el 25-nov tres frases del guion (1:15, 2:20 y 4:15).
 - [ ] Grabar, montar (máximo 5 minutos) y agregarlo en `02_video/`.
 
 ## 5. Cierre

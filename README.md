@@ -5,7 +5,7 @@ Gemelo digital inteligente para la gestión predictiva y la automatización del 
 > **Datos simulados.** Toda la telemetría actual viene de un simulador IoT y se rotula como `SIMULADO`. La geometría del edificio es un **modelo aproximado** hecho en Blender a partir de fotografías, no un plano oficial.
 
 **Demo pública:** https://campuspulse.campuspulse-api.workers.dev (el visitante tiene solo lectura; el administrador entra con passkey).
-**En producción (24-nov-2026):** commit `004eaa4`, Worker `9fca1ec7`. Rollback: `d9180962` (commit `513ce1e`). El despliegue es manual; `main` no se ha fusionado.
+**En producción (25-nov-2026):** commit `004eaa4`, Worker `182f079c` (clave del gateway rotada el 25-nov, sin cambios de código). Rollback de código: `d9180962` (commit `513ce1e`); tras un rollback hay que verificar la clave y volver a rotarla. El despliegue es manual; `main` no se ha fusionado.
 
 ## Ejes integrados
 | Eje | Implementación y estado |

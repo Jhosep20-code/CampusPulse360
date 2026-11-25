@@ -48,7 +48,7 @@ Para la TA5 se añadió un **recorrido en primera persona** con colisiones sobre
 
 | Ámbito | Resultado |
 |---|---|
-| Versión publicada | Worker `9fca1ec7`, commit `004eaa4`; vistas, recorrido, primera persona y asistente verificados tras desplegar |
+| Versión publicada | Worker `182f079c`, commit `004eaa4`; vistas, recorrido, primera persona y asistente verificados tras desplegar |
 | Escenarios en producción | 4 escenarios controlados abrieron la incidencia **crítica** esperada (CO₂ en A401; temperatura en el Hall; sobreaforo en el Auditorio; consumo en LAB1) |
 | Diagnósticos | **3 inferencias reales** de gpt-oss-20b (1,7–4,0 s) y **1 respaldo determinista por reglas**, rotulado «sin IA» |
 | Pruebas automáticas | **350** unitarias y de integración y **15** e2e en Docker (3 omitidas a propósito); CI en verde en `004eaa4` |
@@ -211,6 +211,35 @@ La gestión de las condiciones de un campus universitario suele ser **reactiva y
 - **Cálculos en el backend:** en 18 familias de preguntas, el backend elige la herramienta y calcula rankings y porcentajes; la IA redacta.
 - **Validación de fidelidad** (rankings, espacios por condición e incidencias): si la redacción no incluye el espacio principal o su cifra, se descarta y se muestra el resultado verificado, rotulado `fallback`. **Alcance limitado:** no comprueba el resto del texto ni las respuestas de estado general, actividad del bot o diagnósticos; la IA puede equivocarse.
 - **Defecto corregido:** «el espacio más ocupado respecto a su aforo» respondía «no hay» (hito-9).
+
+**Prompts implementados** (versionados en `apps/api/src/ai/prompts/`; texto en el Anexo D):
+
+| Prompt | Tarea | Técnica | Límite de salida | Control de la salida |
+|---|---|---|---|---|
+| `diagnose@1.0.0` | **Tarea clave:** diagnosticar cada incidencia | Rol, 7 reglas, 2 ejemplos y contexto JSON | 900 tokens | Esquema zod, 1 reintento y respaldo por reglas |
+| `assistant@1.1.0` | Responder preguntas sobre el campus | Definiciones, reglas, 10 herramientas de solo lectura y hasta 6 mensajes de historial | 500 (elegir), 400 (enrutar) y 800 (redactar) | Esquema zod, identificadores filtrados, fidelidad y respaldo |
+| `report@1.0.0` | Narrativa del reporte diario | Rol y datos agregados del día | 700 tokens | Esquema zod; si falla, narrativa determinista |
+
+Parámetros comunes en Workers AI: temperatura 0,2, razonamiento «low» y tiempo máximo de 20 s. Las inferencias se registran en `ai_outputs` con prompt, versión, proveedor, modelo, modo y validez.
+
+**Validación: qué se comprueba y qué no**
+
+| Control | Qué comprueba | Qué no comprueba |
+|---|---|---|
+| Esquema del diagnóstico | Claves y tipos, severidad permitida, de 1 a 6 acciones (el prompt pide de 1 a 4), hasta 10 evidencias y confianza entre 0 y 1 | Que la causa sea correcta ni que los valores citados coincidan con las lecturas |
+| Reintento y respaldo | Ante un JSON inválido, 1 reintento con el error; ante fallo, tiempo agotado o cupo agotado, reglas rotuladas «sin IA» | La calidad del texto del modelo |
+| Fidelidad del asistente | En rankings, espacios por condición e incidencias: que figure el espacio principal y su cifra, cuando la hay | El resto del texto, el estado general, la actividad del bot y los diagnósticos |
+| Citas y foco | Que los identificadores existan | Que sean los más pertinentes |
+| Enrutado determinista | 18 familias de preguntas eligen la herramienta sin depender del modelo | Las demás preguntas dependen del modelo |
+
+**Resultados de la validación**
+
+| Prueba | Resultado | Alcance |
+|---|---|---|
+| Pruebas de IA (25-nov, local): diagnóstico 7, chat 7, regresión del asistente 46, evaluación 3, reporte 2 y cuota 4 | **69 de 69 aprobadas** | Usan un proveedor simulado o reglas: verifican el código y el contrato, **no la calidad del modelo** |
+| Conjunto `apps/api/eval/dataset.json`: 10 diagnósticos y 20 preguntas | Reglas: severidad y causa esperadas en los 10. Proveedor simulado: JSON válido en los 10 y al menos 90 % en las preguntas | No hay resultados registrados de `eval/run.ts` contra el modelo real |
+| Modelo real, asistente (24-nov) | 22 preguntas contrastadas con `/live` (§10) | Revisión manual de una muestra pequeña |
+| Modelo real, diagnóstico en producción (24-nov) | 3 inferencias válidas y 1 fallo resuelto con respaldo | Detalle a continuación |
 
 **Inferencia real frente a respaldo:**
 
@@ -389,6 +418,7 @@ La gestión de las condiciones de un campus universitario suele ser **reactiva y
 - **Acceso:**
   - **passkeys** (WebAuthn) sin contraseñas;
   - alta solo con token de un solo uso, ya consumido;
+  - clave del gateway rotada el 25-nov: la nueva se acepta y la anterior se rechaza (401);
   - vinculación de dispositivos con un código de 10 min;
   - sesión en cookie httpOnly/Secure/SameSite=Strict de 8 h.
   - En producción: 1 administrador con 2 passkeys (escritorio y Android).
@@ -417,6 +447,7 @@ La gestión de las condiciones de un campus universitario suele ser **reactiva y
 | Asistente con el modelo real | 20 preguntas (12 en local y 8 en producción) contrastadas con `/live`, más 2 tras desplegar `004eaa4` (aforo y CO₂, ambas coincidentes) | 24-nov |
 | Escenarios en producción (`513ce1e`) | 4 incidencias críticas coherentes con el gemelo; 3 inferencias reales y 1 respaldo; restauradas (0 abiertas) | 24-nov |
 | Validación tras desplegar `004eaa4` | Fachada, Aérea, Atrio, Referencia, pisos explotados, noche, recorrido (avance y pausa), primera persona 120 FPS, telemetría avanzando, `/ar` y `/reloj` | 24-nov (producción) |
+| Pruebas de IA (subconjunto de las 350) | 69 de 69 aprobadas (alcance en §6.4) | 25-nov (local) |
 | Primera persona (local) | Colisión con tabique, vista móvil emulada, 7 pruebas | 24-nov |
 | Docker sin internet | Red sin salida: web 200, 10/10 espacios, ingesta 610/610, bot correcto, asistente en respaldo | 24-nov (local) |
 | Alta de administrador en Docker local (autenticador **virtual** de Chromium) | Alta y reingreso correctos; escenario con incidencia y diagnóstico por reglas; segundo alta con el mismo token rechazada (403) | 24-nov (local) |
@@ -435,7 +466,7 @@ La gestión de las condiciones de un campus universitario suele ser **reactiva y
 ![Telemetría simulada de los 10 espacios](capturas/produccion/06-iot-telemetria.jpg)
 
 ## 11. Estado de versiones: local, GitHub y producción
-| Componente | Producción (Worker `9fca1ec7`, commit `004eaa4`) | Rama `feature/hito-2` |
+| Componente | Producción (Worker `182f079c`, commit `004eaa4`) | Rama `feature/hito-2` |
 |---|---|---|
 | Asistente, gemelo, recorrido guiado, escenarios, AR, reloj y passkeys | **Sí** | Sí |
 | Regla `RULE_TEMP_CRIT` (migración 0007) | **Sí** | Sí |
@@ -443,6 +474,8 @@ La gestión de las condiciones de un campus universitario suele ser **reactiva y
 | Severidades en español y respaldo para consumo eléctrico | **Sí** | Sí |
 
 Los commits de la rama **posteriores** a `004eaa4` contienen documentación, la presentación y una utilidad local (`infra/generar-env-local.mjs`); **no se volvió a desplegar**.
+
+**Cambio de secreto (25-nov):** se rotó la clave del gateway. Cloudflare generó la versión `182f079c`, con el mismo código y las mismas variables que `9fca1ec7`. Una versión anterior puede restaurar la clave anterior: tras cualquier rollback hay que comprobarla y volver a rotarla.
 
 **Rollback disponible:**
 - Worker: `npx wrangler rollback d9180962-e65a-4c90-b693-3dd8000693fc` (commit `513ce1e`).
@@ -465,8 +498,8 @@ Los commits de la rama **posteriores** a `004eaa4` contienen documentación, la 
 | 2 | Integración articulada de 3 o más tecnologías (3) | IoT → API → D1 → RPA → IA → gemelo/AR, con CI/CD y Docker | Escenarios en producción (§10); figuras 2–3 | **CC** | — |
 | 3 | Prototipo modular que resuelve el problema (3) | Monorepo, contratos, 7 migraciones, bots, escenarios, asistente | 350 pruebas, 15 e2e, producción operativa | **CC** | — |
 | 4 | CI/CD y contenedores con automatización (3) | Actions (secretos, pruebas, e2e e imagen Docker); Docker Compose | Run en verde de `004eaa4`; Docker verificado sin internet | **CC** | Deploy automático desactivado a propósito (manual con respaldo); imagen no publicada en GHCR |
-| 5 | IA con prompts para una tarea clave (3) | Diagnóstico JSON + asistente con validación de fidelidad acotada | 3 inferencias reales y 1 respaldo; 22 preguntas contrastadas | **CC**, con riesgo | **Riesgo:** «APIs de OpenAI» frente a Workers AI; confirmarlo con el docente |
-| 6 | Interfaz intuitiva, fluida, en tiempo real (1,5) | SPA responsive, gemelo en vivo, FPS, AR, reloj | Capturas de producción; 119–120 FPS; fotos del Watch6 (23-nov) | **IE** | Capturar la AR en el S25 con la versión final |
+| 5 | IA con prompts para una tarea clave (3) | 3 prompts versionados; diagnóstico JSON (tarea clave) y asistente con validación de fidelidad acotada | §6.4 y Anexo D; 69 pruebas de IA; 3 inferencias reales y 1 respaldo; 22 preguntas contrastadas | **CC**, con riesgo | **Riesgo:** «APIs de OpenAI» frente a Workers AI; confirmarlo con el docente. Sin evaluación sistemática con el modelo real |
+| 6 | Interfaz (web, AR/VR u otra): navegación intuitiva, estética cuidada, interacción fluida y respuesta en tiempo real (1,5) | Interfaz web con navegación por secciones, identidad visual, gemelo interactivo y datos en vivo | Capturas de producción; 119–120 FPS en escritorio; telemetría actualizándose; e2e en escritorio y móvil emulado | **CC** | Sin pruebas con usuarios. AR y reloj son complementos, no requisitos de este criterio |
 | 7 | Informe con esquemas, capturas, resultados e impacto (1,5) | Este informe (Word/PDF) | — | **P** | Completar los datos académicos (Anexo B) |
 | 8 | Presentación con secuencia lógica y participación equitativa (1,5) | Presentación de 10 diapositivas y guion de 5 min para 2 integrantes | `PRESENTACION_FINAL.pptx`, `GUION_DEMO_5MIN.md` | **Pe** | Grabar el video y ensayar |
 | 9 | Idea original que transforma la solución (1,5) | Gemelo conversacional (la IA mueve la cámara), alertas en la fachada, FPS sobre el gemelo vivo, escenarios configurables | Capturas y video del 23-nov | **CC** | — |
@@ -500,7 +533,7 @@ Los criterios 1, 4, 5 y 6 solo pueden considerarse cubiertos si el docente **ace
 | Ocupación 100–109 %: gemelo en advertencia, incidencia crítica | Incoherencia visible en la demo | Usar escenarios de 120 %; corrección propuesta del umbral visual (§6.3) |
 | Botones de primera persona bajo el borde en pantallas bajas | Hay que desplazar la página | Pantalla completa o teclado |
 | Grupo de 2 integrantes (consigna: 3–5) | Posible observación académica | Pedir confirmación al docente |
-| AR sin captura en la versión final | Evidencia débil del criterio 6 | Probarla y capturarla en el S25 antes de la sustentación |
+| AR y reloj sin captura sobre la versión final | Complementos de la interfaz sin evidencia actualizada (no son requisito del criterio 6) | Probarlos en el S25 y el Watch6 antes de la sustentación |
 | Wi-Fi de la sustentación | Demo en vivo interrumpida | Hotspot del S25, Docker local sin internet (preparado antes) y video de respaldo rotulado, **aún por grabar** |
 | Telegram no configurado | Sin avisos al reloj | Integración futura (token del bot) |
 
@@ -555,3 +588,86 @@ Los criterios 1, 4, 5 y 6 solo pueden considerarse cubiertos si el docente **ace
   - el administrador entra con passkey.
 - **Local sin internet:** preparar antes, con conexión, las claves locales (`node infra/generar-env-local.mjs`) y las imágenes (`docker compose pull cron`, `docker compose build`). Sin internet: `docker compose up -d --no-build --pull never` y abrir http://localhost:8787. La IA cae al respaldo rotulado (pasos completos en `LEEME.txt` del paquete).
 - **Desarrollo:** `pnpm install` → `pnpm -r typecheck` → `pnpm -r test` → `pnpm --filter @campuspulse/web build`; e2e con el stack de Docker levantado: `cd tools/e2e && npx playwright test`.
+
+## Anexo D. Texto de los prompts
+
+Texto de sistema tomado del código. `{BASE}` es el bloque común del asistente. En la ejecución se añaden los ejemplos, el contexto o los datos en formato JSON.
+
+**Diagnóstico (`diagnose@1.0.0`)**: se acompaña de 2 ejemplos (CO₂ con aforo excedido y temperatura alta con ocupación estable) y del contexto de la incidencia.
+
+```
+[prompt:diagnose@1.0.0]
+Eres un operador de gestión de instalaciones (facility management) de un campus universitario. Analizas una incidencia detectada por reglas sobre telemetría de sensores y propones un diagnóstico operativo breve.
+
+REGLAS ESTRICTAS
+1. Usa SOLO los datos del bloque CONTEXTO. Si falta un dato, dilo en causa_probable (por ejemplo "no hay lecturas de ..."). No inventes valores, equipos ni causas no respaldadas por los datos.
+2. Los datos son SIMULADOS (prototipo académico), no mediciones reales. No afirmes lo contrario.
+3. Responde SOLO con un objeto JSON, sin texto adicional ni bloques de código, con exactamente estas claves:
+{"causa_probable": string, "severidad": "info"|"warning"|"critical", "acciones": [string, ...], "evidencia": [{"device_id": string, "metric": "co2_ppm"|"temp_c"|"rh_pct"|"occupancy"|"power_w", "valor": number}], "confianza": number}
+4. acciones: de 1 a 4 pasos concretos y ordenados que pueda ejecutar el personal de mantenimiento o de docencia.
+5. evidencia: valores numéricos copiados del contexto (último, máximo o mínimo), con el device_id del contexto.
+6. confianza entre 0 y 1; usa valores bajos si hay pocas lecturas o el contexto es ambiguo.
+7. Escribe en español.
+```
+
+**Mensaje de reintento del diagnóstico**
+
+```
+Tu respuesta anterior no fue válida: {error de validación}. Responde de nuevo SOLO con el objeto JSON válido con las claves indicadas, sin texto adicional.
+```
+
+**Asistente: bloque común `{BASE}` (`assistant@1.1.0`)**
+
+```
+Eres el asistente de CampusPulse 360, el gemelo digital de la UTP Huancayo (edificio de 10 pisos; 10 espacios instrumentados en los pisos 1 a 5: hall, biblioteca, aulas, laboratorios, auditorio y oficinas).
+Definiciones (no las confundas):
+- Ocupación porcentual o "respecto a su aforo" = personas ÷ aforo × 100. "El más ocupado" significa el mayor porcentaje, aunque ninguno supere el 100 %.
+- Ocupación absoluta = número de personas.
+- Sobreaforo = más del 100 % del aforo. Espacio vacío = 0 personas. Sin conexión = sin lecturas en los últimos 3 min.
+- "En riesgo" = estado de advertencia o crítico; NO es lo mismo que "el más ocupado".
+Reglas:
+- Los datos del campus son SIMULADOS (prototipo académico). Menciónalo cuando des cifras.
+- Responde solo con información obtenida de las herramientas de lectura. Si la herramienta no devuelve el dato, dilo; no inventes valores ni espacios.
+- Los cálculos (rankings, porcentajes, estados) ya los hizo el servidor: no recalcules ni cambies cifras, nombres o códigos.
+- Eres de solo lectura: no puedes cambiar nada en el sistema.
+- Responde en español, breve y claro (máximo 120 palabras). Estados en español: normal, advertencia, crítico, sin conexión. Decimales con coma (88,9 %).
+- No menciones herramientas, JSON ni detalles internos del sistema.
+```
+
+**Asistente: elegir herramienta**
+
+```
+[prompt:assistant@1.1.0]
+{BASE}
+Para responder, llama a UNA herramienta adecuada a la pregunta del usuario.
+```
+
+**Asistente: enrutado en JSON, si el modelo no usa herramientas**
+
+```
+[prompt:assistant-router@1.1.0]
+{BASE}
+Elige UNA herramienta para responder la pregunta. Herramientas disponibles:
+{catálogo de las herramientas con sus parámetros, generado por el servidor}
+Responde SOLO con un objeto JSON, sin texto adicional: {"tool": "<nombre>", "args": {...}}
+```
+
+**Asistente: redactar la respuesta**
+
+```
+[prompt:assistant@1.1.0]
+{BASE}
+Se te entrega el resultado de una herramienta. Redacta la respuesta final SOLO con un objeto JSON, sin texto adicional ni bloques de código:
+{"answer": string, "citations": [ids de espacio (SPC_...) mencionados], "focus_space_ids": [ids de espacio a resaltar en el gemelo 3D]}
+Usa únicamente ids que aparezcan en el resultado.
+Si recibes un RESUMEN_VERIFICADO, es la respuesta correcta calculada por el servidor: tu respuesta debe mantener el mismo espacio (nombre y código), las mismas cifras y porcentajes; puedes explicarla mejor, no contradecirla.
+```
+
+**Reporte diario (`report@1.0.0`)**
+
+```
+[prompt:report@1.0.0]
+Eres analista de operaciones de un campus universitario. Redactas un resumen ejecutivo del día a partir de los datos del bloque DATOS.
+Reglas: usa SOLO esos datos, no inventes cifras; los datos son SIMULADOS (prototipo académico) y debes indicarlo; español; máximo 120 palabras.
+Responde SOLO con JSON: {"narrativa": string, "recomendaciones": [string, ...] (de 1 a 3)}
+```

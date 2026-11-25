@@ -5,7 +5,7 @@
 - Las capturas de producción tienen recortada la cabecera, porque mostraba el nombre de la sesión y el repositorio es público.
 - Los respaldos de D1, los secretos y las fotografías privadas **no** se publican.
 
-**Versión publicada:** commit `004eaa4`, Worker `9fca1ec7`. Las capturas fechadas antes de ese despliegue corresponden a versiones anteriores (`513ce1e` o previas) y así se indica.
+**Versión publicada:** commit `004eaa4`, Worker `182f079c` (25-nov: mismo código que `9fca1ec7`, con la clave del gateway rotada). Las capturas fechadas antes de ese despliegue corresponden a versiones anteriores (`513ce1e` o previas) y así se indica.
 
 **Rutas:** relativas a `docs/entregables/FINAL/capturas/`.
 
@@ -55,7 +55,7 @@ La carpeta `entrega/` está ignorada por git y contiene el ZIP `PROFINAL_U5_GRUP
 | Entregable | Contenido | Estado |
 |---|---|---|
 | 1. Propuesta inicial | **No hay evidencia en el proyecto de que se haya entregado** | ⏳ confirmar o adjuntar |
-| 2. Informe técnico | `INFORME_FINAL.docx` y `INFORME_FINAL.pdf` (26 páginas, mismo contenido que el `.md`) | 🟡 completar los datos académicos |
+| 2. Informe técnico | `INFORME_FINAL.docx` y `INFORME_FINAL.pdf` (29 páginas, mismo contenido que el `.md`) | 🟡 completar los datos académicos |
 | 3. Video (máx. 5 min) | Guion, plan de montaje y placas de título | ⏳ **no grabado** |
 | 4. Código y documentación | `codigo-fuente-<commit>.zip` (git archive) y enlace al repositorio | ✅ |
 | 5. Presentación y sustentación | `PRESENTACION_FINAL.pptx` (10 diapositivas, 5 por integrante, notas) y defensa de la TA5 (informe §8.5) | 🟡 completar nombres y ensayar |

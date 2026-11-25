@@ -12,8 +12,11 @@ Repositorio:   https://github.com/Jhosep20-code/CampusPulse360   (rama feature/h
 ------------------------------------------------------------------------
 1. VERSIONES
 ------------------------------------------------------------------------
-Produccion:  Worker 9fca1ec7-2a13-4b09-88fd-e1e55608bccd, commit 004eaa4 (24-nov-2026).
+Produccion:  Worker 182f079c-19ee-49c6-83ed-f566a57515dc, commit 004eaa4.
+             Codigo desplegado el 24-nov-2026. El 25-nov se roto la clave del gateway:
+             nueva version del Worker con el mismo codigo y las mismas variables.
 Rollback:    Worker d9180962-e65a-4c90-b693-3dd8000693fc, commit 513ce1e.
+             Tras un rollback hay que verificar la clave del gateway y volver a rotarla.
 Codigo:      03_codigo/codigo-fuente-<commit>.zip. El commit va en el nombre del archivo.
              Respecto de 004eaa4 solo agrega documentacion, evidencias e
              infra/generar-env-local.mjs: el codigo de la aplicacion es el desplegado.
