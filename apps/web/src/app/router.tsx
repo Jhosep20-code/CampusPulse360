@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { createBrowserRouter, Outlet } from "react-router";
+import { createBrowserRouter, Navigate, Outlet } from "react-router";
 import { AppProviders } from "./context";
 import { Layout } from "./Layout";
 import { PageSkeleton } from "../components/ui";
@@ -13,6 +13,7 @@ const Automations = lazy(() => import("../pages/Automations"));
 const Assistant = lazy(() => import("../pages/Assistant"));
 const SystemPage = lazy(() => import("../pages/SystemPage"));
 const Access = lazy(() => import("../pages/Access"));
+const ARPage = lazy(() => import("../ar/ARPage"));
 const WatchView = lazy(() => import("../pages/WatchView"));
 const NotFound = lazy(() => import("../pages/NotFound"));
 
@@ -40,11 +41,14 @@ export const routes = [
           { path: "asistente", element: <Assistant /> },
           { path: "sistema", element: <SystemPage /> },
           { path: "acceso", element: <Access /> },
+          { path: "ar", element: <ARPage /> },
           { path: "*", element: <NotFound /> },
         ],
       },
+      // Alias historico: /watch redirige a /reloj.
+      { path: "watch", element: <Navigate to="/reloj" replace /> },
       {
-        path: "watch",
+        path: "reloj",
         element: (
           <Suspense fallback={<PageSkeleton />}>
             <WatchView />

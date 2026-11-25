@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="760" viewBox="0 0 1400 760" font-family="Segoe UI, Calibri, Arial, sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2962FF"/></marker>
+    <marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#B07A12"/></marker>
+  </defs>
+  <rect width="1400" height="760" fill="#FFFFFF"/>
+  <text x="700" y="40" text-anchor="middle" font-size="26" font-weight="700" fill="#17243A">CampusPulse 360 — arquitectura de la solución (producción en Cloudflare, plan Free)</text>
+
+  <!-- Fuentes -->
+  <rect x="30" y="80" width="300" height="330" rx="14" fill="#F4F7FB" stroke="#C7D0DC"/>
+  <text x="180" y="110" text-anchor="middle" font-size="18" font-weight="700" fill="#17243A">FUENTES (datos simulados)</text>
+  <rect x="50" y="130" width="260" height="80" rx="10" fill="#FFFFFF" stroke="#22D3D6" stroke-width="2"/>
+  <text x="180" y="160" text-anchor="middle" font-size="16" font-weight="600" fill="#17243A">Simulador IoT en Docker</text>
+  <text x="180" y="184" text-anchor="middle" font-size="13" fill="#5B6B82">10 dispositivos × 5 variables</text>
+  <text x="180" y="201" text-anchor="middle" font-size="13" fill="#5B6B82">envía lotes firmados (HMAC)</text>
+  <rect x="50" y="230" width="260" height="70" rx="10" fill="#FFFFFF" stroke="#22D3D6" stroke-width="2"/>
+  <text x="180" y="258" text-anchor="middle" font-size="16" font-weight="600" fill="#17243A">Escenarios de demostración</text>
+  <text x="180" y="282" text-anchor="middle" font-size="13" fill="#5B6B82">solo administrador (passkey)</text>
+  <rect x="50" y="320" width="260" height="70" rx="10" fill="#FFFFFF" stroke="#C7D0DC" stroke-dasharray="6 4"/>
+  <text x="180" y="348" text-anchor="middle" font-size="16" font-weight="600" fill="#5B6B82">Sensor físico (futuro)</text>
+  <text x="180" y="372" text-anchor="middle" font-size="13" fill="#5B6B82">mismo protocolo HMAC</text>
+
+  <!-- Worker -->
+  <rect x="400" y="80" width="600" height="560" rx="16" fill="#EEF3FF" stroke="#2962FF" stroke-width="2"/>
+  <text x="700" y="112" text-anchor="middle" font-size="19" font-weight="700" fill="#2962FF">Cloudflare Worker «campuspulse» (Hono + TypeScript)</text>
+  <rect x="425" y="135" width="270" height="95" rx="10" fill="#FFFFFF" stroke="#2962FF"/>
+  <text x="560" y="162" text-anchor="middle" font-size="16" font-weight="600" fill="#17243A">API /api/v1</text>
+  <text x="560" y="185" text-anchor="middle" font-size="13" fill="#5B6B82">ingesta HMAC · /live · incidencias</text>
+  <text x="560" y="203" text-anchor="middle" font-size="13" fill="#5B6B82">asistente · escenarios · auth</text>
+  <text x="560" y="221" text-anchor="middle" font-size="13" fill="#5B6B82">validación zod · roles · CSRF</text>
+  <rect x="715" y="135" width="260" height="95" rx="10" fill="#FFFFFF" stroke="#2962FF"/>
+  <text x="845" y="162" text-anchor="middle" font-size="16" font-weight="600" fill="#17243A">Cloudflare D1 (SQLite)</text>
+  <text x="845" y="185" text-anchor="middle" font-size="13" fill="#5B6B82">readings · incidents · alert_rules</text>
+  <text x="845" y="203" text-anchor="middle" font-size="13" fill="#5B6B82">ai_outputs · bot_runs · passkeys</text>
+  <text x="845" y="221" text-anchor="middle" font-size="13" fill="#5B6B82">migraciones 0001–0007</text>
+  <rect x="425" y="255" width="360" height="110" rx="10" fill="#FFF8EC" stroke="#F0B95B" stroke-width="2"/>
+  <text x="605" y="281" text-anchor="middle" font-size="16" font-weight="600" fill="#17243A">Bot RPA — cron cada minuto</text>
+  <text x="605" y="304" text-anchor="middle" font-size="13" fill="#5B6B82">7 reglas sostenidas → 1 incidencia</text>
+  <text x="605" y="323" text-anchor="middle" font-size="13" fill="#5B6B82">→ diagnóstico → cierre automático</text>
+  <text x="605" y="346" text-anchor="middle" font-size="13" fill="#5B6B82">Cron diario: reporte</text>
+  <rect x="805" y="255" width="170" height="110" rx="10" fill="#F2FBFB" stroke="#22D3D6" stroke-width="2"/>
+  <text x="890" y="281" text-anchor="middle" font-size="15" font-weight="600" fill="#17243A">Simulador en</text>
+  <text x="890" y="300" text-anchor="middle" font-size="15" font-weight="600" fill="#17243A">la nube (cron)</text>
+  <text x="890" y="325" text-anchor="middle" font-size="13" fill="#5B6B82">escribe directo</text>
+  <text x="890" y="343" text-anchor="middle" font-size="13" fill="#5B6B82">en D1 (sin HMAC)</text>
+  <line x1="925" y1="253" x2="925" y2="234" stroke="#0E8C8E" stroke-width="2.5" marker-end="url(#a)"/>
+  <rect x="425" y="390" width="550" height="110" rx="10" fill="#F2FBFB" stroke="#22D3D6" stroke-width="2"/>
+  <text x="700" y="418" text-anchor="middle" font-size="16" font-weight="600" fill="#17243A">Workers AI — @cf/openai/gpt-oss-20b</text>
+  <text x="700" y="442" text-anchor="middle" font-size="13" fill="#5B6B82">diagnóstico JSON validado · asistente con herramientas de solo lectura</text>
+  <text x="700" y="461" text-anchor="middle" font-size="13" fill="#5B6B82">respaldo determinista rotulado «sin IA» si falla o se agota la cuota</text>
+  <text x="700" y="482" text-anchor="middle" font-size="12" font-style="italic" fill="#B07A12">No es la API oficial de OpenAI (modelo de pesos abiertos servido por Cloudflare)</text>
+  <rect x="425" y="525" width="550" height="90" rx="10" fill="#FFFFFF" stroke="#2962FF"/>
+  <text x="700" y="553" text-anchor="middle" font-size="16" font-weight="600" fill="#17243A">Static Assets: SPA React 19 + modelo GLB (Blender 5.3)</text>
+  <text x="700" y="577" text-anchor="middle" font-size="13" fill="#5B6B82">gemelo Three.js / R3F · primera persona · AR WebXR · /reloj</text>
+  <text x="700" y="597" text-anchor="middle" font-size="13" fill="#5B6B82">CSP estricta · HSTS · passkeys (WebAuthn)</text>
+
+  <!-- Clientes -->
+  <rect x="1070" y="80" width="300" height="420" rx="14" fill="#F4F7FB" stroke="#C7D0DC"/>
+  <text x="1220" y="110" text-anchor="middle" font-size="18" font-weight="700" fill="#17243A">CLIENTES</text>
+  <rect x="1090" y="130" width="260" height="80" rx="10" fill="#FFFFFF" stroke="#2962FF"/>
+  <text x="1220" y="160" text-anchor="middle" font-size="16" font-weight="600" fill="#17243A">Escritorio</text>
+  <text x="1220" y="184" text-anchor="middle" font-size="13" fill="#5B6B82">Centro de mando + gemelo 3D</text>
+  <text x="1220" y="201" text-anchor="middle" font-size="13" fill="#5B6B82">recorrido guiado · primera persona</text>
+  <rect x="1090" y="225" width="260" height="80" rx="10" fill="#FFFFFF" stroke="#2962FF"/>
+  <text x="1220" y="255" text-anchor="middle" font-size="16" font-weight="600" fill="#17243A">Galaxy S25 Ultra</text>
+  <text x="1220" y="279" text-anchor="middle" font-size="13" fill="#5B6B82">/ar (WebXR · Scene Viewer)</text>
+  <text x="1220" y="296" text-anchor="middle" font-size="13" fill="#5B6B82">vista móvil y cruceta táctil</text>
+  <rect x="1090" y="320" width="260" height="70" rx="10" fill="#FFFFFF" stroke="#2962FF"/>
+  <text x="1220" y="350" text-anchor="middle" font-size="16" font-weight="600" fill="#17243A">Galaxy Watch6 Classic</text>
+  <text x="1220" y="374" text-anchor="middle" font-size="13" fill="#5B6B82">/reloj (navegador del reloj)</text>
+  <rect x="1090" y="405" width="260" height="70" rx="10" fill="#FFFFFF" stroke="#C7D0DC" stroke-dasharray="6 4"/>
+  <text x="1220" y="433" text-anchor="middle" font-size="16" font-weight="600" fill="#5B6B82">Telegram (futuro)</text>
+  <text x="1220" y="457" text-anchor="middle" font-size="13" fill="#5B6B82">no configurado</text>
+
+  <!-- Flechas -->
+  <line x1="310" y1="170" x2="420" y2="175" stroke="#2962FF" stroke-width="2.5" marker-end="url(#a)"/>
+  <text x="365" y="160" text-anchor="middle" font-size="12" fill="#2962FF">HTTPS+HMAC</text>
+  <line x1="310" y1="265" x2="420" y2="215" stroke="#2962FF" stroke-width="2.5" marker-end="url(#a)"/>
+  <line x1="695" y1="182" x2="712" y2="182" stroke="#2962FF" stroke-width="2.5" marker-end="url(#a)"/>
+  <line x1="760" y1="232" x2="720" y2="252" stroke="#B07A12" stroke-width="2.5" marker-end="url(#g)"/>
+  <text x="372" y="262" text-anchor="middle" font-size="12" fill="#2962FF">admin</text>
+  <line x1="700" y1="367" x2="700" y2="387" stroke="#B07A12" stroke-width="2.5" marker-end="url(#g)"/>
+  <line x1="1000" y1="180" x2="1087" y2="170" stroke="#2962FF" stroke-width="2.5" marker-start="url(#a)" marker-end="url(#a)"/>
+  <text x="1043" y="160" text-anchor="middle" font-size="12" fill="#2962FF">/live 10 s</text>
+  <line x1="1000" y1="570" x2="1087" y2="265" stroke="#2962FF" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#a)"/>
+  <line x1="1000" y1="580" x2="1087" y2="355" stroke="#2962FF" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#a)"/>
+
+  <!-- CI/CD -->
+  <rect x="30" y="665" width="1340" height="70" rx="12" fill="#F7F9FC" stroke="#17243A"/>
+  <text x="60" y="696" font-size="16" font-weight="700" fill="#17243A">CI/CD — GitHub Actions en cada PR:</text>
+  <text x="60" y="720" font-size="14" fill="#17243A">gitleaks → tipos, 350 pruebas y build → e2e con Docker Compose + Playwright → construcción de la imagen del simulador → deploy (desactivado por diseño; manual con respaldo D1 y rollback)</text>
+  <line x1="700" y1="662" x2="700" y2="642" stroke="#17243A" stroke-width="2" marker-end="url(#a)"/>
+</svg>

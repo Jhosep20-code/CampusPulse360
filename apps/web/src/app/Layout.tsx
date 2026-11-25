@@ -10,6 +10,7 @@ import {
   Radio,
   ServerCog,
   Siren,
+  Smartphone,
   UserRound,
   Watch,
   Wifi,
@@ -30,6 +31,8 @@ interface NavItem {
   label: string;
   Icon: LucideIcon;
   end?: boolean;
+  /** Etiqueta alternativa en el menu "Más" del telefono. */
+  moreLabel?: string;
 }
 
 const MAIN_NAV: NavItem[] = [
@@ -43,7 +46,8 @@ const MORE_NAV: NavItem[] = [
   { to: "/automatizaciones", label: "Automatizaciones", Icon: Bot },
   { to: "/sistema", label: "Sistema", Icon: ServerCog },
   { to: "/acceso", label: "Acceso", Icon: KeyRound },
-  { to: "/watch", label: "Vista de reloj", Icon: Watch },
+  { to: "/ar", label: "AR", Icon: Smartphone },
+  { to: "/reloj", label: "Vista de reloj", moreLabel: "Vista de reloj (vista previa)", Icon: Watch },
 ];
 
 const DESKTOP_NAV: NavItem[] = [...MAIN_NAV, ...MORE_NAV];
@@ -143,7 +147,9 @@ function BottomBar() {
   const [open, setOpen] = useState(false);
   const { pathname } = useLocation();
 
-  useEffect(() => setOpen(false), [pathname]);
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
@@ -169,11 +175,11 @@ function BottomBar() {
           className="safe-bottom fixed inset-x-3 bottom-[68px] z-50 rounded-2xl border border-line bg-panel p-2 shadow-2xl lg:hidden"
         >
           <ul className="m-0 list-none p-0">
-            {MORE_NAV.map(({ to, label, Icon }) => (
+            {MORE_NAV.map(({ to, label, moreLabel, Icon }) => (
               <li key={to}>
                 <NavLink to={to} className={({ isActive }) => navClass(isActive)}>
                   <Icon size={18} aria-hidden="true" />
-                  {label}
+                  {moreLabel ?? label}
                 </NavLink>
               </li>
             ))}
@@ -246,7 +252,9 @@ export function Layout() {
         <main id="contenido" tabIndex={-1} className="mx-auto w-full max-w-[1600px] flex-1 px-4 pb-28 pt-5 outline-none sm:px-6 lg:pb-10">
           <ErrorBoundary
             key={pathname}
-            fallback={(error, reset) => <ErrorState error={error} onRetry={reset} title="Error al mostrar la página" />}
+            fallback={(error, reset) => (
+              <ErrorState error={error} onRetry={reset} title="No se pudo mostrar esta sección" />
+            )}
           >
             <Suspense fallback={<PageSkeleton />}>
               <Outlet />

@@ -31,3 +31,23 @@ Thumbs.db
 docs/referencias/utp-huancayo/fotos-originales/
 .mcp.json
 docs/referencias/utp-huancayo/guias-generadas/
+
+# Secretos del modo local con Docker Compose
+infra/local.env
+
+# Despliegue: worktree temporal y secretos de produccion (nunca versionar)
+.deploy-wt/
+infra/*.secrets.local*
+
+# Copias de seguridad automaticas de Blender
+*.blend1
+
+# Comparaciones con fotos y fotogramas autenticos: privadas, no se publican
+docs/referencias/utp-huancayo/comparaciones-privadas/
+
+# Respaldos locales de D1 (contienen datos de produccion)
+backups/
+
+# Paquete de entrega academica (ZIP generado localmente)
+entrega/
+*.local.env

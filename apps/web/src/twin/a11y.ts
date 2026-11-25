@@ -40,7 +40,7 @@ export function describeTwin(
   }
   let text = `${parts.join(", ")}. Capa activa: ${LAYER_LABEL[layer]}.`;
   if (live?.simulated) text += " Datos simulados.";
-  if (provisional) text += " Modelo representativo con geometría provisional.";
+  if (provisional) text += " Modelo aproximado basado en fotografía, dimensiones estimadas, sin planos verificados.";
   return text;
 }
 
@@ -60,4 +60,10 @@ export function describeSpaces(
       const extra = layer === "status" || value === status ? "" : `, ${LAYER_LABEL[layer]}: ${value}`;
       return { id: s.id, text: `${s.name}, piso ${s.level}: ${status}${extra}` };
     });
+}
+
+/** Una linea por piso sin espacios instrumentados (P6-P10 y similares), para lectores de pantalla. */
+export function describeEmptyLevels(campus: CampusResponse, levels: readonly number[]): string[] {
+  const withSpaces = new Set(campus.spaces.map((s) => s.level));
+  return levels.filter((l) => !withSpaces.has(l)).map((l) => `Piso ${l}: sin espacios instrumentados`);
 }

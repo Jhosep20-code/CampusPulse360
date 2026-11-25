@@ -21,6 +21,29 @@ import { SESSION_COOKIE, clearSessionCookie, loadUser, newSession, setSessionCoo
 
 const CHALLENGE_TTL_MS = 5 * 60_000;
 const enc = new TextEncoder();
+/** Vigencia del codigo para vincular otro dispositivo a la MISMA cuenta. */
+export const LINK_CODE_TTL_MS = 10 * 60_000;
+/** Alfabeto sin caracteres ambiguos (0/O, 1/I/L): 31 simbolos x 10 = ~49 bits; un solo uso, 10 min y rate limit. */
+const LINK_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
+const LINK_LEN = 10;
+
+export function newLinkCode(): string {
+  const out: string[] = [];
+  const buf = new Uint8Array(1);
+  while (out.length < LINK_LEN) {
+    crypto.getRandomValues(buf);
+    const v = buf[0]!;
+    if (v < 248) out.push(LINK_ALPHABET[v % 31]!); // rechazo para no sesgar (248 = 8 x 31)
+  }
+  return out.join("");
+}
+
+/** Normaliza lo que escribe la persona: mayusculas, sin espacios ni guiones. */
+export function normalizeLinkCode(raw: string): string {
+  return raw.toUpperCase().replace(/[\s-]/g, "");
+}
+
+const LinkOptionsBody = z.object({ code: z.string().trim().min(LINK_LEN).max(32) });
 
 const RegisterOptionsBody = z.object({
   bootstrap_token: z.string().min(1).max(256),
@@ -126,6 +149,32 @@ authRoutes.post("/passkey/register/verify", async (c) => {
   const dup = await c.env.DB.prepare("SELECT 1 AS x FROM passkeys WHERE credential_id = ?").bind(cred.id).first();
   if (dup) throw new HttpError(409, "La credencial ya esta registrada");
 
+  if (meta.lh !== undefined) {
+    // Vinculacion: el codigo se reclama de forma atomica y solo para la cuenta a la que pertenece.
+    const link = await c.env.DB.prepare(
+      "UPDATE link_codes SET used_at = ? WHERE code_hash = ? AND user_id = ? AND used_at IS NULL AND expires_at >= ?",
+    )
+      .bind(now, meta.lh, ch.user_id, now)
+      .run();
+    if (link.meta.changes !== 1) throw new HttpError(403, "Codigo de vinculacion invalido, usado o caducado");
+    const owner = await c.env.DB.prepare("SELECT name, role FROM users WHERE id = ?").bind(ch.user_id).first<{
+      name: string;
+      role: "admin" | "operator";
+    }>();
+    if (!owner) throw new HttpError(403, "Codigo de vinculacion invalido, usado o caducado");
+    const linked = await newSession(c.env, ch.user_id, now);
+    await c.env.DB.batch([
+      c.env.DB.prepare(
+        "INSERT INTO passkeys (credential_id, user_id, public_key, counter, transports, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+      ).bind(cred.id, ch.user_id, toBase64Url(cred.publicKey), cred.counter, cred.transports ? JSON.stringify(cred.transports) : null, now),
+      linked.stmt,
+      auditStmt(c.env.DB, now, ch.user_id, "user.passkey_linked", ch.user_id, { ip: clientIp(c) }),
+    ]);
+    setSessionCookie(c, linked.token);
+    const out: SessionInfo = { authenticated: true, role: owner.role, name: owner.name };
+    return c.json(out);
+  }
+
   // Reclama el token de un solo uso: falla si otra peticion lo uso antes (carrera).
   const claim = await c.env.DB.prepare(
     `INSERT INTO bootstrap_tokens (token_hash, role, expires_at, used_at) VALUES (?, ?, ?, ?)
@@ -150,15 +199,79 @@ authRoutes.post("/passkey/register/verify", async (c) => {
   return c.json(info);
 });
 
-function safeParseMeta(s: string | null): { name: string; th: string } | null {
+/** th = hash del token de arranque (alta de cuenta nueva); lh = hash del codigo de vinculacion (cuenta existente). */
+type ChallengeMeta = { name: string; th: string; lh?: undefined } | { name: string; lh: string; th?: undefined };
+
+function safeParseMeta(s: string | null): ChallengeMeta | null {
   if (!s) return null;
   try {
-    const v = JSON.parse(s) as { name?: unknown; th?: unknown };
-    return typeof v.name === "string" && typeof v.th === "string" ? { name: v.name, th: v.th } : null;
+    const v = JSON.parse(s) as { name?: unknown; th?: unknown; lh?: unknown };
+    if (typeof v.name !== "string") return null;
+    if (typeof v.th === "string" && v.lh === undefined) return { name: v.name, th: v.th };
+    if (typeof v.lh === "string" && v.th === undefined) return { name: v.name, lh: v.lh };
+    return null;
   } catch {
     return null;
   }
 }
+
+/* ------------------------------------------------- vincular otro dispositivo */
+
+/** Una persona con sesion genera un codigo para registrar una passkey en OTRO dispositivo, en SU propia cuenta. */
+authRoutes.post("/passkey/link/code", async (c) => {
+  const user = await loadUser(c);
+  if (!user) throw new HttpError(401, "Inicie sesion para continuar");
+  const now = Date.now();
+  const code = newLinkCode();
+  const expiresAt = now + LINK_CODE_TTL_MS;
+  await c.env.DB.batch([
+    // Un codigo vigente por cuenta: generar otro invalida los anteriores sin usar.
+    c.env.DB.prepare("DELETE FROM link_codes WHERE user_id = ? AND used_at IS NULL").bind(user.id),
+    c.env.DB.prepare("DELETE FROM link_codes WHERE expires_at < ?").bind(now - 86_400_000),
+    c.env.DB.prepare("INSERT INTO link_codes (code_hash, user_id, expires_at, used_at, created_at) VALUES (?, ?, ?, NULL, ?)").bind(
+      await sha256Hex(code),
+      user.id,
+      expiresAt,
+      now,
+    ),
+    auditStmt(c.env.DB, now, user.id, "auth.link_code", user.id, { ip: clientIp(c) }),
+  ]);
+  return c.json({ code, expires_at: expiresAt });
+});
+
+/** Opciones de registro para vincular este dispositivo a la cuenta duena del codigo (sin crear usuarios ni roles). */
+authRoutes.post("/passkey/link/options", async (c) => {
+  const body = await jsonBody(c, LinkOptionsBody);
+  const now = Date.now();
+  const hash = await sha256Hex(normalizeLinkCode(body.code));
+  const row = await c.env.DB.prepare(
+    `SELECT l.user_id, u.name, u.role FROM link_codes l JOIN users u ON u.id = l.user_id
+     WHERE l.code_hash = ? AND l.used_at IS NULL AND l.expires_at >= ?`,
+  )
+    .bind(hash, now)
+    .first<{ user_id: string; name: string; role: "admin" | "operator" }>();
+  if (!row) throw new HttpError(403, "Codigo de vinculacion invalido, usado o caducado");
+  const existing = await c.env.DB.prepare("SELECT credential_id FROM passkeys WHERE user_id = ?")
+    .bind(row.user_id)
+    .all<{ credential_id: string }>();
+  const options = await generateRegistrationOptions({
+    rpName: c.env.WEBAUTHN_RP_NAME,
+    rpID: c.env.WEBAUTHN_RP_ID,
+    userName: row.name,
+    userID: new Uint8Array(enc.encode(row.user_id)),
+    attestationType: "none",
+    authenticatorSelection: { residentKey: "required", userVerification: "required" },
+    excludeCredentials: existing.results.map((r) => ({ id: r.credential_id })),
+  });
+  const challengeId = newId("chl");
+  await c.env.DB.batch([
+    c.env.DB.prepare("DELETE FROM auth_challenges WHERE expires_at < ?").bind(now),
+    c.env.DB.prepare(
+      "INSERT INTO auth_challenges (id, challenge, kind, user_id, role, user_name, expires_at) VALUES (?, ?, 'register', ?, ?, ?, ?)",
+    ).bind(challengeId, options.challenge, row.user_id, row.role, JSON.stringify({ name: row.name, lh: hash }), now + CHALLENGE_TTL_MS),
+  ]);
+  return c.json({ challenge_id: challengeId, options });
+});
 
 /* ---------------------------------------------------------------- login */
 

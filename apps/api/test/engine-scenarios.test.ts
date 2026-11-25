@@ -20,11 +20,11 @@ describe("escenarios", () => {
     expect(rows.map((x) => x.rule_id)).toEqual(["RULE_CO2_CRIT", "RULE_OVERCAP"]);
   });
 
-  it("falla-climatizacion dispara la regla de temperatura en SPC_4_LAB2", async () => {
+  it("falla-climatizacion (29,5 -> 31 C) dispara la regla CRITICA de temperatura en SPC_4_LAB2, coherente con el gemelo", async () => {
     await applyScenario(E, "falla-climatizacion", NOW, "tester");
     await runIncidentBot(E, NOW);
-    const rows = (await E.DB.prepare("SELECT space_id, rule_id FROM incidents").all<{ space_id: string; rule_id: string }>()).results;
-    expect(rows).toEqual([{ space_id: "SPC_4_LAB2", rule_id: "RULE_TEMP_HIGH" }]);
+    const rows = (await E.DB.prepare("SELECT space_id, rule_id, severity FROM incidents").all<{ space_id: string; rule_id: string }>()).results;
+    expect(rows).toEqual([{ space_id: "SPC_4_LAB2", rule_id: "RULE_TEMP_CRIT", severity: "critical" }]);
     const t = await E.DB.prepare("SELECT MIN(temp_c) AS lo, MAX(temp_c) AS hi FROM readings WHERE device_id = 'DEV_4_LAB2'").first<{
       lo: number;
       hi: number;

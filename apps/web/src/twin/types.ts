@@ -1,4 +1,5 @@
 import type { CampusResponse, LiveSnapshot } from "@campuspulse/contracts";
+import type { TwinPresetId } from "./view";
 
 /** Capa de datos que colorea los espacios del gemelo. */
 export type TwinLayer = "status" | "co2" | "temperature" | "occupancy" | "energy";
@@ -22,6 +23,32 @@ export interface TwinProps {
   exploded?: boolean;
   /** Nivel visible en aislamiento (null = todos). */
   isolatedLevel?: number | null;
+  /** Clic en la losa o el borde de un piso: aislar ese nivel (opcional; sin el, no hay seleccion por piso). */
+  onSelectLevel?: (level: number | null) => void;
+  /** Modo datos: vidrio y muros semitransparentes para ver el interior (atrio, nucleo, espacios). */
+  dataMode?: boolean;
+  /** Preset de camara inicial o solicitado desde fuera (Fachada, Aerea, Atrio, Foto). */
+  cameraPreset?: TwinPresetId;
+  /**
+   * Vista controlada: el padre aplica la maquina de estados (view-state.ts). Al pulsar un
+   * preset, el gemelo lo notifica y el padre resuelve incompatibilidades (p. ej. Referencia
+   * limpia el aislamiento y la explosion).
+   */
+  onPresetChange?: (id: TwinPresetId) => void;
+  /** Cambia cada vez que el padre pide "Restablecer vista" (camara inicial y sin estados residuales). */
+  viewResetToken?: number;
+  /** El usuario empezo a mover la camara a mano (arrastre, pellizco o rueda): p. ej. cancela el recorrido guiado. */
+  onUserInteract?: () => void;
+  /** Recorrido en primera persona activo en ese piso (null o ausente: camaras orbitales normales). */
+  firstPersonLevel?: number | null;
+  /** Pide cambiar de piso en primera persona (botones o teclas). */
+  onFirstPersonLevel?: (level: number) => void;
+  /** Pide salir de primera persona (boton o Esc). */
+  onExitFirstPerson?: () => void;
+  /** Recorrido guiado activo: transiciones de camara lentas y orbita continua (sin efecto con movimiento reducido). */
+  cinematic?: boolean;
+  /** Estado de carga del modelo 3D (el padre bloquea el recorrido hasta que este listo). */
+  onModelState?: (state: "loading" | "glb" | "procedural") => void;
   /** Modo noche: ventanas emisivas segun ocupacion. */
   night?: boolean;
   /** Perfil de calidad; "auto" decide por PerformanceMonitor. */

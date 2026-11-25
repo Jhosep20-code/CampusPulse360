@@ -2,6 +2,9 @@
   // CampusPulse 360 - Worker unico (API + SPA). Plan Workers Free; sin servicios de pago.
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "campuspulse",
+  // Cuenta Cloudflare EXCLUSIVA de CampusPulse 360 (no es secreto). Evita operar
+  // por error en otra cuenta del mismo usuario (otro proyecto).
+  "account_id": "5ca2972899cf96e5009864b8549b2a89",
   "main": "src/index.ts",
   "compatibility_date": "2026-11-01",
   "compatibility_flags": ["nodejs_compat"],
@@ -10,14 +13,14 @@
     "directory": "../web/dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*"]
+    "run_worker_first": ["/api/*", "/__scheduled"]
   },
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "campuspulse-db",
       // Se completa al crear la BD en la cuenta del equipo (wrangler d1 create).
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "fba88b80-4846-4f5c-b7ef-d3578dc2390b",
       "migrations_dir": "migrations"
     }
   ],
@@ -30,7 +33,10 @@
     "GIT_COMMIT": "dev",
     "AI_PROVIDER": "workers-ai",
     "AI_MODEL": "@cf/openai/gpt-oss-20b",
-    "AI_DAILY_LIMIT": "60",
+    // ~17-20 neuronas medidas por llamada real (22-nov-2026): 250 llamadas <= ~5.000 de 10.000 diarias Free.
+    "AI_DAILY_LIMIT": "250",
+    // Simulador en la nube (telemetria SIMULADA) para la demo publica: "on" solo en el deploy.
+    "CLOUD_SIM": "off",
     "WEBAUTHN_RP_ID": "localhost",
     "WEBAUTHN_RP_NAME": "CampusPulse 360",
     "WEBAUTHN_ORIGIN": "http://localhost:5173"

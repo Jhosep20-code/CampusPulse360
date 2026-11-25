@@ -4,8 +4,41 @@
     {
       "name": "campuspulse-local",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@campuspulse/api", "exec", "wrangler", "dev", "--local", "--port", "8787"],
+      "runtimeArgs": [
+        "--filter",
+        "@campuspulse/api",
+        "exec",
+        "wrangler",
+        "dev",
+        "--local",
+        "--port",
+        "8787"
+      ],
       "port": 8787
+    },
+    {
+      "name": "web-dev",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@campuspulse/web",
+        "dev"
+      ],
+      "port": 5173
+    },
+    {
+      "name": "evidencias-video",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8799",
+        "--bind",
+        "127.0.0.1",
+        "--directory",
+        "docs/entregables/FINAL/capturas/video"
+      ],
+      "port": 8799
     }
   ]
 }

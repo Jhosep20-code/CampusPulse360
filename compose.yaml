@@ -1,0 +1,50 @@
+# CampusPulse 360 - modo local de contingencia (sin internet en la feria).
+#   1) Copy-Item infra/local.env.example infra/local.env  (y completar)
+#   2) docker compose up --build
+#   3) Abrir http://localhost:8787
+# Telemetria SIMULADA. Sin internet no hay Workers AI: el diagnostico usa el
+# respaldo por reglas, rotulado "sin IA".
+name: campuspulse
+services:
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+    env_file: infra/local.env
+    ports:
+      - "8787:8787"
+    volumes:
+      - d1-local:/repo/apps/api/.wrangler
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/api/v1/system/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+    restart: unless-stopped
+
+  simulator:
+    build:
+      context: .
+      dockerfile: tools/simulator/Dockerfile
+    env_file: infra/local.env
+    environment:
+      API_URL: http://api:8787
+      GATEWAY_ID: gw-sim-01
+    entrypoint: ["sh", "-c", "node src/cli.ts backfill --minutes 60 && exec node src/cli.ts live --interval 30"]
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Dispara el bot de incidencias cada minuto en local (en Cloudflare lo hace el Cron Trigger).
+  cron:
+    image: curlimages/curl:8.11.1
+    entrypoint: ["sh", "-c", "while true; do curl -fsS 'http://api:8787/__scheduled?cron=*+*+*+*+*' >/dev/null || true; sleep 60; done"]
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  d1-local:

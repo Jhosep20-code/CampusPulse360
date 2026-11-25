@@ -5,13 +5,14 @@ import { round } from "../ai/util";
 export const FALLBACK_PROVIDER = "rules-fallback" as const;
 export const FALLBACK_MODEL = "rules-v1";
 
-type Kind = "co2" | "temp" | "aforo" | "otro";
+type Kind = "co2" | "temp" | "aforo" | "energia" | "otro";
 
 function kindOf(ctx: DiagnoseContext): Kind {
   const m = ctx.rule?.metric;
   if (m === "co2_ppm") return "co2";
   if (m === "temp_c") return "temp";
   if (m === "occupancy_ratio" || m === "occupancy") return "aforo";
+  if (m === "power_w") return "energia";
   return "otro";
 }
 
@@ -69,6 +70,18 @@ export function buildRuleDiagnosis(ctx: DiagnoseContext, confianza: number): AiD
       "Redistribuir parte de los asistentes a otros espacios con aforo disponible.",
       "Controlar el acceso hasta que la ocupación baje del aforo máximo.",
       "Vigilar el CO2 del espacio mientras persista la alta ocupación.",
+    ];
+  } else if (kind === "energia") {
+    add("power_w", "last");
+    add("occupancy", "last");
+    const w = s.power_w;
+    causa = w
+      ? `Consumo eléctrico alto en ${sp.name}: ${Math.round(w.last)} W (máximo ${Math.round(w.max)} W en ${ctx.readings.window_min} min) frente al umbral de ${ctx.rule?.threshold} W, con ${occTxt}. Posibles equipos encendidos sin uso, climatización forzada o una carga anómala.`
+      : `Regla de consumo eléctrico activada en ${sp.name}, pero no hay lecturas recientes de potencia en el contexto.`;
+    acciones = [
+      "Verificar qué equipos o circuitos están encendidos y apagar los que no estén en uso.",
+      "Revisar la climatización y los equipos de alto consumo del espacio.",
+      "Derivar a mantenimiento eléctrico si el consumo no baja o hay olor o calor anómalo en tableros.",
     ];
   } else {
     add("co2_ppm", "last");

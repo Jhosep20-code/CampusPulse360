@@ -2,6 +2,7 @@ import { app } from "./app";
 import type { Env } from "./env";
 import { runIncidentBot } from "./engine/incident-bot";
 import { runReportBot } from "./engine/report-bot";
+import { runCloudSimTick } from "./engine/cloud-sim";
 
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -23,7 +24,13 @@ export default {
       }
     };
     if (controller.cron === "* * * * *") {
-      ctx.waitUntil(run("incident-bot", () => runIncidentBot(env, now)));
+      // Primero el simulador en la nube (solo si CLOUD_SIM=on y no hay gateway activo) y luego el bot.
+      ctx.waitUntil(
+        (async () => {
+          await run("cloud-sim", () => runCloudSimTick(env, now));
+          await run("incident-bot", () => runIncidentBot(env, now));
+        })(),
+      );
     } else if (controller.cron === "0 12 * * *") {
       ctx.waitUntil(run("report-bot", () => runReportBot(env, now)));
     }

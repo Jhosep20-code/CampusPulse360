@@ -78,6 +78,40 @@ function detectionStatement(env: Env, rule: RuleRow, now: number): D1PreparedSta
   ).bind(rule.id, rule.name, rule.severity, now, rule.threshold, now - windowMs, minAgeMs, rule.metric, SEV_RANK[rule.severity] ?? 0);
 }
 
+/** Ventana sin la condicion para cerrar automaticamente una incidencia. */
+export const AUTO_RESOLVE_MS = 10 * 60_000;
+
+/**
+ * Cierre automatico: una incidencia activa (open/acknowledged) se resuelve si su
+ * regla NO se cumplio en ninguna lectura de los ultimos 10 min (al menos 3 lecturas)
+ * y lleva abierta al menos ese tiempo. Devuelve 2 sentencias (evento + cierre).
+ */
+function autoResolveStatements(env: Env, rule: RuleRow, now: number): D1PreparedStatement[] {
+  const expr = METRIC_EXPR[rule.metric];
+  if (!expr || !OPS.has(rule.op)) return [];
+  const candidates = `
+    SELECT i.id FROM incidents i
+     WHERE i.rule_id = ?1 AND i.status IN ('open','acknowledged') AND i.opened_at <= ?2 - ?3
+       AND (SELECT COUNT(*) FROM readings r JOIN devices d ON d.id = r.device_id JOIN spaces s ON s.id = d.space_id
+             WHERE d.space_id = i.space_id AND r.ts > ?2 - ?3 AND r.ts <= ?2) >= 3
+       AND (SELECT COUNT(*) FROM readings r JOIN devices d ON d.id = r.device_id JOIN spaces s ON s.id = d.space_id
+             WHERE d.space_id = i.space_id AND r.ts > ?2 - ?3 AND r.ts <= ?2 AND ${expr} ${rule.op} ?4) = 0`;
+  return [
+    env.DB.prepare(
+      `INSERT INTO incident_events (id, incident_id, ts, kind, actor, detail)
+       SELECT 'evt_' || lower(hex(randomblob(16))), id, ?2, 'resolved', 'incident-bot',
+              'Resuelta automaticamente: condicion normalizada durante 10 min (datos simulados)'
+         FROM (${candidates})`,
+    ).bind(rule.id, now, AUTO_RESOLVE_MS, rule.threshold),
+    env.DB.prepare(`UPDATE incidents SET status = 'resolved', closed_at = ?2 WHERE id IN (${candidates})`).bind(
+      rule.id,
+      now,
+      AUTO_RESOLVE_MS,
+      rule.threshold,
+    ),
+  ];
+}
+
 /**
  * Bot de incidencias (cron cada minuto). Presupuesto de CPU: 1 lectura de reglas +
  * 1 batch de deteccion en SQL + a lo sumo 1 diagnostico (E/S) y 1 mensaje (E/S).
@@ -100,7 +134,7 @@ export async function runIncidentBot(env: Env, now: number): Promise<BotRunSumma
       env.DB.prepare(
         `INSERT OR REPLACE INTO readings (device_id, ts, co2_ppm, temp_c, rh_pct, occupancy, power_w, source)
          SELECT device_id, ?1, co2_ppm, temp_c, rh_pct, occupancy, power_w, 'sim-scenario'
-           FROM scenario_overrides WHERE until > ?1`,
+           FROM scenario_overrides WHERE until > ?1 AND mode = 'values'`,
       ).bind(now),
       env.DB.prepare("DELETE FROM scenario_overrides WHERE until <= ?1").bind(now),
     ]);
@@ -127,6 +161,14 @@ export async function runIncidentBot(env: Env, now: number): Promise<BotRunSumma
       );
     }
     notes.push(`reglas=${rules.length}`, `nuevas=${created.length}`);
+
+    // Cierre automatico de incidencias cuya condicion ya no se cumple (coherencia KPI/incidencias).
+    const resolveStmts = rules.flatMap((r) => autoResolveStatements(env, r, now));
+    if (resolveStmts.length > 0) {
+      const rr = await env.DB.batch(resolveStmts);
+      const closed = rr.filter((_, i) => i % 2 === 1).reduce((n, x) => n + (x.meta.changes ?? 0), 0);
+      if (closed > 0) notes.push(`cerradas=${closed}`);
+    }
 
     // Diagnostica como maximo 1 incidencia pendiente (la mas antigua); el resto en los siguientes ciclos.
     const pending = await env.DB.prepare(

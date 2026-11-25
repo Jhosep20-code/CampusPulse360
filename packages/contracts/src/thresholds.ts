@@ -10,6 +10,8 @@ export const STATUS_THRESHOLDS = {
   co2_ppm: { warning: 1000, critical: 1500 },
   temp_c: { warning: 27, critical: 30 },
   occupancy_ratio: { warning: 0.9, critical: 1.1 },
+  /** Consumo por espacio (W). Normal: 600-3.300 W segun tipo y ocupacion; igual que RULE_POWER_HIGH/CRIT. */
+  power_w: { warning: 4500, critical: 6000 },
 } as const;
 
 /** Un dispositivo se considera offline si no reporta en este intervalo. */
@@ -38,5 +40,7 @@ export function statusFromMetrics(
   const ratio = capacity > 0 ? m.occupancy / capacity : 0;
   if (ratio >= t.occupancy_ratio.critical) s = worstStatus(s, "critical");
   else if (ratio >= t.occupancy_ratio.warning) s = worstStatus(s, "warning");
+  if (m.power_w >= t.power_w.critical) s = worstStatus(s, "critical");
+  else if (m.power_w >= t.power_w.warning) s = worstStatus(s, "warning");
   return s;
 }

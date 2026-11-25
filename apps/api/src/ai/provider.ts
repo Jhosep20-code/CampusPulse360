@@ -3,6 +3,7 @@ import { buildRuleDiagnosis } from "../engine/rules-fallback";
 import { ASSISTANT_TAG, RESULT_END, RESULT_START, ROUTER_TAG } from "./prompts/assistant.v1";
 import { DIAGNOSE_TAG, type DiagnoseContext } from "./prompts/diagnose.v1";
 import { REPORT_TAG, deterministicNarrative, type ReportData } from "./prompts/report.v1";
+import { detectIntent } from "./intent";
 import { renderToolAnswer } from "./tools";
 import type { AiCompleteOpts, AiCompletion, AiMessage, AiToolCall, AIProvider } from "./types";
 import { estimateTokens, extractJsonObject } from "./util";
@@ -212,6 +213,9 @@ export function mockRoute(question: string): AiToolCall {
   if (/pronostic|prevision|forecast|predic|proxim|tendencia/.test(q) && sp) {
     return { name: "get_space_forecast", arguments: { space_id: sp, metric: metric ?? "co2_ppm" } };
   }
+  // Mismo enrutado determinista que usa el servidor para las familias de preguntas conocidas.
+  const intent = detectIntent(question);
+  if (intent) return intent.call;
   if (/incidencia|alerta|abiert/.test(q)) return { name: "get_open_incidents", arguments: {} };
   if (/riesgo|critic|peor|problema|saturad|alert|excedid|sobreaforo/.test(q)) {
     return { name: "list_spaces_at_risk", arguments: metric ? { metric } : {} };

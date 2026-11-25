@@ -1,4 +1,4 @@
-import { Metric, STATUS_THRESHOLDS, statusFromMetrics, type MetricValues, type SpaceStatus } from "@campuspulse/contracts";
+import { Metric, OFFLINE_AFTER_MS, STATUS_THRESHOLDS, statusFromMetrics, type MetricValues, type SpaceStatus } from "@campuspulse/contracts";
 import type { Env } from "../env";
 import { forecastForSpace } from "../forecast/service";
 import type { AiTool } from "./types";
@@ -16,6 +16,10 @@ export const TOOL_NAMES = [
   "get_open_incidents",
   "get_space_forecast",
   "find_spaces",
+  "rank_spaces",
+  "list_spaces_by_condition",
+  "get_bot_activity",
+  "get_ai_diagnoses",
 ] as const;
 export type ToolName = (typeof TOOL_NAMES)[number];
 
@@ -60,6 +64,41 @@ export const ASSISTANT_TOOLS: AiTool[] = [
       required: ["space_id", "metric"],
       additionalProperties: false,
     },
+  },
+  {
+    name: "rank_spaces",
+    description:
+      "Ranking determinista de espacios por una métrica. occupancy_ratio = ocupación actual / aforo (porcentaje); occupancy = personas (absoluto); co2_ppm; temp_c; power_w (consumo eléctrico); rh_pct. Úsalo para 'el más/menos ...', aunque ningún espacio esté en riesgo.",
+    parameters: {
+      type: "object",
+      properties: {
+        metric: { type: "string", enum: ["occupancy_ratio", "occupancy", "co2_ppm", "temp_c", "power_w", "rh_pct"] },
+        order: { type: "string", enum: ["desc", "asc"] },
+        limit: { type: "integer", minimum: 1, maximum: 10 },
+      },
+      required: ["metric"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "list_spaces_by_condition",
+    description: "Espacios que cumplen una condición: over_capacity (más del 100 % del aforo), empty (ocupación 0) u offline (sin lecturas recientes).",
+    parameters: {
+      type: "object",
+      properties: { condition: { type: "string", enum: ["over_capacity", "empty", "offline"] } },
+      required: ["condition"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "get_bot_activity",
+    description: "Acciones automáticas del bot RPA en las últimas 24 h: ejecuciones, incidencias abiertas y cerradas, diagnósticos pedidos.",
+    parameters: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "get_ai_diagnoses",
+    description: "Últimos diagnósticos de incidencias generados por IA (o por el respaldo de reglas), con proveedor y modelo.",
+    parameters: { type: "object", properties: {}, additionalProperties: false },
   },
   {
     name: "find_spaces",
@@ -182,6 +221,7 @@ function reasons(s: SpaceLive): string[] {
   if (s.occupancy_ratio !== null && s.occupancy_ratio >= t.occupancy_ratio.warning) {
     out.push(`ocupación ${Math.round(s.occupancy_ratio * 100)} % (${s.metrics.occupancy}/${s.capacity})`);
   }
+  if (s.metrics.power_w >= t.power_w.warning) out.push(`consumo ${Math.round(s.metrics.power_w)} W`);
   return out;
 }
 
@@ -193,8 +233,10 @@ function riskScore(s: SpaceLive, metric?: string): number {
   const occ = (s.occupancy_ratio ?? 0) / t.occupancy_ratio.critical;
   if (metric === "co2_ppm") return co2;
   if (metric === "temp_c") return temp;
+  const pw = s.metrics.power_w / t.power_w.critical;
   if (metric === "occupancy") return occ;
-  return Math.max(co2, temp, occ);
+  if (metric === "power_w") return pw;
+  return Math.max(co2, temp, occ, pw);
 }
 
 /* ------------------------------------------------------------------ ejecucion */
@@ -217,6 +259,39 @@ const TYPE_WORDS: Record<string, string> = {
   lobby: "hall ingreso lobby entrada",
   office: "oficina oficinas administrativa",
 };
+
+const DAY_MS = 24 * 3_600_000;
+export const RANK_METRICS = ["occupancy_ratio", "occupancy", "co2_ppm", "temp_c", "power_w", "rh_pct"] as const;
+export type RankMetric = (typeof RANK_METRICS)[number];
+const RANK_UNIT: Record<RankMetric, string> = { occupancy_ratio: "%", occupancy: "personas", co2_ppm: "ppm", temp_c: "C", power_w: "W", rh_pct: "%" };
+
+/** Valor exacto (sin redondear) usado para ordenar; los empates se resuelven fuera. */
+function rankValue(s: SpaceLive, metric: RankMetric): number {
+  const m = s.metrics;
+  if (!m) return Number.NEGATIVE_INFINITY;
+  if (metric === "occupancy_ratio") return s.capacity > 0 ? m.occupancy / s.capacity : 0;
+  return m[metric];
+}
+
+/** Fila de ranking con todos los datos que la respuesta debe citar (nombre, codigo, valores y porcentaje). */
+function spaceRow(s: SpaceLive, metric: RankMetric) {
+  const m = s.metrics;
+  const ratio = m && s.capacity > 0 ? m.occupancy / s.capacity : null;
+  return {
+    space_id: s.space_id,
+    code: s.code,
+    name: s.name,
+    level: s.level,
+    status: s.status,
+    capacity: s.capacity,
+    occupancy: m?.occupancy ?? null,
+    occupancy_pct: ratio === null ? null : round(ratio * 100, 1),
+    value: !m ? null : metric === "occupancy_ratio" ? round((ratio ?? 0) * 100, 1) : metric === "temp_c" ? round(m.temp_c, 1) : Math.round(m[metric]),
+    co2_ppm: m ? Math.round(m.co2_ppm) : null,
+    temp_c: m ? round(m.temp_c, 1) : null,
+    power_w: m ? Math.round(m.power_w) : null,
+  };
+}
 
 function asMetric(v: unknown): Metric | undefined {
   const p = Metric.safeParse(v);
@@ -243,11 +318,23 @@ export async function runTool(env: Env, name: string, rawArgs: unknown, now: num
   const tool = (TOOL_NAMES as readonly string[]).includes(name) ? (name as ToolName) : "get_campus_status";
 
   if (tool === "get_open_incidents") {
-    const { results } = await env.DB.prepare(
-      `SELECT i.id, i.space_id, i.title, i.severity, i.status, i.opened_at
-         FROM incidents i WHERE i.status IN ${OPEN_SQL} ORDER BY i.opened_at DESC LIMIT 10`,
-    ).all<{ id: string; space_id: string; title: string; severity: string; status: string; opened_at: number }>();
-    return { name: tool, args: {}, result: { simulated: true, count: results.length, incidents: results } };
+    const [list, counts] = await env.DB.batch([
+      env.DB.prepare(
+        `SELECT i.id, i.space_id, s.code, s.name, i.rule_id, i.title, i.severity, i.status, i.opened_at
+           FROM incidents i JOIN spaces s ON s.id = i.space_id
+          WHERE i.status IN ${OPEN_SQL}
+          ORDER BY CASE i.severity WHEN 'critical' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END, i.opened_at DESC LIMIT 10`,
+      ),
+      env.DB.prepare(`SELECT severity, COUNT(*) AS n FROM incidents WHERE status IN ${OPEN_SQL} GROUP BY severity`),
+    ]);
+    const incidents = (list?.results ?? []) as Row[];
+    const by = Object.fromEntries(((counts?.results ?? []) as Array<{ severity: string; n: number }>).map((r) => [r.severity, r.n]));
+    const total = Object.values(by).reduce((n, x) => n + Number(x), 0);
+    return {
+      name: tool,
+      args: {},
+      result: { simulated: true, count: total, by_severity: { critical: by.critical ?? 0, warning: by.warning ?? 0, info: by.info ?? 0 }, incidents },
+    };
   }
 
   const spaces = await loadLiveSpaces(env, now);
@@ -283,6 +370,10 @@ export async function runTool(env: Env, name: string, rawArgs: unknown, now: num
         avg_temp_c: n ? round(tempSum / n, 1) : null,
         open_incidents: open?.n ?? 0,
         spaces_at_risk: atRisk(spaces).slice(0, 5),
+        highest_occupancy: (() => {
+          const top = spaces.filter((s) => s.status !== "offline" && s.metrics).sort((a, b) => rankValue(b, "occupancy_ratio") - rankValue(a, "occupancy_ratio"))[0];
+          return top ? spaceRow(top, "occupancy_ratio") : null;
+        })(),
       },
     };
   }
@@ -355,6 +446,167 @@ export async function runTool(env: Env, name: string, rawArgs: unknown, now: num
     };
   }
 
+  if (tool === "rank_spaces") {
+    const metric = RANK_METRICS.includes(args.metric as RankMetric) ? (args.metric as RankMetric) : "occupancy_ratio";
+    const order: "desc" | "asc" = args.order === "asc" ? "asc" : "desc";
+    const limit = Math.min(10, Math.max(1, Number.isInteger(args.limit) ? (args.limit as number) : 5));
+    const online = spaces.filter((s) => s.status !== "offline" && s.metrics);
+    const offline = spaces.filter((s) => !(s.status !== "offline" && s.metrics));
+    const sorted = [...online].sort((a, b) => {
+      const d = rankValue(b, metric) - rankValue(a, metric);
+      const tie = (b.metrics?.occupancy ?? 0) - (a.metrics?.occupancy ?? 0) || a.code.localeCompare(b.code);
+      return (order === "desc" ? d : -d) || tie;
+    });
+    const ranking = sorted.slice(0, limit).map((s) => spaceRow(s, metric));
+    const top = ranking[0] ?? null;
+    // Para ocupacion relativa, informar tambien quien tiene mas personas (concepto distinto).
+    const absTop = metric === "occupancy_ratio" && order === "desc" ? [...online].sort((a, b) => (b.metrics?.occupancy ?? 0) - (a.metrics?.occupancy ?? 0))[0] : undefined;
+    return {
+      name: tool,
+      args: { metric, order, limit },
+      result: {
+        simulated: true,
+        metric,
+        order,
+        unit: RANK_UNIT[metric],
+        spaces_considered: online.length,
+        no_data: online.length === 0,
+        top,
+        ranking,
+        over_capacity_count: online.filter((s) => (s.metrics?.occupancy ?? 0) > s.capacity).length,
+        absolute_top: absTop ? spaceRow(absTop, "occupancy") : null,
+        excluded_offline: offline.map((s) => ({ space_id: s.space_id, code: s.code, name: s.name })),
+      },
+    };
+  }
+
+  if (tool === "list_spaces_by_condition") {
+    const condition = ["over_capacity", "empty", "offline"].includes(String(args.condition)) ? String(args.condition) : "over_capacity";
+    const online = spaces.filter((s) => s.status !== "offline" && s.metrics);
+    if (condition === "offline") {
+      const off = spaces.filter((s) => s.status === "offline");
+      const devs = await env.DB.prepare("SELECT id, space_id, active FROM devices ORDER BY id").all<{ id: string; space_id: string; active: number }>();
+      return {
+        name: tool,
+        args: { condition },
+        result: {
+          simulated: true,
+          condition,
+          offline_after_min: OFFLINE_AFTER_MS / 60_000,
+          count: off.length,
+          devices_total: devs.results.length,
+          spaces: off.map((s) => ({
+            space_id: s.space_id,
+            code: s.code,
+            name: s.name,
+            level: s.level,
+            devices: devs.results.filter((d) => d.space_id === s.space_id).map((d) => d.id),
+            last_ts: s.last_ts,
+            minutes_since_last: s.last_ts === null ? null : Math.floor((now - s.last_ts) / 60_000),
+          })),
+        },
+      };
+    }
+    if (condition === "empty") {
+      const empty = online.filter((s) => s.metrics?.occupancy === 0);
+      return {
+        name: tool,
+        args: { condition },
+        result: { simulated: true, condition, count: empty.length, spaces_considered: online.length, spaces: empty.map((s) => spaceRow(s, "occupancy")) },
+      };
+    }
+    // over_capacity: estrictamente mas personas que el aforo (> 100 %).
+    const over = online.filter((s) => (s.metrics?.occupancy ?? 0) > s.capacity).sort((a, b) => rankValue(b, "occupancy_ratio") - rankValue(a, "occupancy_ratio"));
+    const atLimit = online.filter((s) => (s.metrics?.occupancy ?? 0) === s.capacity && s.capacity > 0);
+    const top = [...online].sort((a, b) => rankValue(b, "occupancy_ratio") - rankValue(a, "occupancy_ratio"))[0];
+    return {
+      name: tool,
+      args: { condition },
+      result: {
+        simulated: true,
+        condition,
+        count: over.length,
+        spaces_considered: online.length,
+        spaces: over.map((s) => spaceRow(s, "occupancy_ratio")),
+        at_capacity: atLimit.map((s) => spaceRow(s, "occupancy_ratio")),
+        highest_ratio: top ? spaceRow(top, "occupancy_ratio") : null,
+      },
+    };
+  }
+
+  if (tool === "get_bot_activity") {
+    const since = now - DAY_MS;
+    const [runs, events, last] = await env.DB.batch([
+      env.DB.prepare("SELECT bot, status, COUNT(*) AS n FROM bot_runs WHERE started_at >= ?1 AND started_at <= ?2 GROUP BY bot, status").bind(since, now),
+      env.DB.prepare(
+        "SELECT kind, COUNT(*) AS n FROM incident_events WHERE ts >= ?1 AND ts <= ?2 AND kind IN ('opened','resolved','diagnosed','notified') GROUP BY kind",
+      ).bind(since, now),
+      env.DB.prepare("SELECT bot, started_at, status, summary FROM bot_runs WHERE started_at <= ?1 ORDER BY started_at DESC LIMIT 3").bind(now),
+    ]);
+    const runRows = (runs?.results ?? []) as Array<{ bot: string; status: string; n: number }>;
+    const ev = Object.fromEntries(((events?.results ?? []) as Array<{ kind: string; n: number }>).map((r) => [r.kind, r.n]));
+    const byBot: Record<string, Record<string, number>> = {};
+    for (const r of runRows) (byBot[r.bot] ??= {})[r.status] = r.n;
+    return {
+      name: tool,
+      args: {},
+      result: {
+        simulated: true,
+        window_h: 24,
+        runs_total: runRows.reduce((n, r) => n + r.n, 0),
+        runs_by_bot: byBot,
+        incidents_opened: ev.opened ?? 0,
+        incidents_auto_resolved: ev.resolved ?? 0,
+        diagnoses: ev.diagnosed ?? 0,
+        notifications: ev.notified ?? 0,
+        last_runs: (last?.results ?? []) as Row[],
+      },
+    };
+  }
+
+  if (tool === "get_ai_diagnoses") {
+    const { results } = await env.DB.prepare(
+      `SELECT o.incident_id, o.provider, o.model, o.mode, o.created_at, o.output_json, i.title, i.severity, i.status, s.id AS space_id, s.code, s.name
+         FROM ai_outputs o
+         JOIN incidents i ON i.id = o.incident_id
+         JOIN spaces s ON s.id = i.space_id
+        WHERE o.prompt_id = 'diagnose' AND o.valid_json = 1 AND o.created_at <= ?1
+        ORDER BY o.created_at DESC LIMIT 5`,
+    )
+      .bind(now)
+      .all<{ incident_id: string; provider: string; model: string; mode: string; created_at: number; output_json: string | null; title: string; severity: string; status: string; space_id: string; code: string; name: string }>();
+    const items = results.map((r) => {
+      let causa: string | null = null;
+      let sev: string | null = null;
+      try {
+        const o = JSON.parse(r.output_json ?? "{}") as { causa_probable?: unknown; severidad?: unknown };
+        causa = typeof o.causa_probable === "string" ? o.causa_probable.slice(0, 240) : null;
+        sev = typeof o.severidad === "string" ? o.severidad : null;
+      } catch {
+        /* salida no parseable: se informa sin causa */
+      }
+      return {
+        incident_id: r.incident_id,
+        space_id: r.space_id,
+        code: r.code,
+        name: r.name,
+        title: r.title,
+        incident_status: r.status,
+        provider: r.provider,
+        model: r.model,
+        mode: r.mode,
+        created_at: r.created_at,
+        causa_probable: causa,
+        severidad: sev ?? r.severity,
+      };
+    });
+    return {
+      name: tool,
+      args: {},
+      result: { simulated: true, count: items.length, live: items.filter((i) => i.mode === "live").length, fallback: items.filter((i) => i.mode === "fallback").length, diagnoses: items },
+    };
+  }
+
   // find_spaces
   const query = typeof args.query === "string" ? args.query : "";
   const foldedQuery = fold(query);
@@ -398,6 +650,108 @@ type Row = Record<string, unknown>;
 const arr = (v: unknown): Row[] => (Array.isArray(v) ? (v as Row[]) : []);
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 
+const SEV_ES: Record<string, string> = { critical: "crítica", warning: "advertencia", info: "informativa", alta: "alta", media: "media", baja: "baja", critica: "crítica" };
+const INC_STATUS_ES: Record<string, string> = { pending_ai: "pendiente de diagnóstico", open: "abierta", acknowledged: "reconocida", resolved: "resuelta" };
+const RUN_STATUS_ES: Record<string, string> = { success: "correctas", partial: "parciales", failed: "fallidas", running: "en curso" };
+// Formato fijo (sin Intl) para que la salida sea identica en el Worker, en las pruebas y en la evaluacion.
+const fmtInt = (n: unknown) => (typeof n === "number" ? String(Math.round(n)) : "s/d");
+const pct = (n: unknown) => (typeof n === "number" ? `${String(round(n, 1)).replace(".", ",")} %` : "s/d");
+
+/** "Aula A301 (A301, piso 3)". */
+function label(s: Row): string {
+  return `${str(s.name)} (${str(s.code)}, piso ${s.level})`;
+}
+function occText(s: Row): string {
+  return `${s.occupancy}/${s.capacity} personas = ${pct(s.occupancy_pct)} del aforo`;
+}
+function metricText(s: Row, metric: string): string {
+  if (metric === "occupancy_ratio") return occText(s);
+  if (metric === "occupancy") return `${s.occupancy} personas (${pct(s.occupancy_pct)} de su aforo de ${s.capacity})`;
+  if (metric === "co2_ppm") return `CO2 ${fmtInt(s.value)} ppm`;
+  if (metric === "temp_c") return `${String(s.value).replace(".", ",")} °C`;
+  if (metric === "power_w") return `${fmtInt(s.value)} W`;
+  return `${s.value} %`;
+}
+const RANK_PHRASE: Record<string, [string, string]> = {
+  occupancy_ratio: ["El espacio más ocupado respecto a su aforo", "El espacio menos ocupado respecto a su aforo"],
+  occupancy: ["El espacio con más personas (ocupación absoluta)", "El espacio con menos personas (ocupación absoluta)"],
+  co2_ppm: ["El espacio con el CO2 más alto", "El espacio con el CO2 más bajo"],
+  temp_c: ["El espacio con la temperatura más alta", "El espacio con la temperatura más baja"],
+  power_w: ["El espacio con mayor consumo eléctrico", "El espacio con menor consumo eléctrico"],
+  rh_pct: ["El espacio con mayor humedad relativa", "El espacio con menor humedad relativa"],
+};
+
+function renderRanking(result: ToolResult, SIM: string): RenderedAnswer {
+  const metric = str(result.metric);
+  const list = arr(result.ranking);
+  const offline = arr(result.excluded_offline);
+  const offNote = offline.length ? ` Sin lecturas recientes (excluidos del cálculo): ${offline.map((s) => str(s.code)).join(", ")}.` : "";
+  const top = list[0];
+  if (!top) return { answer: `No hay lecturas recientes para calcular este ranking ${SIM}.${offNote}`, citations: [], focus_space_ids: [] };
+  const phrase = (RANK_PHRASE[metric] ?? ["El primero", "El último"])[result.order === "asc" ? 1 : 0];
+  const parts = [`${phrase} es ${label(top)}: ${metricText(top, metric)}, estado ${STATUS_ES[str(top.status) as SpaceStatus] ?? str(top.status)} ${SIM}.`];
+  if (metric === "occupancy_ratio" && result.order !== "asc") {
+    const over = Number(result.over_capacity_count ?? 0);
+    parts.push(over === 0 ? "Ningún espacio supera el 100 % de su aforo." : `${over} espacio(s) superan su aforo (más del 100 %).`);
+    const abs = result.absolute_top as Row | null;
+    if (abs && str(abs.space_id) !== str(top.space_id)) {
+      parts.push(`En número absoluto de personas, el mayor es ${label(abs)} con ${abs.occupancy} personas (${pct(abs.occupancy_pct)} de su aforo de ${abs.capacity}).`);
+    }
+  }
+  if (metric !== "occupancy_ratio" && metric !== "occupancy" && top.occupancy !== null) {
+    parts.push(`Ocupación del espacio: ${occText(top)}.`);
+  }
+  const rest = list.slice(1);
+  const restText = rest.length ? `\nSiguientes:\n${rest.map((s, i) => `${i + 2}. ${label(s)}: ${metricText(s, metric)}`).join("\n")}` : "";
+  const id = str(top.space_id);
+  return { answer: `${parts.join(" ")}${offNote}${restText}`, citations: list.map((s) => str(s.space_id)), focus_space_ids: [id] };
+}
+
+function renderCondition(result: ToolResult, SIM: string): RenderedAnswer {
+  const cond = str(result.condition);
+  const list = arr(result.spaces);
+  const ids = list.map((s) => str(s.space_id));
+  if (cond === "offline") {
+    if (list.length === 0) {
+      return { answer: `Todos los dispositivos están reportando: ningún espacio lleva más de ${result.offline_after_min} min sin lecturas ${SIM}.`, citations: [], focus_space_ids: [] };
+    }
+    const lines = list.map((s) => {
+      const since = s.minutes_since_last === null ? "sin lecturas registradas" : `última lectura hace ${s.minutes_since_last} min`;
+      const devs = Array.isArray(s.devices) && s.devices.length ? (s.devices as string[]).join(", ") : "sin dispositivo activo";
+      return `- ${label(s)}: dispositivo ${devs}, ${since}`;
+    });
+    return {
+      answer: `${list.length} espacio(s) con dispositivos desconectados (más de ${result.offline_after_min} min sin reportar) ${SIM}:\n${lines.join("\n")}`,
+      citations: ids,
+      focus_space_ids: ids,
+    };
+  }
+  if (cond === "empty") {
+    if (list.length === 0) return { answer: `No hay espacios vacíos: todos los espacios con lecturas recientes tienen al menos una persona ${SIM}.`, citations: [], focus_space_ids: [] };
+    return {
+      answer: `${list.length} espacio(s) vacíos (ocupación 0) ${SIM}:\n${list.map((s) => `- ${label(s)}: 0/${s.capacity} personas`).join("\n")}`,
+      citations: ids,
+      focus_space_ids: ids,
+    };
+  }
+  if (list.length === 0) {
+    const top = result.highest_ratio as Row | null;
+    const atCap = arr(result.at_capacity);
+    const capNote = atCap.length ? ` Al límite exacto del aforo (100 %): ${atCap.map((s) => str(s.code)).join(", ")}.` : "";
+    const topNote = top ? ` El más cercano es ${label(top)}: ${occText(top)}.` : "";
+    return {
+      answer: `Ningún espacio supera su aforo (más del 100 %) ${SIM}.${topNote}${capNote}`,
+      citations: top ? [str(top.space_id)] : [],
+      focus_space_ids: top ? [str(top.space_id)] : [],
+    };
+  }
+  return {
+    answer: `${list.length} espacio(s) en sobreaforo (más del 100 % de su aforo) ${SIM}:\n${list.map((s) => `- ${label(s)}: ${occText(s)}, estado ${STATUS_ES[str(s.status) as SpaceStatus] ?? str(s.status)}`).join("\n")}`,
+    citations: ids,
+    focus_space_ids: ids,
+  };
+}
+
 /** Redacta en español, sin IA, la respuesta a partir del resultado de una herramienta. */
 export function renderToolAnswer(name: string, result: ToolResult): RenderedAnswer {
   const SIM = "(datos simulados)";
@@ -417,9 +771,14 @@ export function renderToolAnswer(name: string, result: ToolResult): RenderedAnsw
     const by = (result.by_status ?? {}) as Record<string, number>;
     const risk = arr(result.spaces_at_risk);
     const ids = risk.map((s) => str(s.space_id));
-    const extra = risk.length ? ` En riesgo: ${risk.map((s) => str(s.name)).join(", ")}.` : " Ningún espacio en riesgo.";
+    const extra = risk.length
+      ? ` En riesgo: ${risk.map((s) => `${str(s.name)} (${str(s.space_id).split("_").slice(2).join("_")}${Array.isArray(s.reasons) && s.reasons.length ? `: ${(s.reasons as string[]).join(", ")}` : ""})`).join("; ")}.`
+      : " Ningún espacio en riesgo.";
+    const hi = result.highest_occupancy as Row | null;
+    const hiText = hi ? ` Mayor ocupación relativa: ${label(hi)}, ${occText(hi)}.` : "";
+    const totalPct = Number(result.capacity_total) > 0 ? ` (${pct(round((Number(result.occupancy_total) / Number(result.capacity_total)) * 100, 1))} del aforo total)` : "";
     return {
-      answer: `Campus ${SIM}: ${result.spaces_total} espacios (${by.ok ?? 0} normales, ${by.warning ?? 0} en advertencia, ${by.critical ?? 0} críticos, ${by.offline ?? 0} sin datos). Ocupación ${result.occupancy_total}/${result.capacity_total} personas, CO2 promedio ${result.avg_co2_ppm ?? "s/d"} ppm, temperatura media ${result.avg_temp_c ?? "s/d"} C, ${result.open_incidents} incidencias activas.${extra}`,
+      answer: `Campus ${SIM}: ${result.spaces_total} espacios (${by.ok ?? 0} normales, ${by.warning ?? 0} en advertencia, ${by.critical ?? 0} críticos, ${by.offline ?? 0} sin datos). Ocupación ${result.occupancy_total}/${result.capacity_total} personas${totalPct}, CO2 promedio ${result.avg_co2_ppm ?? "s/d"} ppm, temperatura media ${result.avg_temp_c ?? "s/d"} C, ${result.open_incidents} incidencias activas.${hiText}${extra}`,
       citations: ids,
       focus_space_ids: ids,
     };
@@ -442,8 +801,40 @@ export function renderToolAnswer(name: string, result: ToolResult): RenderedAnsw
     const list = arr(result.incidents);
     if (list.length === 0) return { answer: `No hay incidencias activas ${SIM}.`, citations: [], focus_space_ids: [] };
     const ids = [...new Set(list.map((i) => str(i.space_id)))];
+    const by = (result.by_severity ?? {}) as Record<string, number>;
+    const head = `${result.count ?? list.length} incidencias activas ${SIM}: ${by.critical ?? 0} críticas, ${by.warning ?? 0} de advertencia${by.info ? `, ${by.info} informativas` : ""}.`;
+    const lines = list.map(
+      (i) => `- [${SEV_ES[str(i.severity)] ?? str(i.severity)}] ${str(i.name)} (${str(i.code)}): ${str(i.title)} — ${INC_STATUS_ES[str(i.status)] ?? str(i.status)}`,
+    );
+    return { answer: `${head}\n${lines.join("\n")}`, citations: ids, focus_space_ids: ids };
+  }
+  if (name === "rank_spaces") return renderRanking(result, SIM);
+  if (name === "list_spaces_by_condition") return renderCondition(result, SIM);
+  if (name === "get_bot_activity") {
+    const runs = Number(result.runs_total ?? 0);
+    const byBot = (result.runs_by_bot ?? {}) as Record<string, Record<string, number>>;
+    const bots = Object.entries(byBot)
+      .map(([b, st]) => `${b}: ${Object.entries(st).map(([k, n]) => `${n} ${RUN_STATUS_ES[k] ?? k}`).join(", ")}`)
+      .join("; ");
+    const lastRun = arr(result.last_runs)[0];
+    const last = lastRun ? ` Última ejecución: ${str(lastRun.bot)} (${RUN_STATUS_ES[str(lastRun.status)] ?? str(lastRun.status)}) — «${str(lastRun.summary) || "sin resumen"}».` : "";
+    if (runs === 0) return { answer: `El bot no registró ejecuciones en las últimas 24 h ${SIM}.${last}`, citations: [], focus_space_ids: [] };
     return {
-      answer: `Incidencias activas ${SIM}:\n${list.map((i) => `- ${str(i.title)} (${str(i.severity)}, ${str(i.status)})`).join("\n")}`,
+      answer: `Acciones automáticas del bot en las últimas 24 h ${SIM}: ${runs} ejecuciones (${bots}). Incidencias abiertas por el bot: ${result.incidents_opened}; cerradas automáticamente al normalizarse: ${result.incidents_auto_resolved}; diagnósticos generados: ${result.diagnoses}; notificaciones enviadas: ${result.notifications}.${last}`,
+      citations: [],
+      focus_space_ids: [],
+    };
+  }
+  if (name === "get_ai_diagnoses") {
+    const list = arr(result.diagnoses);
+    if (list.length === 0) return { answer: `Todavía no hay diagnósticos de incidencias registrados ${SIM}.`, citations: [], focus_space_ids: [] };
+    const ids = [...new Set(list.map((d) => str(d.space_id)))];
+    const lines = list.map((d) => {
+      const who = str(d.mode) === "live" ? `IA ${str(d.provider)} · ${str(d.model)}` : `respaldo por reglas (sin IA, ${str(d.model)})`;
+      return `- ${str(d.name)} (${str(d.code)}) — ${str(d.title)}: ${str(d.causa_probable) || "sin causa registrada"} [${SEV_ES[str(d.severidad)] ?? str(d.severidad)}; ${who}]`;
+    });
+    return {
+      answer: `Últimos ${list.length} diagnósticos ${SIM} (${result.live ?? 0} por IA, ${result.fallback ?? 0} por reglas):\n${lines.join("\n")}`,
       citations: ids,
       focus_space_ids: ids,
     };

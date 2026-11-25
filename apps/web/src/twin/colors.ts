@@ -1,4 +1,4 @@
-import type { LiveSpace, SpaceStatus } from "@campuspulse/contracts";
+import { STATUS_THRESHOLDS, type LiveSpace, type SpaceStatus } from "@campuspulse/contracts";
 import { CO2_RAMP, ENERGY_RAMP_MAX_W, PALETTE, TEMP_RAMP } from "./constants";
 import type { TwinLayer } from "./types";
 
@@ -158,4 +158,32 @@ export function primaryValueLabel(
     case "energy":
       return m.power_w >= 1000 ? `${fmt1(m.power_w / 1000)} kW` : `${Math.round(m.power_w)} W`;
   }
+}
+
+/** Causa dominante del estado de un espacio (para la baliza): la metrica que cruza el umbral MAS severo. */
+export interface StatusCause {
+  metric: "co2" | "temperature" | "occupancy" | "power" | "offline" | null;
+  label: string;
+}
+
+const nf0 = new Intl.NumberFormat("es-PE", { maximumFractionDigits: 0 });
+const nf1 = new Intl.NumberFormat("es-PE", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+export function statusCause(live: LiveSpace | undefined, capacity: number): StatusCause {
+  if (!live || live.status === "offline" || !live.metrics) return { metric: "offline", label: "sin conexión" };
+  if (live.status === "ok") return { metric: null, label: STATUS_LABEL.ok };
+  const m = live.metrics;
+  const t = STATUS_THRESHOLDS;
+  const ratio = capacity > 0 ? m.occupancy / capacity : 0;
+  const candidates: Array<{ level: number; cause: StatusCause }> = [
+    { level: m.co2_ppm >= t.co2_ppm.critical ? 2 : m.co2_ppm >= t.co2_ppm.warning ? 1 : 0, cause: { metric: "co2", label: `CO₂ ${nf0.format(m.co2_ppm)} ppm` } },
+    { level: m.temp_c >= t.temp_c.critical ? 2 : m.temp_c >= t.temp_c.warning ? 1 : 0, cause: { metric: "temperature", label: `${nf1.format(m.temp_c)} °C` } },
+    {
+      level: ratio >= t.occupancy_ratio.critical ? 2 : ratio >= t.occupancy_ratio.warning ? 1 : 0,
+      cause: { metric: "occupancy", label: `${nf0.format(m.occupancy)}/${nf0.format(capacity)} personas` },
+    },
+    { level: m.power_w >= t.power_w.critical ? 2 : m.power_w >= t.power_w.warning ? 1 : 0, cause: { metric: "power", label: `${nf1.format(m.power_w / 1000)} kW` } },
+  ];
+  const top = candidates.reduce((a, b) => (b.level > a.level ? b : a));
+  return top.level > 0 ? top.cause : { metric: null, label: STATUS_LABEL[live.status] };
 }

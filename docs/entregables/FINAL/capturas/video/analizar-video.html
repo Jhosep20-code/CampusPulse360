@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Análisis de la grabación</title>
+<style>
+  body { background:#080F1D; color:#E6EDF7; font:13px system-ui, sans-serif; margin:12px; }
+  canvas { max-width:100%; }
+  pre { white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<p>Hoja de contacto de <code>demo-animada-local.webm</code> (fotogramas reales del video) y diferencia media entre muestras consecutivas cada 0,5 s.</p>
+<video id="v" src="demo-animada-local.webm" muted playsinline style="display:none"></video>
+<canvas id="sheet"></canvas>
+<pre id="out">analizando…</pre>
+<script>
+const v = document.getElementById("v");
+const out = document.getElementById("out");
+const seekTo = (t) => new Promise((r) => { v.onseeked = () => r(); v.currentTime = t; });
+v.addEventListener("loadedmetadata", async () => {
+  // Sin indice de busqueda (WebM de MediaRecorder): se muestrea REPRODUCIENDO, no buscando.
+  const W = 320, H = Math.round(W * v.videoHeight / v.videoWidth);
+  const small = document.createElement("canvas"); small.width = 96; small.height = Math.round(96 * H / W);
+  const sctx = small.getContext("2d", { willReadFrequently: true });
+  const times = [1, 4, 8, 12, 16, 20, 24, 28, 33, 38, 42, 46, 50, 54, 58, 64];
+  const cols = 4, rows = Math.ceil(times.length / cols);
+  const sheet = document.getElementById("sheet"); sheet.width = cols * W; sheet.height = rows * (H + 18);
+  const ctx = sheet.getContext("2d"); ctx.fillStyle = "#080F1D"; ctx.fillRect(0, 0, sheet.width, sheet.height);
+  let prev = null, lastT = -1, ti = 0; const diffs = [];
+  v.playbackRate = 4;
+  const onFrame = (_now, meta) => {
+    const t = meta.mediaTime;
+    if (t - lastT >= 0.5) {
+      lastT = t;
+      sctx.drawImage(v, 0, 0, small.width, small.height);
+      const d = sctx.getImageData(0, 0, small.width, small.height).data;
+      if (prev) { let s = 0; for (let i = 0; i < d.length; i += 4) s += Math.abs(d[i] - prev[i]) + Math.abs(d[i+1] - prev[i+1]) + Math.abs(d[i+2] - prev[i+2]); diffs.push([t, s / (d.length / 4) / 3]); }
+      prev = d.slice();
+    }
+    if (ti < times.length && t >= times[ti]) {
+      const x = (ti % cols) * W, y = Math.floor(ti / cols) * (H + 18);
+      ctx.drawImage(v, x, y + 18, W - 4, H);
+      ctx.fillStyle = "#22D3D6"; ctx.font = "12px sans-serif"; ctx.fillText(`t = ${t.toFixed(1)} s`, x + 4, y + 13);
+      ti++;
+    }
+    if (!v.ended) v.requestVideoFrameCallback(onFrame);
+  };
+  v.requestVideoFrameCallback(onFrame);
+  v.addEventListener("ended", () => {
+    const moving = diffs.filter(([, d]) => d > 0.4).length;
+    let cur = 0, max = 0, lt = null;
+    for (const [t, d] of diffs) { if (d <= 0.4) { cur += lt === null ? 0.5 : t - lt; max = Math.max(max, cur); } else cur = 0; lt = t; }
+    const summary = { duracion_s: +lastT.toFixed(1), resolucion: `${v.videoWidth}x${v.videoHeight}`, muestras: diffs.length, muestras_con_movimiento: moving, porcentaje_con_movimiento: Math.round(100 * moving / Math.max(1, diffs.length)), tramo_quieto_mas_largo_s: +max.toFixed(1) };
+    out.textContent = JSON.stringify(summary, null, 1) + "\n" + diffs.map(([t, d]) => `${t.toFixed(1)}s ${d.toFixed(2)}`).join("  ");
+    window.__videoSummary = summary;
+  });
+  await v.play();
+});
+</script>
+</body>
+</html>

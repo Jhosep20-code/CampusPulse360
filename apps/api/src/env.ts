@@ -11,6 +11,8 @@ export interface Env {
   AI_PROVIDER: "workers-ai" | "openai" | "mock";
   AI_MODEL: string;
   AI_DAILY_LIMIT: string;
+  /** "on" activa el simulador en la nube (demo publica); por defecto apagado. */
+  CLOUD_SIM?: string;
   WEBAUTHN_RP_ID: string;
   WEBAUTHN_RP_NAME: string;
   WEBAUTHN_ORIGIN: string;

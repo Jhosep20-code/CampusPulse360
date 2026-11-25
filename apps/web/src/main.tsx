@@ -19,3 +19,14 @@ createRoot(root).render(
     <RouterProvider router={router} />
   </StrictMode>,
 );
+
+// Si la pagina cargo bien, se permite una nueva recarga automatica en un futuro despliegue.
+window.addEventListener("load", () => {
+  setTimeout(() => {
+    try {
+      sessionStorage.removeItem("cp-chunk-reload");
+    } catch {
+      /* sin almacenamiento */
+    }
+  }, 10_000);
+});

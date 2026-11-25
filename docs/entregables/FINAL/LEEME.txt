@@ -1,0 +1,131 @@
+CAMPUSPULSE 360 - Proyecto Final (Unidad 5) y Tarea Academica 5
+Universidad Tecnologica del Peru, sede Huancayo. Fecha limite: viernes 27-nov-2026.
+(Texto sin tildes para que se lea igual en cualquier editor.)
+
+Grupo: [COMPLETAR]    Integrante 1: [COMPLETAR]    Integrante 2: [COMPLETAR]
+Curso: [COMPLETAR]    Docente: [COMPLETAR]
+Equipo de 2 integrantes. La consigna pide grupos de 3 a 5: excepcion PENDIENTE de confirmacion docente.
+
+Demo publica:  https://campuspulse.campuspulse-api.workers.dev
+Repositorio:   https://github.com/Jhosep20-code/CampusPulse360   (rama feature/hito-2, PR #1)
+
+------------------------------------------------------------------------
+1. VERSIONES
+------------------------------------------------------------------------
+Produccion:  Worker 182f079c-19ee-49c6-83ed-f566a57515dc, commit 004eaa4.
+             Codigo desplegado el 24-nov-2026. El 25-nov se roto la clave del gateway:
+             nueva version del Worker con el mismo codigo y las mismas variables.
+Rollback:    Worker d9180962-e65a-4c90-b693-3dd8000693fc, commit 513ce1e.
+             Tras un rollback hay que verificar la clave del gateway y volver a rotarla.
+Codigo:      03_codigo/codigo-fuente-<commit>.zip. El commit va en el nombre del archivo.
+             Respecto de 004eaa4 solo agrega documentacion, evidencias e
+             infra/generar-env-local.mjs: el codigo de la aplicacion es el desplegado.
+             Tambien amplia el limite de tiempo de una prueba automatica movil.
+
+------------------------------------------------------------------------
+2. CONTENIDO DEL PAQUETE
+------------------------------------------------------------------------
+01_informe/       Informe tecnico unico (Word y PDF). Matriz de ambas rubricas en la seccion 12.
+02_video/         Guion de 5 minutos y placas de titulo. EL VIDEO NO ESTA GRABADO.
+03_codigo/        Codigo fuente (git archive: sin node_modules, secretos ni respaldos).
+04_evidencias/    Capturas clasificadas + INVENTARIO_EVIDENCIAS.md.
+05_presentacion/  PRESENTACION_FINAL.pptx (10 diapositivas, notas del orador) y defensa de la TA5.
+
+------------------------------------------------------------------------
+3. DEMOSTRACION SIN INTERNET (Docker, en la laptop)
+------------------------------------------------------------------------
+Requisitos: Windows con Docker Desktop abierto. Node 24 es opcional (ver 3.1-B).
+Los comandos son para PowerShell, dentro de la carpeta donde se descomprimio el codigo
+(la que contiene compose.yaml).
+
+3.1  CON INTERNET, ANTES DE LA DEMOSTRACION (una sola vez por laptop)
+
+  Paso 1. Generar las credenciales LOCALES (crea infra/local.env con valores aleatorios;
+          no los muestra, no sobrescribe un archivo existente y no usa claves de produccion).
+
+    A) Con Node 24:
+       node infra/generar-env-local.mjs
+
+    B) Sin Node, usando Docker:
+       docker pull node:24-bookworm-slim
+       docker run --rm -v "${PWD}\infra:/infra" node:24-bookworm-slim node /infra/generar-env-local.mjs
+
+  Paso 2. Descargar las imagenes y construir con sus dependencias (varios minutos; necesita red):
+       docker compose pull cron
+       docker compose build
+
+  Paso 3. Arrancar una vez y comprobar:
+       docker compose up -d --no-build --pull never --wait
+       docker compose ps
+     Abrir http://localhost:8787 y http://localhost:8787/api/v1/system/health (debe decir ok).
+
+  Paso 4. Crear el administrador local (sirve para lanzar escenarios):
+       notepad infra\local.env
+     - Abrir http://localhost:8787/acceso (usar "localhost", no 127.0.0.1).
+     - En "Alta inicial": pegar el valor de BOOTSTRAP_TOKEN, escribir un nombre,
+       elegir Administrador y pulsar "Registrar passkey" (confirmar con Windows Hello o PIN).
+     - Cerrar el Bloc de notas sin guardar. No mostrar ni grabar ese archivo.
+     El token sirve UNA sola vez. Esta passkey es solo de localhost: no es la de produccion.
+
+  Paso 5. Detener sin borrar nada:
+       docker compose stop
+
+3.2  EL DIA DE LA DEMOSTRACION, SIN INTERNET
+
+       docker compose up -d --no-build --pull never
+       docker compose ps
+     Abrir http://localhost:8787 e iniciar sesion en /acceso.
+     Centro de mando > Demostracion > "Lanzar escenario". La incidencia aparece en 1 a 3 minutos.
+
+  Al terminar:
+       docker compose stop
+
+3.3  QUE CAMBIA SIN INTERNET
+  - No hay Workers AI: el diagnostico y el asistente usan el respaldo por reglas, rotulado "sin IA".
+  - La AR en el telefono necesita la demo publica por HTTPS (internet o punto de acceso movil).
+  - Las passkeys y los datos de produccion no existen en local.
+
+3.4  SI ALGO FALLA
+  - "Falta GATEWAY_KEYS": no se genero infra/local.env (paso 1).
+  - Puerto 8787 ocupado: cerrar el programa que lo usa.
+  - "No such image" o intento de descarga sin red: faltaron los pasos 2 y 3.
+  - Perdiste la passkey local: "docker compose down -v" BORRA solo la base local de Docker
+    y permite repetir el alta (paso 4). No afecta a produccion.
+  - Ver registros: docker compose logs api --tail 50
+
+3.5  QUE SE COMPROBO (24-nov-2026, laptop del equipo)
+  - Red interna de Docker sin salida a internet: arranque, web, 10 espacios, ingesta firmada
+    (610 de 610 lecturas), bot de incidencias y respuesta del asistente por reglas.
+  - Stack local aislado: alta de administrador y reingreso con un autenticador VIRTUAL de
+    Chromium, escenario, incidencia con diagnostico por reglas y segundo alta rechazada (403).
+  - NO comprobado: el alta local con Windows Hello fisico ni la preparacion en otra laptop.
+
+------------------------------------------------------------------------
+4. DESARROLLO Y PRUEBAS (necesita internet la primera vez)
+------------------------------------------------------------------------
+Requisitos: Node 24 y pnpm 12.14.
+       pnpm install
+       pnpm typecheck
+       pnpm test
+Pruebas de extremo a extremo (con el stack de Docker en marcha):
+       pnpm --filter @campuspulse/e2e exec playwright install chromium
+       pnpm --filter @campuspulse/e2e e2e
+
+------------------------------------------------------------------------
+5. ALCANCE DECLARADO
+------------------------------------------------------------------------
+- Telemetria SIMULADA. No hay sensores fisicos.
+- Modelo 3D aproximado a partir de fotografias; no es un plano oficial.
+- IA: @cf/openai/gpt-oss-20b, modelo de OpenAI ejecutado en Cloudflare Workers AI.
+  No es la API oficial de OpenAI.
+- TA5: adaptacion web (Blender, Three.js, React Three Fiber, primera persona y WebXR).
+  No es un proyecto Unity ni realidad virtual con visor. Requiere aceptacion del docente.
+- Costo adicional: S/ 0.00.
+
+------------------------------------------------------------------------
+6. ESTADO DEL PAQUETE
+------------------------------------------------------------------------
+- Datos academicos marcados como [COMPLETAR].
+- Video no grabado.
+- AR (Galaxy S25 Ultra) y reloj (Galaxy Watch6) pendientes de repetir sobre la version publicada.
+- Grupo de 2, uso de Workers AI y TA5 en web: pendientes de confirmacion del docente.
